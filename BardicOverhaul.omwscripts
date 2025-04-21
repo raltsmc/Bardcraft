@@ -1,0 +1,3 @@
+MENU: scripts/BardicOverhaul/settings/menu.lua
+GLOBAL: scripts/BardicOverhaul/settings/global.lua
+GLOBAL: scripts/BardicOverhaul/globalmanager.lua

@@ -1,12 +1,5 @@
 local I = require('openmw.interfaces')
 
-local wavParser = require('scripts.BardicOverhaul.util.wav_parser')
-local genres = wavParser.Genre
-local genresList = {}
-for k, v in pairs(genres) do
-    genresList[v] = k
-end
-
 -- Settings page
 I.Settings.registerGroup {
     key = 'Settings/BardicOverhaul/3_Options',

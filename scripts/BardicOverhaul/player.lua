@@ -6,13 +6,16 @@ local I = require('openmw.interfaces')
 local camera = require('openmw.camera')
 
 local Performer = require('scripts.BardicOverhaul.performer')
-
-
+local Editor = require('scripts.BardicOverhaul.editor')
 
 return {
     engineHandlers = {
+        onInit = function()
+            Editor:init()
+        end,
         onLoad = function()
             anim.removeAllVfx(self)
+            Editor:init()
         end,
         onUpdate = function(dt)
             -- Uncomment this once first-person animations are working
@@ -35,13 +38,29 @@ return {
         end,
         onKeyPress = function(e)
             if e.symbol == 'k' then
-                core.sendGlobalEvent('Bardic_StartPerformance')
+                core.sendGlobalEvent('BO_StartPerformance')
+            elseif e.symbol == ';' then
+                Editor:onToggle()
             end
+        end,
+        onMouseWheel = function(v)
+            Editor:onMouseWheel(v)
+        end,
+        onFrame = function()
+            Editor:onFrame()
         end,
     },
     eventHandlers = {
         BO_Perform = function(data)
             Performer.handlePerformEvent(data)
-        end
+        end,
+        BO_ConductorEvent = function(data)
+            Performer.handleConductorEvent(data)
+        end,
+        UiModeChanged = function(data)
+            if data.newMode == nil then
+                Editor:onUINil()
+            end
+        end,
     }
 }

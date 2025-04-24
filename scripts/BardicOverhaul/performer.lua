@@ -8,6 +8,7 @@ local I = require("openmw.interfaces")
 local nearby = require("openmw.nearby")
 
 local configGlobal = require('scripts.BardicOverhaul.config.global')
+local instrumentData = require('scripts.BardicOverhaul.instruments')
 
 P.bpm = 0
 P.musicTime = -1
@@ -16,30 +17,13 @@ P.playing = false
 P.wasMoving = false
 P.idleTimer = nil
 P.instrument = nil
-
-P.instrumentData = {
-    Lute = {
-        path = "meshes/m/misc_de_lute_01.nif",
-        anim = "BOLute",
-        boneName = "Bip01 BOInstrument",
-    },
-    Drum = {
-        path = "meshes/m/misc_de_drum_01.nif",
-        anim = "BODrum",
-        boneName = "Bip01 BOInstrument",
-    },
-    Ocarina = {
-        path = "meshes/BardicOverhaul/ocarina.nif",
-        anim = "BOOcarina",
-        boneName = "Bip01 BOInstrumentHand",
-    },
-}
+P.lastNote = nil
+P.lastNoteTime = nil
 
 local function getBpmConstant()
     local animFps = 24
     local animFramesPerBeat = 20
     local animBpm = animFps * 60 / animFramesPerBeat
-    print("constant: " .. (P.bpm / animBpm))
     return P.bpm / animBpm
 end
 
@@ -82,7 +66,7 @@ function P.handleMovement(dt, idleAnim)
         idleAnim = 'idle'
     end
     local lowerBodyAnim = anim.getActiveGroup(self, anim.BONE_GROUP.LowerBody)
-    local isMoving = lowerBodyAnim and (lowerBodyAnim:find('walk') or lowerBodyAnim:find('run') or lowerBodyAnim:find('sneak'))
+    local isMoving = lowerBodyAnim and (lowerBodyAnim:find('walk') or lowerBodyAnim:find('run') or lowerBodyAnim:find('sneak') or lowerBodyAnim:find('turn'))
     if P.wasMoving and not isMoving then
         I.AnimationController.playBlendedAnimation(idleAnim, { 
             loops = 1000000000,
@@ -107,10 +91,10 @@ function P.handleMovement(dt, idleAnim)
 end
 
 function P.resetVfx()
-    if P.instrumentData[P.instrument] then
+    if instrumentData[P.instrument] then
         anim.removeVfx(self, 'BO_Instrument')
-        anim.addVfx(self, P.instrumentData[P.instrument].path, {
-            boneName = P.instrumentData[P.instrument].boneName,
+        anim.addVfx(self, instrumentData[P.instrument].path, {
+            boneName = instrumentData[P.instrument].boneName,
             vfxId = 'BO_Instrument',
             loop = true,
             useAmbientLight = false
@@ -119,17 +103,17 @@ function P.resetVfx()
 end
 
 function P.resetAnim()
-    if P.instrumentData[P.instrument] then
-        anim.cancel(self, P.instrumentData[P.instrument].anim)
-        P.startAnim(P.instrumentData[P.instrument].anim)
+    if instrumentData[P.instrument] then
+        anim.cancel(self, instrumentData[P.instrument].anim)
+        P.startAnim(instrumentData[P.instrument].anim)
     end
 end
 
 function P.handlePerformEvent(data)
     P.musicTime = data.time + (core.getRealTime() - data.realTime)
     P.bpm = data.bpm
-    local instrumentData = P.instrumentData[data.instrument]
-    if not instrumentData then return end
+    local iData = instrumentData[data.instrument]
+    if not iData then return end
     if data.instrument ~= P.instrument then
         P.instrument = data.instrument
         P.resetVfx()
@@ -137,6 +121,18 @@ function P.handlePerformEvent(data)
     if P.playing ~= true then
         P.playing = true
         P.resetAnim()
+    end
+end
+
+function P.handleConductorEvent(data)
+    -- This function handles special animations for instruments like drums that are a lot more visual and should reflect the rhythm being played
+    if P.instrument and instrumentData[P.instrument] and instrumentData[P.instrument].eventHandler then
+        data.lastNote = P.lastNote
+        data.time = core.getRealTime()
+        data.lastNoteTime = P.lastNoteTime
+        P.lastNote = data.note
+        P.lastNoteTime = core.getRealTime()
+        instrumentData[P.instrument].eventHandler(data)
     end
 end
 

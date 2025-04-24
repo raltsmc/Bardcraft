@@ -3,8 +3,7 @@
 
 local vfs = require('openmw.vfs')
 
-local sampleFolder = 'sound\\BardicOverhaul\\samples\\'
-local midiFolder = 'midi\\'
+local Song = require('scripts.BardicOverhaul.util.song')
 
 -- Basic bit operations since Lua 5.1 doesn't have them built-in
 local bit = {}
@@ -49,24 +48,37 @@ end
 local MidiParser = {}
 MidiParser.__index = MidiParser
 
+MidiParser.sampleFolder = 'sound\\BardicOverhaul\\samples\\'
+MidiParser.midiFolder = 'midi\\'
+
 MidiParser.instrumentProfiles = {
     [24] = {
         name = "Lute",
         loop = false,
         sustain = true,
+        transpose = true,
         volume = 1.0,
+    },
+    [73] = {
+        name = "BassFlute",
+        loop = true,
+        sustain = false,
+        transpose = true,
+        volume = 1,
     },
     [79] = {
         name = "Ocarina",
         loop = true,
         sustain = false,
-        volume = 0.5,
+        transpose = true,
+        volume = 1,
     },
     [116] = {
         name = "Drum",
         loop = false,
         sustain = true,
-        volume = 0.35,
+        transpose = false,
+        volume = 1,
     }
 }
 
@@ -83,6 +95,8 @@ function MidiParser.new(filename)
     self.division = 0
     self.events = {}
     self.tempoEvents = {}
+    self.timeSignatureEvents = {}
+    self.instruments = {}
     return self
 end
 
@@ -218,6 +232,9 @@ function MidiParser:parse()
                 event.type = "programChange"
                 event.program = file:read(1):byte()
                 table.insert(track.events, event)
+                if not self.instruments[channel] then
+                    self.instruments[channel] = event.program
+                end
             elseif eventType == 0xF then
                 -- Meta Event or System Exclusive
                 if statusByte == 0xFF then
@@ -253,6 +270,34 @@ function MidiParser:parse()
                             -- Skip malformed tempo event
                             file:seek("cur", metaLength)
                         end
+                    elseif metaType == 0x58 then
+                        -- Time Signature Event
+                        if metaLength == 4 then
+                            local numerator = file:read(1):byte()
+                            local denominator = file:read(1):byte()
+                            local clocksPerClick = file:read(1):byte()
+                            local thirtySecondNotesPerQuarter = file:read(1):byte()
+
+                            if metaLength > 4 then
+                                file:seek("cur", metaLength - 4)
+                            end
+
+                            local denominator = 2 ^ denominator
+                            local timeSignatureEvent = {
+                                type = "timeSignature",
+                                time = absoluteTime,
+                                track = trackNum,
+                                numerator = numerator,
+                                denominator = denominator,
+                                clocksPerClick = clocksPerClick,
+                                thirtySecondNotesPerQuarter = thirtySecondNotesPerQuarter
+                            }
+
+                            table.insert(self.timeSignatureEvents, timeSignatureEvent)
+                        else
+                            -- Skip malformed time signature event
+                            file:seek("cur", metaLength)
+                        end
                     else
                         -- Skip other meta events
                         file:seek("cur", metaLength)
@@ -272,6 +317,7 @@ function MidiParser:parse()
     end
 
     table.sort(self.tempoEvents, function(a, b) return a.time < b.time end)
+    table.sort(self.timeSignatureEvents, function(a, b) return a.time < b.time end)
 
     file:close()
     return true
@@ -335,12 +381,26 @@ function MidiParser:getTempoEvents()
     return self.tempoEvents
 end
 
+-- Get time signature information
+function MidiParser:getTimeSignatureEvents()
+    return self.timeSignatureEvents
+end
+
 -- Get the initial tempo (or default 120 BPM if none specified)
 function MidiParser:getInitialTempo()
     if #self.tempoEvents > 0 then
         return self.tempoEvents[1].bpm
     else
         return 120 -- Default standard MIDI tempo is 120 BPM
+    end
+end
+
+-- Get the initial time signature (or default 4/4 if none specified)
+function MidiParser:getInitialTimeSignature()
+    if #self.timeSignatureEvents > 0 then
+        return self.timeSignatureEvents[1].numerator, self.timeSignatureEvents[1].denominator
+    else
+        return 4, 4 -- Default time signature is 4/4
     end
 end
 
@@ -384,10 +444,52 @@ function MidiParser:getTempoAtTime(tickPosition)
     return currentTempo
 end
 
+-- Get time signature at a specific tick position
+function MidiParser:getTimeSignatureAtTime(tickPosition)
+    if #self.timeSignatureEvents == 0 then
+        return 4, 4 -- Default 4/4 if no time signature events
+    end
+
+    -- Find the latest time signature change before or at the current position
+    local currentNum = self.timeSignatureEvents[1].numerator
+    local currentDenom = self.timeSignatureEvents[1].denominator
+
+    for _, tsEvent in ipairs(self.timeSignatureEvents) do
+        if tsEvent.time <= tickPosition then
+            currentNum = tsEvent.numerator
+            currentDenom = tsEvent.denominator
+        else
+            break -- Stop when we reach future time signature events
+        end
+    end
+
+    return currentNum, currentDenom
+end
+
+-- Calculate the tick position of a specific bar/beat
+function MidiParser:getTicksAtPosition(bar, beat)
+    -- Get initial time signature
+    local numerator, denominator = self:getInitialTimeSignature()
+
+    -- Calculate ticks per bar based on time signature and division
+    local ticksPerQuarterNote = self.division
+    local ticksPerWholeNote = ticksPerQuarterNote * 4
+    local ticksPerBar = (ticksPerWholeNote * numerator) / denominator
+
+    -- Calculate ticks per beat
+    local ticksPerBeat = ticksPerBar / numerator
+
+    -- Calculate position (adjust for 1-based indexing)
+    local barTicks = (bar - 1) * ticksPerBar
+    local beatTicks = (beat - 1) * ticksPerBeat
+
+    return barTicks + beatTicks
+end
+
 -- Convert a MIDI note number to note name (C4, D#5, etc.)
 function MidiParser.noteNumberToName(noteNumber)
     local noteNames = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
-    local octave = math.floor(noteNumber / 12)
+    local octave = math.floor(noteNumber / 12) - 1
     local noteName = noteNames[(noteNumber % 12) + 1]
     return noteName .. octave
 end
@@ -395,13 +497,61 @@ end
 function MidiParser.noteNumberToFile(noteNumber, instrument)
     local noteName = MidiParser.noteNumberToName(noteNumber)
     local instrumentName = MidiParser.getInstrumentProfile(instrument).name
-    local filePath = sampleFolder .. instrumentName .. "\\" .. instrumentName .. '_' .. noteName
+    local filePath = MidiParser.sampleFolder .. instrumentName .. "\\" .. instrumentName .. '_' .. noteName
     return filePath
+end
+
+function MidiParser:printEverything()
+    print("MIDI Format: " .. self.format)
+    print("Number of tracks: " .. self.numTracks)
+    print("Time division: " .. self.division .. " ticks per quarter note")
+
+    -- Display time signature information
+    local timeSignatureNum, timeSignatureDenom = self:getInitialTimeSignature()
+    print(string.format("\nInitial Time Signature: %d/%d", timeSignatureNum, timeSignatureDenom))
+
+    local timeSignatures = self:getTimeSignatureEvents()
+    if #timeSignatures > 0 then
+        print("\nTime Signature Events:")
+        for i, ts in ipairs(timeSignatures) do
+            print(string.format("Time: %d ticks, Time Signature: %d/%d",
+                ts.time, ts.numerator, ts.denominator))
+        end
+    end
+
+    -- Display tempo information
+    local tempoEvents = self:getTempoEvents()
+    if #tempoEvents > 0 then
+        print("\nTempo Events:")
+        for i, tempo in ipairs(tempoEvents) do
+            print(string.format("Time: %d ticks, BPM: %.2f", tempo.time, tempo.bpm))
+        end
+        print("Initial Tempo: " .. self:getInitialTempo() .. " BPM")
+    else
+        print("\nNo tempo events found. Using default 120 BPM.")
+    end
+
+    print("\nNotes:")
+    local notes = self:getNotes()
+    for i, note in ipairs(notes) do
+        if i <= 20 then -- Show only first 20 notes
+            local noteName = MidiParser.noteNumberToName(note.note)
+            print(string.format("Time: %d, Track: %d, Channel: %d, %s: %s (vel: %d)",
+                note.time, note.track, note.channel, note.type, noteName, note.velocity))
+        end
+    end
+
+    print("\nInstrument Changes:")
+    local instruments = self:getInstruments()
+    for _, instrument in ipairs(instruments) do
+        print(string.format("Time: %d, Track: %d, Channel: %d, Program: %d",
+            instrument.time, instrument.track, instrument.channel, instrument.program))
+    end
 end
 
 -- Usage example
 function parseMidiFile(filename)
-    filename = midiFolder .. filename
+    filename = MidiParser.midiFolder .. filename
     local parser = MidiParser.new(filename)
     local success, errorMsg = parser:parse()
 
@@ -410,9 +560,22 @@ function parseMidiFile(filename)
         return
     end
 
-    print("MIDI Format: " .. parser.format)
+    --[[print("MIDI Format: " .. parser.format)
     print("Number of tracks: " .. parser.numTracks)
     print("Time division: " .. parser.division .. " ticks per quarter note")
+
+    -- Display time signature information
+    local timeSignatureNum, timeSignatureDenom = parser:getInitialTimeSignature()
+    print(string.format("\nInitial Time Signature: %d/%d", timeSignatureNum, timeSignatureDenom))
+
+    local timeSignatures = parser:getTimeSignatureEvents()
+    if #timeSignatures > 0 then
+        print("\nTime Signature Events:")
+        for i, ts in ipairs(timeSignatures) do
+            print(string.format("Time: %d ticks, Time Signature: %d/%d",
+                ts.time, ts.numerator, ts.denominator))
+        end
+    end
 
     -- Display tempo information
     local tempoEvents = parser:getTempoEvents()
@@ -441,7 +604,7 @@ function parseMidiFile(filename)
     for _, instrument in ipairs(instruments) do
         print(string.format("Time: %d, Track: %d, Channel: %d, Program: %d",
             instrument.time, instrument.track, instrument.channel, instrument.program))
-    end
+    end]]
 
     return parser
 end
@@ -449,5 +612,6 @@ end
 -- Return the module
 return {
     MidiParser = MidiParser,
-    parseMidiFile = parseMidiFile
+    parseMidiFile = parseMidiFile,
+    parseAll = parseAll,
 }

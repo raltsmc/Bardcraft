@@ -14,13 +14,18 @@ local playing = false
 local time = 0
 local parser = nil
 local bpm = 0
+local timeSig = {4, 4}
+local ticksPerBar = 0
+local introNotes = 0.5
 local midiTickCurr = 0
 local midiTickPrev = 0
 local currentNoteIndex = 1
 local currentTempoIndex = 1
+local currentTimeSigIndex = 1
 local currentProgramIndex = 1
 local notes = nil
 local tempoChanges = nil
+local timeSigChanges = nil
 local programChanges = nil
 local programs = nil
 
@@ -31,107 +36,8 @@ local function initPrograms()
     end
 end
 
-local function detectBPM()
-    world.players[1]:sendEvent("DetectBPMStart")
-end
-
-local function updateBPM(data)
-end
-
-local function getDagoth()
-    local actors = world.activeActors
-    dagothReverb = false
-    for _, actor in ipairs(actors) do
-        if actor and actor.type == types.Creature and (actor.recordId == "dagoth_ur_1" or actor.recordId == "dagoth_ur_2") then
-            dagothReverb = actor.recordId == "dagoth_ur_2"
-            return actor
-        end
-    end
-    return nil
-end
-
-local function updatePlayingCount()
-    playingCount = 0
-    for _, actor in ipairs(world.activeActors) do
-        if actorData[actor.id] then
-            playingCount = playingCount + 1
-        end
-    end
-end
-
-local function handleStartSoundOnActor(data)
-    local dagoth = getDagoth()
-
-    local actualTime = data.desiredTime
-    if realTimeOffset ~= -1 then
-        actualTime = realTimeOffset % configGlobal.customMusic.customMusicLength
-    elseif dagoth ~= nil then
-        actualTime = 0
-    end
-
-    local startDagoth = dagoth and not actorData[dagoth.id]
-    if startDagoth and data.actor.type ~= types.Player then
-        data.volume = configGlobal.technical.dagothKeytarVolume
-    end
-
-    local t1 = core.getRealTime()
-    core.sound.playSoundFile3d(data.soundKey, data.actor, { timeOffset = actualTime, volume = data.volume, loop = true })
-    local t2 = core.getRealTime()
-    actualTime = actualTime + (t1 - t2)
-    if startDagoth then
-        core.sound.playSoundFile3d("Sound\\keytar\\dagoth-vocals.mp3", dagoth, { timeOffset = actualTime, volume = configGlobal.technical.dagothKeytarVolume, loop = true })
-        actorData[dagoth.id] = {
-            soundKey = "Sound\\keytar\\dagoth-vocals.mp3",
-            volume = configGlobal.technical.dagothKeytarVolume
-        }
-    end
-
-    actorData[data.actor.id] = {
-        soundKey = data.soundKey,
-        volume = data.volume
-    }
-
-    realTimeOffset = actualTime
-    gameTimeOffset = actualTime
-
-    resetTimer = nil
-    updatePlayingCount()
-
-    data.actor:sendEvent('SendKeytarTime', { time = actualTime, realTime = core.getRealTime() })
-
-    playing = true
-    world.players[1]:sendEvent('RecheckAmbient')
-end
-
-local function handleStopSoundOnActor(data)
-    core.sound.stopSoundFile3d(data.soundKey, data.actor)
-    actorData[data.actor.id] = nil
-
-    updatePlayingCount()
-
-    local dagoth = getDagoth()
-    if dagoth ~= nil and actorData[dagoth.id] and playingCount == 1 then
-        core.sound.stopSoundFile3d("Sound\\keytar\\dagoth-vocals.mp3", dagoth)
-        actorData[dagoth.id] = nil
-        playingCount = 0
-    end
-
-    if playingCount == 0 then
-        if resetTimer == nil then
-            resetTimer = configGlobal.technical.musicResetTime
-        end
-        dagothReverb = false
-    end
-
-    if not dagothReverb then
-        core.sound.stopSoundFile3d("Sound\\keytar\\dagoth-reverb.mp3", world.players[1])
-    end
-
-    world.players[1]:sendEvent('RecheckAmbient')
-end
-
 local function resyncActor(actor, instrumentName)
-    actor:sendEvent('BO_Perform', { time = time, realTime = core.getRealTime(), instrument = instrumentName, bpm = bpm })
+    actor:sendEvent('BO_Perform', { time = time, realTime = core.getRealTime(), instrument = instrumentName, bpm = bpm, timeSig = timeSig })
 end
 
 local function stop()
@@ -145,6 +51,8 @@ local function start()
     print("Starting performance (" .. parser.filename .. ")")
     playing = true
     bpm = parser:getInitialTempo()
+    timeSig[1], timeSig[2] = parser:getInitialTimeSignature()
+    ticksPerBar = (parser.division * 4 * timeSig[1]) / timeSig[2]
     print("Initial BPM: " .. bpm)
     time = 0
     midiTickCurr = 0
@@ -156,9 +64,12 @@ local function start()
     actors[1] = world.players[1]
     actors[2] = world.activeActors[2]
     actors[3] = world.activeActors[3]
+    actors[4] = world.activeActors[4]
     resyncActor(actors[1], 'Lute')
     resyncActor(actors[3], 'Drum')
-    resyncActor(actors[2], 'Ocarina')
+    resyncActor(actors[4], 'Ocarina')
+    resyncActor(actors[2], 'BassFlute')
+    parser:printEverything()
 end
 
 local instrumentProfiles = {}
@@ -169,12 +80,14 @@ local function doNoteEvent(type, noteName, velocity, instrument)
     end
     local profile = instrumentProfiles[instrument]
     velocity = velocity * 2 * profile.volume / 127
-    local actor = actors[2]
-    if instrument == 24 then actor = actors[1]
-    elseif instrument == 116 then actor = actors[3] end
+    local actor = actors[1]
+    if profile.name == "Ocarina" then actor = actors[4]
+    elseif profile.name == "Drum" then actor = actors[3]
+    elseif profile.name == "BassFlute" then actor = actors[2] end
     local fileName = parser.noteNumberToFile(noteName, instrument or 0)
     if type == 'noteOn' then
         core.sound.playSoundFile3d(fileName .. ".wav", actor, { timeOffset = 0, volume = velocity, loop = false })--instrumentProfiles[instrument].loop })
+        actor:sendEvent('BO_ConductorEvent', { type = 'NoteEvent', note = noteName })
         --print("Playing note: " .. string.match(fileName, "([^\\]+)$") .. string.format(" with volume %.3f", velocity))
     elseif type == 'noteOff' and not profile.sustain then
         core.sound.stopSoundFile3d(fileName .. ".wav", actor)
@@ -202,8 +115,29 @@ local function tickPerformance(dt)
         end
     end
 
+    while currentTimeSigIndex < #timeSigChanges do
+        local nextTimeSigEvent = timeSigChanges[currentTimeSigIndex + 1]
+        if midiTickCurr >= nextTimeSigEvent.time then
+            currentTimeSigIndex = currentTimeSigIndex + 1
+            timeSig[1], timeSig[2] = nextTimeSigEvent.numerator, nextTimeSigEvent.denominator
+            ticksPerBar = (parser.division * 4 * timeSig[1]) / timeSig[2]
+            print("new time sig: " .. timeSig[1] .. "/" .. timeSig[2])
+        else
+            break
+        end
+    end
+
     midiTickPrev = midiTickCurr
     midiTickCurr = midiTickCurr + parser:secondsToTicks(dt, bpm)
+
+    -- Check if it's a new bar, and if so alert all actors
+    local barProgress = (midiTickCurr - introNotes * parser.division) % ticksPerBar
+    if barProgress < (midiTickPrev - introNotes * parser.division) % ticksPerBar then
+        --print("New bar: " .. math.floor(midiTickCurr / ticksPerBar))
+        for _, actor in ipairs(actors) do
+            actor:sendEvent('BO_ConductorEvent', { type = 'NewBar', bar = math.floor(midiTickCurr / ticksPerBar) })
+        end
+    end
 
     while currentProgramIndex <= #programChanges do
         local programEvent = programChanges[currentProgramIndex]
@@ -223,15 +157,16 @@ local function tickPerformance(dt)
             break
         end
         if note.time >= midiTickPrev then
-            doNoteEvent(note.type, note.note + transpose, note.velocity, programs[note.channel])
+            local transposeAmt = parser.getInstrumentProfile(programs[note.channel]).transpose and transpose or 0
+            doNoteEvent(note.type, note.note + transposeAmt, note.velocity, programs[note.channel])
         end
 
         currentNoteIndex = currentNoteIndex + 1
     end
     if currentNoteIndex > #notes then
         start()
-        midiTickCurr = 48
-        midiTickPrev = 48
+        midiTickCurr = introNotes * parser.division
+        midiTickPrev = introNotes * parser.division
     end
 end
 
@@ -245,6 +180,7 @@ local function init()
         parser = MIDI.parseMidiFile('greensleeves.mid')
         notes = parser:getNotes()
         tempoChanges = parser:getTempoEvents()
+        timeSigChanges = parser:getTimeSignatureEvents()
         programChanges = parser:getInstruments()
         initPrograms()
     end
@@ -254,9 +190,10 @@ return {
     engineHandlers = {
         onUpdate = update,
         onLoad = init,
+        onInit = init,
     },
     eventHandlers = {
-        Bardic_StartPerformance = function(data)
+        BO_StartPerformance = function(data)
             if not playing then
                 init()
                 start()

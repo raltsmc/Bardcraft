@@ -99,6 +99,7 @@ local animMappings = {
 
 local lastPlayed = nil
 local lastTime = nil
+local playedThisBar = false
 
 local Instruments = {
     Lute = {
@@ -125,7 +126,9 @@ local Instruments = {
                 if aData then
                     I.AnimationController.playBlendedAnimation(animName, aData)
                 end
-            elseif data.type == 'NewBar' then
+                playedThisBar = true
+            elseif data.type == 'NewBar' and playedThisBar then
+                playedThisBar = false
                 local curr
                 for i = 1, 4 do
                     local animName = "bolute_fret" .. i

@@ -7,6 +7,7 @@ local camera = require('openmw.camera')
 
 local Performer = require('scripts.BardicOverhaul.performer')
 local Editor = require('scripts.BardicOverhaul.editor')
+local Song = require('scripts.BardicOverhaul.util.song')
 
 return {
     engineHandlers = {
@@ -37,17 +38,19 @@ return {
             Performer.handleMovement(dt)
         end,
         onKeyPress = function(e)
-            if e.symbol == 'k' then
-                core.sendGlobalEvent('BO_StartPerformance')
+            if e.symbol == 'k' and Editor.song then
+                core.sendGlobalEvent('BO_StartPerformance', { song = Editor.song })
             elseif e.symbol == ';' then
                 Editor:onToggle()
+            elseif Editor.active and e.code == input.KEY.Space then
+                Editor:togglePlayback()
             end
         end,
         onMouseWheel = function(v)
             Editor:onMouseWheel(v)
         end,
         onFrame = function()
-            Editor:onFrame()
+            Editor:onFrame(self)
         end,
     },
     eventHandlers = {

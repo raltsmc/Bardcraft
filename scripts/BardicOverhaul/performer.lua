@@ -118,10 +118,8 @@ function P.handlePerformEvent(data)
         P.instrument = data.instrument
         P.resetVfx()
     end
-    if P.playing ~= true then
-        P.playing = true
-        P.resetAnim()
-    end
+    P.playing = true
+    P.resetAnim()
 end
 
 function P.handleConductorEvent(data)

@@ -1,6 +1,0 @@
-MENU: scripts/BardicOverhaul/settings/menu.lua
-MENU: scripts/BardicOverhaul/menu.lua
-GLOBAL: scripts/BardicOverhaul/settings/global.lua
-GLOBAL: scripts/BardicOverhaul/conductor.lua
-PLAYER: scripts/BardicOverhaul/player.lua
-NPC: scripts/BardicOverhaul/npc.lua

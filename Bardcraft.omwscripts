@@ -1,0 +1,6 @@
+MENU: scripts/Bardcraft/settings/menu.lua
+MENU: scripts/Bardcraft/menu.lua
+GLOBAL: scripts/Bardcraft/settings/global.lua
+GLOBAL: scripts/Bardcraft/conductor.lua
+PLAYER: scripts/Bardcraft/player.lua
+NPC: scripts/Bardcraft/npc.lua

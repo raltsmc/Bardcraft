@@ -1,4 +1,4 @@
-				Bardic Overhaul
+				Bardcraft
 				By therealralts
 
 Version: 1.0.0
@@ -39,7 +39,7 @@ Overview
 Installation
 =============
 1. Place the contents of the archive into your Data Files folder, or add it as a data directory in the OpenMW launcher.
-2. Enable "BardicOverhaul.omwscripts" in your load order.
+2. Enable "Bardcraft.omwscripts" in your load order.
 3. In your OpenMW launcher, go to Settings > Visuals > Animations and make sure "Use Additional Animation Sources" is checked. "Smooth Animation Transitions" is also highly recommended but not required.
 
 ========

@@ -32,13 +32,23 @@ Editor.ZOOM_LEVELS = {
     [7] = 8.0,
 }
 
+Editor.SNAP_LEVELS = {
+    [1] = 0.0625,
+    [2] = 0.125,
+    [3] = 0.25,
+    [4] = 0.5,
+    [5] = 1.0,
+    [6] = 2.0,
+    [7] = 4.0,
+}
+
 Editor.active = false
 Editor.song = nil
 Editor.songs = nil
 Editor.state = nil
 Editor.noteMap = nil
-Editor.resolutionSnap = 0.25
-Editor.noteIdCounter = 0
+Editor.snapLevel = 3
+Editor.noteIdCounter = 1
 Editor.zoomLevel = 4
 
 Editor.windowXOff = 20
@@ -68,11 +78,6 @@ Editor.barLineColor = uiColors.DEFAULT_LIGHT
 Editor.loopStartLineColor = uiColors.CYAN
 Editor.loopEndLineColor = uiColors.CYAN
 Editor.playbackLineColor = uiColors.YELLOW
-
-Editor.scale = {
-    root = 1,
-    mode = 1,
-}
 
 local function createPaddingTemplate(size)
     size = util.vector2(1, 1) * size
@@ -247,7 +252,7 @@ local activeDropdown = nil
 
 function Editor:getScaleTexture()
     if not self.song then return end
-    local modeName = Song.Mode[self.scale.mode]
+    local modeName = Song.Mode[self.song.scale.mode]
     return ui.texture {
         path = 'textures/bardcraft/ui/scales/' .. modeName .. '.dds',
         size = util.vector2(4, 192),
@@ -264,7 +269,9 @@ local DragType = {
 }
 local pianoRollActiveNote = nil
 local pianoRollDragStart = nil
+local pianoRollDragOffset = nil
 local pianoRollDragType = DragType.NONE
+local pianoRollLastNoteSize = 0
 
 local playback = false
 local playbackStartScrollX = 0
@@ -897,8 +904,8 @@ uiTemplates = {
             props = {
                 resource = Editor:getScaleTexture(),
                 relativeSize = util.vector2(1, 1),
-                position = util.vector2(0, -16 * (Editor.scale.root - 1)),
-                size = util.vector2(0, 16 * (Editor.scale.root - 1)),
+                position = util.vector2(0, -16 * (Editor.song.scale.root - 1)),
+                size = util.vector2(0, 16 * (Editor.song.scale.root - 1)),
                 tileH = true,
                 tileV = true,
                 color = Editor.backgroundColor,
@@ -1025,6 +1032,21 @@ uiTemplates = {
                     if e.button == 3 then
                         removeNote(self)
                         saveNotes()
+                        return
+                    end
+                    if e.button == 1 then
+                        pianoRollLastNoteSize = duration
+                        pianoRollActiveNote = tonumber(self.name)
+                        pianoRollDragStart = editorOffsetToRealOffset(self.props.position + e.offset)
+                        local resizeArea = math.min(8, noteWidth / 2)
+                        local distFromEnd = noteWidth - e.offset.x
+                        if distFromEnd < resizeArea then
+                            pianoRollDragType = DragType.RESIZE_RIGHT
+                            pianoRollDragOffset = util.vector2(0, 0)
+                        else
+                            pianoRollDragType = DragType.MOVE
+                            pianoRollDragOffset = -e.offset
+                        end
                     end
                 end),
             }
@@ -1225,6 +1247,9 @@ addNote = function(note, tick, duration, instrument)
     pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(Editor.noteIdCounter, note, tick, duration))
     Editor.noteIdCounter = Editor.noteIdCounter + 1
     pianoRollEditorWrapper:update()
+    --[[table.sort(Editor.noteMap, function(a, b)
+        return a.time < b.time
+    end)]]
     return #Editor.noteMap
 end
 
@@ -1232,9 +1257,10 @@ removeNote = function(element)
     if not Editor.song then return end
     local id = element.name
     if not id then return end
-    for i, noteData in ipairs(Editor.noteMap) do
+    for i, noteData in pairs(Editor.noteMap) do
         if noteData.id == tonumber(id) then
-            table.remove(Editor.noteMap, i)
+            --table.remove(Editor.noteMap, i)
+            Editor.noteMap[i] = nil
             break
         end
     end
@@ -1250,7 +1276,7 @@ end
 
 local function populateNotes()
     pianoRollEditorWrapper.layout.content[1].content[3].content = ui.content{}
-    for _, noteData in ipairs(Editor.noteMap) do
+    for _, noteData in pairs(Editor.noteMap) do
         local id = noteData.id
         local note = noteData.note
         local tick = noteData.time
@@ -1265,14 +1291,13 @@ local function populateNotes()
             pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration))
         end
         --pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration))
-        Editor.noteIdCounter = math.max(Editor.noteIdCounter, id + 1)
     end
     pianoRollEditorWrapper:update()
 end
 
 initNotes = function()
     if not Editor.song then return end
-    Editor.noteIdCounter = 0
+    Editor.noteIdCounter = 1
     noteEventsToNoteMap()
     populateNotes()
 end
@@ -1386,6 +1411,8 @@ noteEventsToNoteMap = function()
     local noteEvents = Editor.song.notes
     local activeNotes = {}
 
+    Editor.noteIdCounter = 1
+
     for _, event in ipairs(noteEvents) do
         if event.type == 'noteOn' and event.velocity > 0 then
             local key = event.note .. '_' .. event.instrument
@@ -1399,7 +1426,7 @@ noteEventsToNoteMap = function()
                 local duration = event.time - activeNotes[key].start
                 if duration > 0 then
                     local noteData = {
-                        id = event.id,
+                        id = Editor.noteIdCounter,--event.id,
                         note = event.note,
                         velocity = activeNotes[key].velocity,
                         track = event.track,
@@ -1407,43 +1434,47 @@ noteEventsToNoteMap = function()
                         time = activeNotes[key].start,
                         duration = duration,
                     }
-                    table.insert(Editor.noteMap, noteData)
+                    --table.insert(Editor.noteMap, noteData)
+                    Editor.noteMap[noteData.id] = noteData
                     activeNotes[key] = nil
+                    Editor.noteIdCounter = math.max(Editor.noteIdCounter, noteData.id + 1)
                 end
             end
         end
     end
-    table.sort(Editor.noteMap, function(a, b)
+    --[[table.sort(Editor.noteMap, function(a, b)
         return a.time < b.time
-    end)
+    end)]]
 end
 
 noteMapToNoteEvents = function()
     if not Editor.noteMap then return {} end
     -- This converts the merged note map back to a list of on/off note events
     local noteEvents = {}
-    for _, noteData in ipairs(Editor.noteMap) do
-        local noteOnEvent = {
-            id = noteData.id,
-            type = 'noteOn',
-            note = noteData.note,
-            velocity = noteData.velocity,
-            track = noteData.track,
-            instrument = noteData.instrument,
-            time = noteData.time,
-        }
-        table.insert(noteEvents, noteOnEvent)
+    for _, noteData in pairs(Editor.noteMap) do
+        if noteData then
+            local noteOnEvent = {
+                id = noteData.id,
+                type = 'noteOn',
+                note = noteData.note,
+                velocity = noteData.velocity,
+                track = noteData.track,
+                instrument = noteData.instrument,
+                time = noteData.time,
+            }
+            table.insert(noteEvents, noteOnEvent)
 
-        local noteOffEvent = {
-            id = noteData.id,
-            type = 'noteOff',
-            note = noteData.note,
-            velocity = 0,
-            track = noteData.track,
-            instrument = noteData.instrument,
-            time = noteData.time + noteData.duration,
-        }
-        table.insert(noteEvents, noteOffEvent)
+            local noteOffEvent = {
+                id = noteData.id,
+                type = 'noteOff',
+                note = noteData.note,
+                velocity = 0,
+                track = noteData.track,
+                instrument = noteData.instrument,
+                time = noteData.time + noteData.duration,
+            }
+            table.insert(noteEvents, noteOffEvent)
+        end
     end
     table.sort(noteEvents, function(a, b)
         if a.time == b.time then
@@ -1469,7 +1500,7 @@ end
 local function startPlayback(fromStart)
     if not Editor.song then return end
     playback = true
-    playbackStartScrollX = pianoRollScrollX
+    playbackStartScrollX = (pianoRollScrollX / Editor.ZOOM_LEVELS[Editor.zoomLevel])
     Editor.song:resetPlayback()
     if not fromStart then
         Editor.song.playbackTickCurr = Editor.song:beatToTick(-pianoRollScrollX / calcBeatWidth(Editor.song.timeSig[2]))
@@ -1479,10 +1510,12 @@ end
 
 local function stopPlayback()
     playback = false
-    pianoRollScrollX = util.clamp(playbackStartScrollX, -pianoRollScrollXMax, 0)
+    pianoRollScrollX = util.clamp(playbackStartScrollX * Editor.ZOOM_LEVELS[Editor.zoomLevel], -pianoRollScrollXMax, 0)
+    updatePianoRoll()
+    pianoRollScrollLastPopulateX = pianoRollScrollX
+    populateNotes()
     Editor.song:resetPlayback()
     pianoRollEditorMarkersWrapper:update()
-    redrawPianoRollEditor()
     stopAllSounds()
 end
 
@@ -1492,6 +1525,7 @@ setSong = function(song)
         setmetatable(Editor.song, Song)
         redrawPianoRollEditor()
         stopPlayback()
+        pianoRollLastNoteSize = Editor.song.resolution * (4 / Editor.song.timeSig[2])
     end
 end
 
@@ -1693,8 +1727,8 @@ getSongTab = function()
             local bgrRows = pianoRollEditorWrapper.layout.content[1].content[1].content[1]
             if bgrRows then
                 bgrRows.props.resource = Editor:getScaleTexture()
-                bgrRows.props.position = util.vector2(0, -16 * (Editor.scale.root - 1))
-                bgrRows.props.size = util.vector2(0, 16 * (Editor.scale.root - 1))
+                bgrRows.props.position = util.vector2(0, -16 * (Editor.song.scale.root - 1))
+                bgrRows.props.size = util.vector2(0, 16 * (Editor.song.scale.root - 1))
                 pianoRollEditorWrapper:update()
             end
         end
@@ -1711,21 +1745,59 @@ getSongTab = function()
                 stretch = 1,
             },
             content = ui.content {
-                uiTemplates.select(Song.Note, Editor.scale.root, 0, function(newVal)
-                    Editor.scale.root = newVal
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = l10n('UI_PRoll_Scale'),
+                        textAlignV = ui.ALIGNMENT.Center,
+                    },
+                },
+                {
+                    template = createPaddingTemplate(4),
+                },
+                uiTemplates.select(Song.Note, Editor.song.scale.root, 0, function(newVal)
+                    Editor.song.scale.root = newVal
                     updateEditorOverlayRows()
                 end),
-                uiTemplates.select(Song.Mode, Editor.scale.mode, 50, function(newVal)
-                    Editor.scale.mode = newVal
+                uiTemplates.select(Song.Mode, Editor.song.scale.mode, 50, function(newVal)
+                    Editor.song.scale.mode = newVal
                     updateEditorOverlayRows()
                 end)
             }
         }
-        
         table.insert(middleBox, scaleSelect)
-        --[[table.insert(middleBox, uiTemplates.dropdown("Test", {"Test 1", "Test 2", "Test 3"}, "Test 1", function(selected)
-            print("Selected: " .. selected)
-        end))]]
+
+        local snapSelect = {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+                autoSize = false,
+                relativeSize = util.vector2(1, 0),
+                size = util.vector2(0, 32),
+                arrange = ui.ALIGNMENT.Center,
+                grow = 1,
+                stretch = 1,
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = l10n('UI_PRoll_Snap'),
+                        textAlignV = ui.ALIGNMENT.Center,
+                    },
+                },
+                {
+                    template = createPaddingTemplate(4),
+                },
+                uiTemplates.select(Editor.SNAP_LEVELS, Editor.snapLevel, 0, function(newVal)
+                    Editor.snapLevel = newVal
+                    --pianoRollLastNoteSize = Editor.song.resolution * (4 / Editor.song.timeSig[2])
+                    --updatePianoRollBarNumberLabels()
+                    --updatePianoRoll()
+                end),
+            }
+        }
+        table.insert(middleBox, snapSelect)
 
         table.insert(manager.content[2].content, {
             type = ui.TYPE.Flex,
@@ -1852,24 +1924,32 @@ getSongTab = function()
                         end
                     end
                     if e.button == 1 and pianoRollDragStart then
-                        local offset = editorOffsetToRealOffset(e.offset)
-                        if pianoRollDragType == DragType.RESIZE_RIGHT then
-                            local _, tick = realOffsetToNote(offset)
-                            local snap = Editor.song.resolution * Editor.resolutionSnap * (4 / Editor.song.timeSig[2])
-                            tick = math.ceil(tick / snap) * snap + 1
-                            local noteData = Editor.noteMap[pianoRollActiveNote]
-                            noteData.duration = util.clamp(tick - noteData.time, snap, math.huge)
-                            local layout = pianoRollEditorWrapper.layout.content[1].content[3].content
-                            local notePos
-                            for i, note in ipairs(layout) do
-                                if note.name == tostring(noteData.id) then
-                                    notePos = i
-                                    break
-                                end
+                        local offset = editorOffsetToRealOffset(e.offset + util.vector2(pianoRollDragOffset and pianoRollDragOffset.x or 0, 0))
+                        local note, tick = realOffsetToNote(offset)
+                        local snap = Editor.song.resolution * Editor.SNAP_LEVELS[Editor.snapLevel] * (4 / Editor.song.timeSig[2])
+                        tick = util.round(tick / snap) * snap + 1
+                        
+                        local noteData = Editor.noteMap[pianoRollActiveNote]
+                        if pianoRollDragType == DragType.MOVE then
+                            noteData.time = util.clamp(tick, 1, math.huge)
+                            noteData.note = note
+                            if note ~= noteData.note then
+                                playNoteSound(note)
                             end
-                            layout[notePos] = uiTemplates.pianoRollNote(noteData.id, noteData.note, noteData.time, noteData.duration)
-                            pianoRollEditorWrapper:update()
+                        elseif pianoRollDragType == DragType.RESIZE_RIGHT then
+                            noteData.duration = util.clamp(tick - noteData.time, snap, math.huge)
                         end
+                        local layout = pianoRollEditorWrapper.layout.content[1].content[3].content
+                        local notePos
+                        for i, note in ipairs(layout) do
+                            if note.name == tostring(noteData.id) then
+                                notePos = i
+                                break
+                            end
+                        end
+                        layout[notePos] = uiTemplates.pianoRollNote(noteData.id, noteData.note, noteData.time, noteData.duration)
+                        --pianoRollLastNoteSize = noteData.duration
+                        pianoRollEditorWrapper:update()
                     end
                 end),
                 mousePress = async:callback(function(e)
@@ -1880,12 +1960,13 @@ getSongTab = function()
                     end
                     if e.button ~= 1 then return end
                     local note, tick = realOffsetToNote(editorOffsetToRealOffset(e.offset))
-                    local snap = Editor.song.resolution * Editor.resolutionSnap * (4 / Editor.song.timeSig[2])
+                    local snap = Editor.song.resolution * Editor.SNAP_LEVELS[Editor.snapLevel] * (4 / Editor.song.timeSig[2])
                     tick = math.floor(tick / snap) * snap + 1
                     playNoteSound(note)
-                    pianoRollActiveNote = addNote(note, tick, snap)
+                    pianoRollActiveNote = addNote(note, tick, pianoRollLastNoteSize)
                     pianoRollDragStart = editorOffsetToRealOffset(e.offset)
-                    pianoRollDragType = DragType.RESIZE_RIGHT
+                    pianoRollDragOffset = util.vector2(0, 0)
+                    pianoRollDragType = DragType.MOVE
                 end),
                 mouseRelease = async:callback(function(e)
                     if e.button == 2 then
@@ -1894,6 +1975,7 @@ getSongTab = function()
                     if e.button == 1 then
                         pianoRollDragStart = nil
                         pianoRollDragType = DragType.NONE
+                        pianoRollLastNoteSize = Editor.noteMap[pianoRollActiveNote].duration
                         pianoRollActiveNote = nil
                         pianoRollActiveNoteElement = nil
                         pianoRollEditorWrapper:update()

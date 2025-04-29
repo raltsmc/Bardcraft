@@ -144,12 +144,12 @@ Song.Mode = {
     "Aeolian", -- Natural Minor (W H W W H W W)
     "Resdayn", --  Phrygian Dominant (H WH H W H W W)
     "Nordic", -- Dorian (W H W W W H W)
-    "Imperial", -- Lydian Hexatonic (W W WH W W H)
+    "Imperial", -- Lydian Dominant/Acoustic (W W W H W H W)
     "Yokudan", -- Double Harmonic Minor (W H WH H H WH H)
     "Direnni", -- Harmonic Major (W W H W H WH H)
     "Altmeri", -- Lydian Augmented (W W W W H W H)
     "Bosmeri", -- Mixolydian (W W H W W H W)
-    "Dwemeri", -- Byzantine (H H H H WW WH H)
+    "Dwemeri", -- Octatonic (H W H W H W H W)
     "Wrothgarian",  -- Superlocrian Maj7 (H W H W W WH H)
     "Argonian", -- Whole Tone (W W W W W W W)
     "Elsweyri", -- Hirajoshi (W H WW H WW)
@@ -170,6 +170,10 @@ function Song.new(title, desc, tempo, timeSig)
     self.title = title or 'New Song'
     self.desc = desc or 'No description'
     self.tempo = tempo or 120
+    self.scale = {
+        root = 1,
+        mode = 1,
+    }
     self.timeSig = timeSig or {4, 4}
     self.notes = {}
     self.parts = {}

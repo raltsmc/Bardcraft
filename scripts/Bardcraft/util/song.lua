@@ -84,7 +84,9 @@ local instrumentMappings = {
     { instr = 73, low = 88, high = 95 }, -- Synth Pad maps to BassFlute
     { instr = 0, low = 96, high = 103 }, -- Synth Effects maps to nothing (ignore them)
     { instr = 24, low = 104, high = 111 }, -- Ethnic maps to Lute
-    { instr = 116, low = 112, high = 119 }, -- Percussive maps to Drum
+    { instr = 116, low = 112, high = 113 }, -- Tinkle Bell, Agogo to Drum
+    { instr = 24,  low = 114, high = 114 }, -- Steel Drums to Lute
+    { instr = 116, low = 115, high = 119 }, -- Rest of Percussion to Drum
     { instr = 0, low = 120, high = 127 }, -- Sound Effects maps to nothing (ignore them)
 }
 
@@ -129,6 +131,35 @@ end
 
 local Song = {}
 Song.__index = Song
+
+Song.Note = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
+-- Create index lookup for notes
+Song.NoteIndex = {}
+for i, note in ipairs(Song.Note) do
+    Song.NoteIndex[note] = i
+end
+
+Song.Mode = {
+    "Ionian",  -- Major (W W H W W W H)
+    "Aeolian", -- Natural Minor (W H W W H W W)
+    "Resdayn", --  Phrygian Dominant (H WH H W H W W)
+    "Nordic", -- Dorian (W H W W W H W)
+    "Imperial", -- Lydian Hexatonic (W W WH W W H)
+    "Yokudan", -- Double Harmonic Minor (W H WH H H WH H)
+    "Direnni", -- Harmonic Major (W W H W H WH H)
+    "Altmeri", -- Lydian Augmented (W W W W H W H)
+    "Bosmeri", -- Mixolydian (W W H W W H W)
+    "Dwemeri", -- Byzantine (H H H H WW WH H)
+    "Wrothgarian",  -- Superlocrian Maj7 (H W H W W WH H)
+    "Argonian", -- Whole Tone (W W W W W W W)
+    "Elsweyri", -- Hirajoshi (W H WW H WW)
+    "Daedric", -- Ultralocrian (H W H W W WW)
+}
+-- Create index lookup for scales
+Song.ModeIndex = {}
+for i, scale in ipairs(Song.Mode) do
+    Song.ModeIndex[scale] = i
+end
 
 Song.playbackTickPrev = 0
 Song.playbackTickCurr = 0
@@ -235,10 +266,17 @@ function Song:tickToBeat(tick)
     return beat
 end
 
+function Song:beatToTick(beat)
+    local beatsPerQuarterNote = 4 / self.timeSig[2]
+    local ticksPerQuarterNote = self.resolution
+    local ticksPerBeat = ticksPerQuarterNote * beatsPerQuarterNote
+    local tick = math.floor(beat * ticksPerBeat)
+    return tick
+end
+
 function Song.noteNumberToName(noteNumber)
-    local noteNames = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
     local octave = math.floor(noteNumber / 12) - 1
-    local noteName = noteNames[(noteNumber % 12) + 1]
+    local noteName = Song.Note[(noteNumber % 12) + 1]
     return noteName .. octave
 end
 

@@ -104,11 +104,11 @@ return {
             elseif e.symbol == 'n' then
                 addPerformanceXP(10) -- debug
             elseif Editor.active and e.code == input.KEY.Space then
-                Editor:togglePlayback()
+                Editor:togglePlayback(input.isCtrlPressed())
             end
         end,
-        onMouseWheel = function(v)
-            Editor:onMouseWheel(v)
+        onMouseWheel = function(v, h)
+            Editor:onMouseWheel(v, h)
         end,
         onFrame = function()
             Editor:onFrame(self)

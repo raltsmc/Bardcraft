@@ -19,6 +19,17 @@ Editor.STATE = {
     PERFORMANCE = 0,
     PRACTICE = 1,
     SONG = 2,
+    STATS = 3,
+}
+
+Editor.ZOOM_LEVELS = {
+    [1] = 0.125,
+    [2] = 0.25,
+    [3] = 0.5,
+    [4] = 1.0,
+    [5] = 2.0,
+    [6] = 4.0,
+    [7] = 8.0,
 }
 
 Editor.active = false
@@ -28,6 +39,7 @@ Editor.state = nil
 Editor.noteMap = nil
 Editor.resolutionSnap = 0.25
 Editor.noteIdCounter = 0
+Editor.zoomLevel = 4
 
 Editor.windowXOff = 20
 Editor.windowYOff = 200
@@ -56,6 +68,11 @@ Editor.barLineColor = uiColors.DEFAULT_LIGHT
 Editor.loopStartLineColor = uiColors.CYAN
 Editor.loopEndLineColor = uiColors.CYAN
 Editor.playbackLineColor = uiColors.YELLOW
+
+Editor.scale = {
+    root = 1,
+    mode = 1,
+}
 
 local function createPaddingTemplate(size)
     size = util.vector2(1, 1) * size
@@ -226,6 +243,17 @@ local pianoRollEditorWrapper = nil
 local pianoRollEditorMarkersWrapper = nil
 local pianoRoll = nil
 
+local activeDropdown = nil
+
+function Editor:getScaleTexture()
+    if not self.song then return end
+    local modeName = Song.Mode[self.scale.mode]
+    return ui.texture {
+        path = 'textures/bardcraft/ui/scales/' .. modeName .. '.dds',
+        size = util.vector2(4, 192),
+    }
+end
+
 local textFocused = false
 
 local DragType = {
@@ -239,6 +267,7 @@ local pianoRollDragStart = nil
 local pianoRollDragType = DragType.NONE
 
 local playback = false
+local playbackStartScrollX = 0
 
 local function playNoteSound(note)
     local noteNames = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
@@ -258,7 +287,7 @@ end
 local uiWholeNoteWidth = 256
 
 local function calcBeatWidth(denominator)
-    return uiWholeNoteWidth / denominator
+    return uiWholeNoteWidth / denominator * Editor.ZOOM_LEVELS[Editor.zoomLevel]
 end
 
 local function calcBarWidth()
@@ -354,6 +383,41 @@ local function updatePianoRollKeyboardLabels()
     pianoRollKeyboardWrapper:update()
 end
 
+local function updatePianoRollBarNumberLabels()
+    -- First, calculate which bar lines are visible
+    local barWidth = calcBarWidth()
+    local barCount = math.floor(calcPianoRollEditorWidth() / barWidth) + 1
+    local barLines = {
+        type = ui.TYPE.Widget,
+        props = {
+            size = util.vector2(calcPianoRollEditorWidth(), calcPianoRollEditorHeight()),
+        },
+        content = ui.content {},
+    }
+    for i = 0, barCount do
+        local xOffset = i * barWidth + pianoRollScrollX % barWidth
+        local barNumber = i + math.floor((-pianoRollScrollX - (1 * Editor.ZOOM_LEVELS[Editor.zoomLevel])) / barWidth) + 2
+        table.insert(barLines.content, {
+            type = ui.TYPE.Widget,
+            props = {
+                size = util.vector2(96, 24),
+                position = util.vector2(xOffset, 0),
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = tostring(barNumber),
+                        textSize = 24,
+                        textColor = uiColors.DEFAULT_LIGHT,
+                    },
+                },
+            }
+        })
+    end
+    pianoRollEditorMarkersWrapper.layout.content[2] = barLines
+end
+
 local function updatePianoRoll()
     if not Editor.song then return end
     if not pianoRollWrapper or not pianoRollEditorWrapper or not pianoRollEditorWrapper.layout or not pianoRollEditorMarkersWrapper or not pianoRollEditorMarkersWrapper.layout then return end
@@ -364,6 +428,7 @@ local function updatePianoRoll()
     local octaveHeight = calcOctaveHeight()
     pianoRollKeyboardWrapper.layout.content[1].props.position = util.vector2(0, pianoRollScrollY)
     updatePianoRollKeyboardLabels()
+    updatePianoRollBarNumberLabels()
     
     editorOverlay.props.position = util.vector2(pianoRollScrollX % barWidth - barWidth, pianoRollScrollY % octaveHeight - octaveHeight)
     editorMarkers.props.position = util.vector2(pianoRollScrollX, 0)
@@ -403,7 +468,9 @@ local addNote, removeNote, initNotes, saveNotes
 local addSong, saveSong, setSong
 local noteEventsToNoteMap, noteMapToNoteEvents
 
-local uiTemplates = {
+local uiTemplates
+
+uiTemplates = {
     wrapper = {
         layer = 'Windows',
         template = I.MWUI.templates.boxTransparentThick,
@@ -469,11 +536,17 @@ local uiTemplates = {
                                                     stretch = 1,
                                                 },
                                                 content = ui.content {
-                                                    uiButton("Song Manager", function()
+                                                    uiButton(l10n('UI_Tab_Performance'), function()
+                                                        Editor:setState(Editor.STATE.PERFORMANCE)
+                                                    end),
+                                                    uiButton(l10n('UI_Tab_Practice'), function()
+                                                        Editor:setState(Editor.STATE.PRACTICE)
+                                                    end),
+                                                    uiButton(l10n('UI_Tab_Songwriting'), function()
                                                         Editor:setState(Editor.STATE.SONG)
                                                     end),
-                                                    uiButton("Performance", function()
-                                                        Editor:setState(Editor.STATE.PERFORMANCE)
+                                                    uiButton(l10n('UI_Tab_Stats'), function()
+                                                        Editor:setState(Editor.STATE.STATS)
                                                     end),
                                                 }
                                             },
@@ -569,6 +642,33 @@ local uiTemplates = {
             }
         }
     },
+    baseTab = {
+        type = ui.TYPE.Flex,
+        props = {
+            autoSize = false,
+            relativeSize = util.vector2(1, 1),
+        },
+        content = ui.content {
+            {
+                template = I.MWUI.templates.borders,
+                props = {
+                    relativeSize = util.vector2(1, 1),
+                },
+                content = ui.content {
+                    {
+                        type = ui.TYPE.Flex,
+                        props = {
+                            autoSize = false,
+                            relativeSize = util.vector2(1, 1),
+                            grow = 1,
+                            stretch = 1
+                        },
+                        content = ui.content {},
+                    },
+                },
+            },
+        }
+    },
     labeledTextEdit = function(label, default, callback)
         return {
             type = ui.TYPE.Flex,
@@ -619,10 +719,86 @@ local uiTemplates = {
                                 end),
                             }
                         }
-                    }
+                    },
                 },
-            }
+            },
         }
+    end,
+    select = function(items, index, addSize, onChange)
+        local leftArrow = ui.texture {
+            path = 'textures/omw_menu_scroll_left.dds',
+        }
+        local rightArrow = ui.texture {
+            path = 'textures/omw_menu_scroll_right.dds',
+        }
+        local itemCount = #items
+        local label = l10n('UI_' .. tostring(items[index]))
+        local labelColor = nil
+        if index == nil then
+            labelColor = util.color.rgb(1, 0, 0)
+        end
+        local element = ui.create {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+                autoSize = false,
+                size = util.vector2(addSize, 32),
+                arrange = ui.ALIGNMENT.Center,
+                selected = index,
+            },
+            external = {
+                grow = 1,
+                stretch = 1,
+            },
+            content = ui.content {
+                {
+                    type = ui.TYPE.Image,
+                    props = {
+                        resource = leftArrow,
+                        size = util.vector2(1, 1) * 12,
+                    },
+                    events = {},
+                },
+                { template = I.MWUI.templates.interval },
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = label,
+                        textColor = labelColor,
+                    },
+                    external = {
+                        grow = 1,
+                    },
+                },
+                { template = I.MWUI.templates.interval },
+                {
+                    type = ui.TYPE.Image,
+                    props = {
+                        resource = rightArrow,
+                        size = util.vector2(1, 1) * 12,
+                    },
+                    events = {},
+                },
+            },
+        }
+
+        local function update()
+            element.layout.props.selected = index
+            element.layout.content[3].props.text = l10n('UI_' .. tostring(items[index]))
+            onChange(index)
+            element:update()
+        end
+
+        element.layout.content[1].events.mouseClick = async:callback(function()
+            index = (index - 2) % itemCount + 1
+            update()
+        end)
+        element.layout.content[5].events.mouseClick = async:callback(function()
+            index = (index) % itemCount + 1
+            update()
+        end)
+
+        return element
     end,
     pianoRollKeyboard = function(timeSig)
         local bar = {
@@ -719,8 +895,10 @@ local uiTemplates = {
             type = ui.TYPE.Image,
             name = 'bgrRows',
             props = {
-                resource = uiTextures.pianoRollRows,
+                resource = Editor:getScaleTexture(),
                 relativeSize = util.vector2(1, 1),
+                position = util.vector2(0, -16 * (Editor.scale.root - 1)),
+                size = util.vector2(0, 16 * (Editor.scale.root - 1)),
                 tileH = true,
                 tileV = true,
                 color = Editor.backgroundColor,
@@ -744,18 +922,20 @@ local uiTemplates = {
                 },
             })
         end
-        editorOverlay.content:add({
-            type = ui.TYPE.Image,
-            name = 'bgrBars',
-            props = {
-                resource = uiTextures.pianoRollBeatLines[timeSig[2]],
-                relativeSize = util.vector2(1, 1),
-                tileH = true,
-                tileV = true,
-                color = Editor.beatLineColor,
-                alpha = 0.3,
-            },
-        })
+        if Editor.zoomLevel > 1 then
+            editorOverlay.content:add({
+                type = ui.TYPE.Image,
+                name = 'bgrBars',
+                props = {
+                    resource = uiTextures.pianoRollBeatLines[timeSig[2] / (Editor.ZOOM_LEVELS[Editor.zoomLevel])],
+                    relativeSize = util.vector2(1, 1),
+                    tileH = true,
+                    tileV = true,
+                    color = Editor.beatLineColor,
+                    alpha = 0.3,
+                },
+            })
+        end
 
         local editorMarkers = {
             type = ui.TYPE.Widget,
@@ -850,6 +1030,182 @@ local uiTemplates = {
             }
         }
     end,
+    --[[scrollBarH = function()
+
+    end,
+    scrollable = function(content, scrollH, scrollV)
+        return {
+            type = ui.TYPE.Scrollable,
+            props = {
+                autoSize = false,
+                size = util.vector2(0, 0),
+                relativeSize = util.vector2(1, 1),
+                scrollH = scrollH or true,
+                scrollV = scrollV or true,
+            },
+            external = {
+                grow = 1,
+                stretch = 1,
+            },
+            content = ui.content {},
+        }
+    end,
+    dropdown = function(items, onChange)
+    end,]]
+    --[[dropdown = function(label, options, selected, onChange)
+        local isOpen = false
+        
+        local function closeDropdown()
+            if activeDropdown then
+                auxUi.deepDestroy(activeDropdown)
+                activeDropdown = nil
+            end
+            isOpen = false
+        end
+        
+        local function openDropdown(pos)
+            if isOpen then
+                closeDropdown()
+                return
+            end
+            
+            local dropdownWidth = 150
+            local dropdownHeight = #options * 32
+
+            local items = {}
+            for i, option in ipairs(options) do
+                table.insert(items, {
+                    template = I.MWUI.templates.borders,
+                    props = {
+                        size = util.vector2(0, 32),
+                        relativeSize = util.vector2(1, 0),
+                    },
+                    content = ui.content {
+                        {
+                            template = I.MWUI.templates.textNormal,
+                            props = {
+                                text = option.text or option,
+                                textColor = (option.value or option) == selected and uiColors.DEFAULT or uiColors.WHITE,
+                                anchor = util.vector2(0, 0.5),
+                                relativePosition = util.vector2(0, 0.5),
+                                size = util.vector2(dropdownWidth, 32)
+                            },
+                        },
+                    },
+                    events = {
+                        mousePress = async:callback(function()
+                            print("yeah")
+                            selected = option.value or option
+                            closeDropdown()
+                            if onChange then
+                                onChange(selected)
+                            end
+                        end),}
+                    }
+                )
+            end
+            
+            activeDropdown = ui.create {
+                layer = 'Windows',
+                type = ui.TYPE.Widget,
+                props = {
+                    size = util.vector2(dropdownWidth + 8, dropdownHeight + 8),
+                    position = pos,
+                },
+                content = ui.content {
+                    {
+                        template = I.MWUI.templates.boxThick,
+                        content = ui.content {
+                            {
+                                type = ui.TYPE.Flex,
+                                props = {
+                                    autoSize = false,
+                                    size = util.vector2(dropdownWidth, dropdownHeight),
+                                },
+                                content = ui.content(items),
+                            }
+                        },
+                    }
+                },
+                events = {
+                    mousePress = async:callback(function(e)
+                        -- This event will capture clicks outside the dropdown
+                        if not e.hit then
+                            closeDropdown()
+                        end
+                    end),
+                }
+            }
+            
+            isOpen = true
+        end
+        
+        return {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+                autoSize = false,
+                size = util.vector2(0, 32),
+                relativeSize = util.vector2(1, 0),
+                arrange = ui.ALIGNMENT.Center,
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = label,
+                        textAlignV = ui.ALIGNMENT.Center,
+                    },
+                },
+                {
+                    template = createPaddingTemplate(4),
+                },
+                {
+                    template = I.MWUI.templates.bordersThick,
+                    props = {
+                        size = util.vector2(0, 32),
+                        relativeSize = util.vector2(1, 0),
+                    },
+                    content = ui.content {
+                        {
+                            type = ui.TYPE.Flex,
+                            props = {
+                                horizontal = true,
+                                autoSize = false,
+                                relativeSize = util.vector2(1, 1),
+                                align = ui.ALIGNMENT.Center,
+                            },
+                            content = ui.content {
+                                {
+                                    template = I.MWUI.templates.textNormal,
+                                    props = {
+                                        text = selected and (type(selected) == "table" and selected.text or selected) or "",
+                                        textAlignV = ui.ALIGNMENT.Center,
+                                    },
+                                    external = {
+                                        grow = 1,
+                                        stretch = 1,
+                                    },
+                                },
+                                {
+                                    template = I.MWUI.templates.textNormal,
+                                    props = {
+                                        text = "▼",
+                                        textAlignV = ui.ALIGNMENT.Center,
+                                    },
+                                },
+                            },
+                            events = {
+                                mousePress = async:callback(function(e, self)
+                                    openDropdown(e.position - e.offset + util.vector2(0, 32))
+                                end),
+                            }
+                        }
+                    }
+                },
+            }
+        }
+    end,]]
 }
 
 addNote = function(note, tick, duration, instrument)
@@ -928,7 +1284,7 @@ saveNotes = function()
     saveSong()
 end
 
-local getSongManager
+local getSongTab, getPerformanceTab, getPracticeTab, getStatsTab
 
 local function setMainContent(content)
     if wrapperElement then
@@ -945,12 +1301,10 @@ local function importSong()
         if manager then
             local importTextBox = manager.content[2].content[2].content.importExportTextBox.content[1] --TODO make this use importExport tag, not sure why it isn't working
             local songData = importTextBox.props.text
-            print(songData)
             if songData and songData ~= "" then
                 local song = Song.decode(songData)
                 if song then
                     setSong(song)
-                    print("set song to " .. song.title)
                     saveSong()
                 end
             end
@@ -991,7 +1345,7 @@ local function setTextBoxesEnabled(enabled)
 end]]
 
 local function updateSongManager()
-    setMainContent(getSongManager())
+    setMainContent(getSongTab())
 end
 
 local function initPianoRoll()
@@ -1008,8 +1362,12 @@ local function initPianoRoll()
     end 
 end
 
+local alreadyRedrewThisFrame = false
+
 local function redrawPianoRollEditor()
     if not Editor.song then return end
+    if alreadyRedrewThisFrame then return end
+    alreadyRedrewThisFrame = true
     if pianoRollEditorWrapper then
         auxUi.deepDestroy(pianoRollEditorWrapper.layout)
     end
@@ -1017,6 +1375,7 @@ local function redrawPianoRollEditor()
     updateSongManager()
     updatePianoRollKeyboardLabels()
     pianoRollEditorWrapper.layout.content[1] = uiTemplates.pianoRollEditor()
+    updatePianoRollBarNumberLabels()
     initNotes()
 end
 
@@ -1107,16 +1466,23 @@ local function stopAllSounds()
     end
 end
 
-local function startPlayback()
+local function startPlayback(fromStart)
     if not Editor.song then return end
     playback = true
+    playbackStartScrollX = pianoRollScrollX
     Editor.song:resetPlayback()
+    if not fromStart then
+        Editor.song.playbackTickCurr = Editor.song:beatToTick(-pianoRollScrollX / calcBeatWidth(Editor.song.timeSig[2]))
+        Editor.song.playbackTickPrev = Editor.song.playbackTickCurr
+    end
 end
 
 local function stopPlayback()
     playback = false
+    pianoRollScrollX = util.clamp(playbackStartScrollX, -pianoRollScrollXMax, 0)
     Editor.song:resetPlayback()
     pianoRollEditorMarkersWrapper:update()
+    redrawPianoRollEditor()
     stopAllSounds()
 end
 
@@ -1175,7 +1541,7 @@ end
 
 local lastMouseDragPos = nil
 
-getSongManager = function()
+getSongTab = function()
     local manager = auxUi.deepLayoutCopy(uiTemplates.songManager)
     local leftBox = manager.content[1].content[1].content
     Editor.songs = storage.playerSection('Bardcraft'):getCopy('songs/preset') or {}
@@ -1322,6 +1688,44 @@ getSongManager = function()
                 redrawPianoRollEditor()
             end
         end))
+
+        local function updateEditorOverlayRows()
+            local bgrRows = pianoRollEditorWrapper.layout.content[1].content[1].content[1]
+            if bgrRows then
+                bgrRows.props.resource = Editor:getScaleTexture()
+                bgrRows.props.position = util.vector2(0, -16 * (Editor.scale.root - 1))
+                bgrRows.props.size = util.vector2(0, 16 * (Editor.scale.root - 1))
+                pianoRollEditorWrapper:update()
+            end
+        end
+
+        local scaleSelect = {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+                autoSize = false,
+                relativeSize = util.vector2(1, 0),
+                size = util.vector2(0, 32),
+                arrange = ui.ALIGNMENT.Center,
+                grow = 1,
+                stretch = 1,
+            },
+            content = ui.content {
+                uiTemplates.select(Song.Note, Editor.scale.root, 0, function(newVal)
+                    Editor.scale.root = newVal
+                    updateEditorOverlayRows()
+                end),
+                uiTemplates.select(Song.Mode, Editor.scale.mode, 50, function(newVal)
+                    Editor.scale.mode = newVal
+                    updateEditorOverlayRows()
+                end)
+            }
+        }
+        
+        table.insert(middleBox, scaleSelect)
+        --[[table.insert(middleBox, uiTemplates.dropdown("Test", {"Test 1", "Test 2", "Test 3"}, "Test 1", function(selected)
+            print("Selected: " .. selected)
+        end))]]
 
         table.insert(manager.content[2].content, {
             type = ui.TYPE.Flex,
@@ -1541,6 +1945,51 @@ getSongManager = function()
     return manager
 end
 
+getPerformanceTab = function()
+    local performance = auxUi.deepLayoutCopy(uiTemplates.baseTab)
+    return performance
+end
+
+getPracticeTab = function()
+    local practice = auxUi.deepLayoutCopy(uiTemplates.baseTab)
+    return practice
+end
+
+getStatsTab = function()
+    local stats = auxUi.deepLayoutCopy(uiTemplates.baseTab)
+    local flexContent = stats.content[1].content[1].content
+    table.insert(flexContent, {
+        type = ui.TYPE.Flex,
+        props = {
+            autoSize = false,
+            size = util.vector2(0, 32),
+            relativeSize = util.vector2(1, 0),
+            align = ui.ALIGNMENT.Start,
+            arrange = ui.ALIGNMENT.Center,
+            relativePosition = util.vector2(0, 1),
+            anchor = util.vector2(0, 1),
+            position = util.vector2(0, -32),
+        },
+        content = ui.content {
+            {
+                template = createPaddingTemplate(16),
+                props = {
+                    anchor = util.vector2(0.5, 0.5),
+                },
+                content = ui.content {
+                    {
+                        template = I.MWUI.templates.textNormal,
+                        props = {
+                            text = 'Stats',
+                        },
+                    },
+                },
+            },
+        }
+    })
+    return stats
+end
+
 local function updatePlaybackMarker()
     if pianoRollEditorMarkersWrapper and pianoRollEditorMarkersWrapper.layout.content.pianoRollMarkers.content[1] then
         local playbackMarker = pianoRollEditorMarkersWrapper.layout.content.pianoRollMarkers.content[1]
@@ -1548,7 +1997,7 @@ local function updatePlaybackMarker()
             local playbackX = (Editor.song:tickToBeat(Editor.song.playbackTickCurr)) * calcBeatWidth(Editor.song.timeSig[2])
             playbackMarker.props.position = util.vector2(playbackX, 0)
             playbackMarker.props.alpha = playbackX > 0 and 0.8 or 0
-            if (playbackX + pianoRollScrollX) > calcPianoRollEditorWrapperSize().x or (playbackX + pianoRollScrollX) < 0 then
+            if playback and ((playbackX + pianoRollScrollX) > calcPianoRollEditorWrapperSize().x or (playbackX + pianoRollScrollX) < 0) then
                 pianoRollScrollX = util.clamp(-playbackX, -pianoRollScrollXMax, 0)
                 pianoRollScrollLastPopulateX = pianoRollScrollX
                 updatePianoRoll()
@@ -1583,17 +2032,21 @@ end
 
 function Editor:setContent()
     if self.state == self.STATE.SONG then
-        setMainContent(getSongManager())
+        setMainContent(getSongTab())
         updatePianoRoll()
     elseif self.state == self.STATE.PERFORMANCE then
-        setMainContent(uiTemplates.songManager)
+        setMainContent(getPerformanceTab())
+    elseif self.state == self.STATE.PRACTICE then
+        setMainContent(getPracticeTab())
+    elseif self.state == self.STATE.STATS then
+        setMainContent(getStatsTab())
     end
 end
 
 function Editor:createUI()
     local wrapper = uiTemplates.wrapper
     screenSize = ui.screenSize()
-    self.windowXOff = self.state == self.STATE.SONG and 20 or (screenSize.x / 2)
+    self.windowXOff = self.state == self.STATE.SONG and 20 or (screenSize.x * 2 / 3)
     wrapper.content[1].props.size = util.vector2(screenSize.x-Editor.windowXOff, screenSize.y - Editor.windowYOff)
     wrapperElement = ui.create(wrapper)
     Editor:setContent()
@@ -1620,12 +2073,12 @@ function Editor:onToggle()
     end
 end
 
-function Editor:togglePlayback()
+function Editor:togglePlayback(fromStart)
     if playback then
         stopPlayback()
         updatePlaybackMarker()
     else
-        startPlayback()
+        startPlayback(fromStart)
     end
 end
 
@@ -1654,7 +2107,8 @@ local function cacheAllSoundsCoroutine()
 end
 
 function Editor:onFrame()
-    if self.active and playback then
+    alreadyRedrewThisFrame = false
+    if self.active and playback and self.state == self.STATE.SONG then
         tickPlayback(core.getRealFrameDuration())
     end
     if cacheCoroutine and coroutine.status(cacheCoroutine) ~= 'dead' then
@@ -1670,18 +2124,32 @@ function Editor:onFrame()
     end
 end
 
-function Editor:onMouseWheel(vertical)
+function Editor:onMouseWheel(vertical, horizontal)
     if pianoRollFocused then
-        local changeAmt = vertical * 48
-        if input.isShiftPressed() then
-            pianoRollScrollX = util.clamp(pianoRollScrollX + changeAmt, -pianoRollScrollXMax, 0)
-            if math.abs(pianoRollScrollX - pianoRollScrollLastPopulateX) > pianoRollScrollPopulateWindowSize then
-                pianoRollScrollLastPopulateX = pianoRollScrollX
-                populateNotes()
-            end
-        else
-            pianoRollScrollY = util.clamp(pianoRollScrollY + changeAmt, -pianoRollScrollYMax, 0)
+        if input.isCtrlPressed() then
+            local currZoom = self.ZOOM_LEVELS[self.zoomLevel]
+            self.zoomLevel = util.clamp(self.zoomLevel + vertical, 1, #self.ZOOM_LEVELS)
+            local diff = self.ZOOM_LEVELS[self.zoomLevel] / currZoom
+            initPianoRoll()
+            pianoRollScrollX = util.clamp(pianoRollScrollX * diff, -pianoRollScrollXMax, 0)
+            redrawPianoRollEditor()
+            return
         end
+
+        local changeAmtY = vertical * 48
+        local changeAmtX = horizontal * 48
+        if input.isShiftPressed() then
+            local y = changeAmtY
+            changeAmtY = changeAmtX
+            changeAmtX = y
+        end
+
+        pianoRollScrollX = util.clamp(pianoRollScrollX + changeAmtX, -pianoRollScrollXMax, 0)
+        if math.abs(pianoRollScrollX - pianoRollScrollLastPopulateX) > pianoRollScrollPopulateWindowSize then
+            pianoRollScrollLastPopulateX = pianoRollScrollX
+            populateNotes()
+        end
+        pianoRollScrollY = util.clamp(pianoRollScrollY + changeAmtY, -pianoRollScrollYMax, 0)
         updatePianoRoll()
     end
 end

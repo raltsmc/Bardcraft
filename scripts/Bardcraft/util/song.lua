@@ -121,11 +121,15 @@ end
 
 local Part = {}
 Part.__index = Part
+Part.__eq = function(a, b)
+    return a.index == b.index and a.instrument == b.instrument and a.title == b.title
+end
 
-function Part.new(instrument, title)
+function Part.new(index, instrument)
     local self = setmetatable({}, Part)
+    self.index = index
     self.instrument = instrument or 0
-    self.title = title or instrumentProfiles[getInstrumentMapping(instrument)].name
+    self.title = instrumentProfiles[instrument].name .. ' ' .. index
     return self
 end
 
@@ -150,7 +154,7 @@ Song.Mode = {
     "Altmeri", -- Lydian Augmented (W W W W H W H)
     "Bosmeri", -- Mixolydian (W W H W W H W)
     "Dwemeri", -- Octatonic (H W H W H W H W)
-    "Wrothgarian",  -- Superlocrian Maj7 (H W H W W WH H)
+    "Wrothgarian", -- Superlocrian Maj7 (H W H W W WH H)
     "Argonian", -- Whole Tone (W W W W W W W)
     "Elsweyri", -- Hirajoshi (W H WW H WW)
     "Daedric", -- Ultralocrian (H W H W W WW)
@@ -200,13 +204,19 @@ function Song.fromMidiParser(parser)
         if note.channel == 9 then
             note.note = mapDrumNote(note.note)
         end
+        local instrument = (note.channel == 9 and 116) or getInstrumentMapping(parser.instruments[note.channel])
+        if not self.parts[instrument] then
+            self.parts[instrument] = {
+                Part.new(1, instrument),
+            }
+        end
         local noteData = {
             id = id,
             type = note.type,
             note = note.note,
             velocity = note.velocity,
-            track = note.track,
-            instrument = (note.channel == 9 and 116) or getInstrumentMapping(parser.instruments[note.channel]),
+            part = 1,
+            instrument = instrument,
             time = math.floor(note.time * self.resolution / parser.division),
         }
         id = id + 1
@@ -255,6 +265,15 @@ end
 
 function Song.getInstrumentProfiles()
     return instrumentProfiles
+end
+
+function Song.getInstrumentNumber(instrumentName)
+    for i, mapping in ipairs(instrumentMappings) do
+        if instrumentProfiles[mapping.instr].name == instrumentName then
+            return mapping.instr
+        end
+    end
+    return 0
 end
 
 function Song:secondsToTicks(seconds)
@@ -501,4 +520,7 @@ function Song.decode(encoded)
 	return song
 end
 
-return Song
+return {
+    Song = Song,
+    Part = Part,
+}

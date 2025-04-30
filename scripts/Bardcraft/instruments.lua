@@ -112,6 +112,7 @@ local playedThisBar = false
 local Instruments = {
     Lute = {
         path = "meshes/m/misc_de_lute_01.nif",
+        icon = "icons/m/tx_de_lute_01.dds",
         anim = "bolute",
         boneName = "Bip01 BOInstrument",
         eventHandler = function(data)
@@ -159,6 +160,7 @@ local Instruments = {
     },
     Drum = {
         path = "meshes/m/misc_de_drum_01.nif",
+        icon = "icons/m/tx_de_drum_01.dds",
         anim = "bodrum",
         boneName = "Bip01 BOInstrument",
         eventHandler = function(data)
@@ -183,6 +185,7 @@ local Instruments = {
     },
     Ocarina = {
         path = "meshes/Bardcraft/ocarina.nif",
+        icon = "icons/Bardcraft/tx_ocarina.dds",
         anim = "boocarina",
         boneName = "Bip01 BOInstrumentHand",
         eventHandler = function(data)
@@ -211,6 +214,7 @@ local Instruments = {
     },
     BassFlute = {
         path = "meshes/Bardcraft/flute.nif",
+        icon = "icons/Bardcraft/tx_flute.dds",
         anim = "boflute",
         boneName = "Bip01 BOInstrumentHand",
         eventHandler = function(data)

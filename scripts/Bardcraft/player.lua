@@ -11,7 +11,7 @@ local l10n = core.l10n('Bardcraft')
 
 local Performer = require('scripts.Bardcraft.performer')
 local Editor = require('scripts.Bardcraft.editor')
-local Song = require('scripts.Bardcraft.util.song')
+local Song = require('scripts.Bardcraft.util.song').Song
 
 local performance = {
     level = 0,

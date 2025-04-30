@@ -11,7 +11,8 @@ local input = require('openmw.input')
 local l10n = core.l10n('Bardcraft')
 
 local luaxp = require('scripts.Bardcraft.util.luaxp')
-local Song = require('scripts.Bardcraft.util.song')
+local Song = require('scripts.Bardcraft.util.song').Song
+local Instruments = require('scripts.Bardcraft.instruments').Instruments
 
 local Editor = {}
 
@@ -23,9 +24,9 @@ Editor.STATE = {
 }
 
 Editor.ZOOM_LEVELS = {
-    [1] = 0.125,
-    [2] = 0.25,
-    [3] = 0.5,
+    [1] = 1/8,
+    [2] = 1/4,
+    [3] = 1/2,
     [4] = 1.0,
     [5] = 2.0,
     [6] = 4.0,
@@ -33,13 +34,14 @@ Editor.ZOOM_LEVELS = {
 }
 
 Editor.SNAP_LEVELS = {
-    [1] = 0.0625,
-    [2] = 0.125,
-    [3] = 0.25,
-    [4] = 0.5,
-    [5] = 1.0,
-    [6] = 2.0,
-    [7] = 4.0,
+    [1] = 1/32,
+    [2] = 1/16,
+    [3] = 1/8,
+    [4] = 1/4,
+    [5] = 1/2,
+    [6] = 1.0,
+    [7] = 2.0,
+    [8] = 4.0,
 }
 
 Editor.active = false
@@ -47,9 +49,11 @@ Editor.song = nil
 Editor.songs = nil
 Editor.state = nil
 Editor.noteMap = nil
-Editor.snapLevel = 3
-Editor.noteIdCounter = 1
+Editor.snap = true
+Editor.snapLevel = 4
 Editor.zoomLevel = 4
+Editor.noteIdCounter = 1
+Editor.activePart = nil
 
 Editor.windowXOff = 20
 Editor.windowYOff = 200
@@ -341,6 +345,11 @@ local function calcPianoRollEditorHeight()
     return calcOctaveHeight() * 128 / 12
 end
 
+local function calcSnapFactor()
+    if not Editor.song or not Editor.snap then return 1 end
+    return Editor.song.resolution * Editor.SNAP_LEVELS[Editor.snapLevel] * (4 / Editor.song.timeSig[2])
+end
+
 local function editorOffsetToRealOffset(offset)
     return offset - util.vector2(pianoRollScrollX, pianoRollScrollY)
 end
@@ -407,15 +416,15 @@ local function updatePianoRollBarNumberLabels()
         table.insert(barLines.content, {
             type = ui.TYPE.Widget,
             props = {
-                size = util.vector2(96, 24),
-                position = util.vector2(xOffset, 0),
+                size = util.vector2(96, 16),
+                position = util.vector2(xOffset + 4, 0),
             },
             content = ui.content {
                 {
                     template = I.MWUI.templates.textNormal,
                     props = {
                         text = tostring(barNumber),
-                        textSize = 24,
+                        textSize = 16,
                         textColor = uiColors.DEFAULT_LIGHT,
                     },
                 },
@@ -613,12 +622,27 @@ uiTemplates = {
                     {
                         type = ui.TYPE.Flex,
                         props = {
+                            horizontal = true,
                             autoSize = false,
                             relativeSize = util.vector2(1, 1),
-                            grow = 1,
-                            stretch = 1
                         },
-                        content = ui.content {},
+                        content = ui.content {
+                            createPaddingTemplate(4),
+                            {
+                                type = ui.TYPE.Flex,
+                                props = {
+                                    autoSize = false,
+                                    grow = 1,
+                                    stretch = 1
+                                },
+                                external = {
+                                    grow = 1,
+                                    stretch = 1,
+                                },
+                                content = ui.content {},
+                            },
+                            createPaddingTemplate(4),
+                        },
                     },
                 },
             },
@@ -676,13 +700,45 @@ uiTemplates = {
             },
         }
     },
-    labeledTextEdit = function(label, default, callback)
+    textEdit = function(default, height, callback)
+        return {
+            template = I.MWUI.templates.borders,
+            props = {
+                size = util.vector2(0, height),
+            },
+            external = {
+                grow = 1,
+                stretch = 1,
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.textEditLine,
+                    props = {
+                        text = default,
+                        textAlignV = ui.ALIGNMENT.Center,
+                        relativeSize = util.vector2(1, 1),
+                    },
+                    events = {
+                        textChanged = async:callback(function(text, self)
+                            if callback then
+                                callback(text, self)
+                            end
+                        end),
+                        focusGain = async:callback(function()
+                            textFocused = true
+                        end),
+                    }
+                }
+            },
+        }
+    end,
+    labeledTextEdit = function(label, default, height, callback)
         return {
             type = ui.TYPE.Flex,
             props = {
                 horizontal = true,
                 autoSize = false,
-                size = util.vector2(0, 32),
+                size = util.vector2(0, height),
                 relativeSize = util.vector2(1, 0),
                 arrange = ui.ALIGNMENT.Center,
             },
@@ -697,41 +753,11 @@ uiTemplates = {
                 {
                     template = createPaddingTemplate(4),
                 },
-                {
-                    template = I.MWUI.templates.borders,
-                    props = {
-                        size = util.vector2(0, 32),
-                        relativeSize = util.vector2(1, 0),
-                    },
-                    content = ui.content {
-                        {
-                            template = I.MWUI.templates.textEditLine,
-                            props = {
-                                text = default,
-                                textAlignV = ui.ALIGNMENT.Center,
-                                relativeSize = util.vector2(1, 1),
-                            },
-                            external = {
-                                grow = 1,
-                                stretch = 1,
-                            },
-                            events = {
-                                textChanged = async:callback(function(text, self)
-                                    if callback then
-                                        callback(text, self)
-                                    end
-                                end),
-                                focusGain = async:callback(function()
-                                    textFocused = true
-                                end),
-                            }
-                        }
-                    },
-                },
+                uiTemplates.textEdit(default, height, callback),
             },
         }
     end,
-    select = function(items, index, addSize, onChange)
+    select = function(items, index, addSize, localize, height, callback)
         local leftArrow = ui.texture {
             path = 'textures/omw_menu_scroll_left.dds',
         }
@@ -739,7 +765,16 @@ uiTemplates = {
             path = 'textures/omw_menu_scroll_right.dds',
         }
         local itemCount = #items
-        local label = l10n('UI_' .. tostring(items[index]))
+
+        local function getLabel()
+            local label = tostring(items[index])
+            if localize then
+                label = l10n('UI_' .. label)
+            end
+            return label
+        end
+
+        local label = getLabel()
         local labelColor = nil
         if index == nil then
             labelColor = util.color.rgb(1, 0, 0)
@@ -749,7 +784,7 @@ uiTemplates = {
             props = {
                 horizontal = true,
                 autoSize = false,
-                size = util.vector2(addSize, 32),
+                size = util.vector2(addSize, height),
                 arrange = ui.ALIGNMENT.Center,
                 selected = index,
             },
@@ -791,8 +826,8 @@ uiTemplates = {
 
         local function update()
             element.layout.props.selected = index
-            element.layout.content[3].props.text = l10n('UI_' .. tostring(items[index]))
-            onChange(index)
+            element.layout.content[3].props.text = getLabel()
+            callback(index)
             element:update()
         end
 
@@ -806,6 +841,155 @@ uiTemplates = {
         end)
 
         return element
+    end,
+    labeledSelect = function(label, items, index, addSize, localize, height, callback)
+        return {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+                autoSize = false,
+                size = util.vector2(0, height),
+                relativeSize = util.vector2(1, 0),
+                arrange = ui.ALIGNMENT.Center,
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = label,
+                        textAlignV = ui.ALIGNMENT.Center,
+                    },
+                },
+                {
+                    template = createPaddingTemplate(4),
+                },
+                uiTemplates.select(items, index, addSize, localize, height, callback),
+            },
+        }
+    end,
+    checkbox = function(value, trueLabel, falseLabel, onChange)
+        local function getLabel()
+            return l10n('UI_' .. (value and trueLabel or falseLabel))
+        end
+
+        local element = ui.create {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+                arrange = ui.ALIGNMENT.Center,
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = getLabel(),
+                        textAlignV = ui.ALIGNMENT.Center,
+                    },
+                },
+            },
+            events = {
+            }
+        }
+
+        element.layout.events.mouseClick = async:callback(function()
+            value = not value
+            element.layout.content[1].props.text = getLabel()
+            if onChange then
+                onChange(value)
+            end
+            element:update()
+        end)
+        return element
+    end,
+    partDisplay = function(part)
+        local function getInstruments()
+            local instruments = {}
+            for k, _ in pairs(Instruments) do
+                table.insert(instruments, k)
+            end
+            return instruments
+        end
+
+        local instruments = getInstruments()
+
+        local function indexOf(table, i)
+            for k, v in ipairs(table) do
+                if v == i then
+                    return k
+                end
+            end
+            return nil
+        end
+
+        local function getInstrumentName()
+            return Song.getInstrumentProfile(part.instrument).name
+        end
+
+        local partDisplay = ui.create {
+            template = (part == Editor.activePart) and I.MWUI.templates.bordersThick or I.MWUI.templates.borders,
+            props = {
+                size = util.vector2(0, 48),
+            },
+            external = {
+                stretch = 1,
+            },
+            content = ui.content {
+                {
+                    type = ui.TYPE.Flex,
+                    props = {
+                        horizontal = true,
+                        autoSize = false,
+                        size = util.vector2(0, 44),
+                        relativeSize = util.vector2(1, 0),
+                        arrange = ui.ALIGNMENT.Center,
+                    },
+                    content = ui.content {
+                        {
+                            type = ui.TYPE.Image,
+                            props = {
+                                resource = ui.texture { path = Instruments[getInstrumentName()].icon },
+                                size = util.vector2(40, 40),
+                            },
+                            events = {}
+                        },
+                        {
+                            type = ui.TYPE.Flex,
+                            external = {
+                                grow = 1,
+                                stretch = 1,
+                            },
+                            content = ui.content {}
+                        }
+                    }
+                }
+            },
+        }
+
+        partDisplay.layout.content[1].content[1].events.mouseClick = async:callback(function()
+            Editor.activePart = part
+            Editor:destroyUI()
+            Editor:createUI()
+        end)
+
+        partDisplay.layout.content[1].content[2].content = ui.content {
+            uiTemplates.textEdit(part.title, 20, function(text)
+                if text ~= part.title then
+                    part.title = text
+                    saveSong()
+                end
+            end),
+            uiTemplates.select(instruments, indexOf(instruments, getInstrumentName()), 0, true, 20, function(index)
+                local instrumentName = instruments[index]
+                local instrumentNumber = Song.getInstrumentNumber(instrumentName)
+                if instrumentNumber ~= part.instrument then
+                    part.instrument = instrumentNumber
+                    saveSong()
+                    partDisplay.layout.content[1].content[1].props.resource = ui.texture { path = Instruments[instrumentName].icon }
+                    partDisplay:update()
+                end
+            end),
+        }
+        return partDisplay
     end,
     pianoRollKeyboard = function(timeSig)
         local bar = {
@@ -1052,182 +1236,6 @@ uiTemplates = {
             }
         }
     end,
-    --[[scrollBarH = function()
-
-    end,
-    scrollable = function(content, scrollH, scrollV)
-        return {
-            type = ui.TYPE.Scrollable,
-            props = {
-                autoSize = false,
-                size = util.vector2(0, 0),
-                relativeSize = util.vector2(1, 1),
-                scrollH = scrollH or true,
-                scrollV = scrollV or true,
-            },
-            external = {
-                grow = 1,
-                stretch = 1,
-            },
-            content = ui.content {},
-        }
-    end,
-    dropdown = function(items, onChange)
-    end,]]
-    --[[dropdown = function(label, options, selected, onChange)
-        local isOpen = false
-        
-        local function closeDropdown()
-            if activeDropdown then
-                auxUi.deepDestroy(activeDropdown)
-                activeDropdown = nil
-            end
-            isOpen = false
-        end
-        
-        local function openDropdown(pos)
-            if isOpen then
-                closeDropdown()
-                return
-            end
-            
-            local dropdownWidth = 150
-            local dropdownHeight = #options * 32
-
-            local items = {}
-            for i, option in ipairs(options) do
-                table.insert(items, {
-                    template = I.MWUI.templates.borders,
-                    props = {
-                        size = util.vector2(0, 32),
-                        relativeSize = util.vector2(1, 0),
-                    },
-                    content = ui.content {
-                        {
-                            template = I.MWUI.templates.textNormal,
-                            props = {
-                                text = option.text or option,
-                                textColor = (option.value or option) == selected and uiColors.DEFAULT or uiColors.WHITE,
-                                anchor = util.vector2(0, 0.5),
-                                relativePosition = util.vector2(0, 0.5),
-                                size = util.vector2(dropdownWidth, 32)
-                            },
-                        },
-                    },
-                    events = {
-                        mousePress = async:callback(function()
-                            print("yeah")
-                            selected = option.value or option
-                            closeDropdown()
-                            if onChange then
-                                onChange(selected)
-                            end
-                        end),}
-                    }
-                )
-            end
-            
-            activeDropdown = ui.create {
-                layer = 'Windows',
-                type = ui.TYPE.Widget,
-                props = {
-                    size = util.vector2(dropdownWidth + 8, dropdownHeight + 8),
-                    position = pos,
-                },
-                content = ui.content {
-                    {
-                        template = I.MWUI.templates.boxThick,
-                        content = ui.content {
-                            {
-                                type = ui.TYPE.Flex,
-                                props = {
-                                    autoSize = false,
-                                    size = util.vector2(dropdownWidth, dropdownHeight),
-                                },
-                                content = ui.content(items),
-                            }
-                        },
-                    }
-                },
-                events = {
-                    mousePress = async:callback(function(e)
-                        -- This event will capture clicks outside the dropdown
-                        if not e.hit then
-                            closeDropdown()
-                        end
-                    end),
-                }
-            }
-            
-            isOpen = true
-        end
-        
-        return {
-            type = ui.TYPE.Flex,
-            props = {
-                horizontal = true,
-                autoSize = false,
-                size = util.vector2(0, 32),
-                relativeSize = util.vector2(1, 0),
-                arrange = ui.ALIGNMENT.Center,
-            },
-            content = ui.content {
-                {
-                    template = I.MWUI.templates.textNormal,
-                    props = {
-                        text = label,
-                        textAlignV = ui.ALIGNMENT.Center,
-                    },
-                },
-                {
-                    template = createPaddingTemplate(4),
-                },
-                {
-                    template = I.MWUI.templates.bordersThick,
-                    props = {
-                        size = util.vector2(0, 32),
-                        relativeSize = util.vector2(1, 0),
-                    },
-                    content = ui.content {
-                        {
-                            type = ui.TYPE.Flex,
-                            props = {
-                                horizontal = true,
-                                autoSize = false,
-                                relativeSize = util.vector2(1, 1),
-                                align = ui.ALIGNMENT.Center,
-                            },
-                            content = ui.content {
-                                {
-                                    template = I.MWUI.templates.textNormal,
-                                    props = {
-                                        text = selected and (type(selected) == "table" and selected.text or selected) or "",
-                                        textAlignV = ui.ALIGNMENT.Center,
-                                    },
-                                    external = {
-                                        grow = 1,
-                                        stretch = 1,
-                                    },
-                                },
-                                {
-                                    template = I.MWUI.templates.textNormal,
-                                    props = {
-                                        text = "▼",
-                                        textAlignV = ui.ALIGNMENT.Center,
-                                    },
-                                },
-                            },
-                            events = {
-                                mousePress = async:callback(function(e, self)
-                                    openDropdown(e.position - e.offset + util.vector2(0, 32))
-                                end),
-                            }
-                        }
-                    }
-                },
-            }
-        }
-    end,]]
 }
 
 addNote = function(note, tick, duration, instrument)
@@ -1277,20 +1285,22 @@ end
 local function populateNotes()
     pianoRollEditorWrapper.layout.content[1].content[3].content = ui.content{}
     for _, noteData in pairs(Editor.noteMap) do
-        local id = noteData.id
-        local note = noteData.note
-        local tick = noteData.time
-        local duration = noteData.duration
-        -- Check if note is within the viewing area
-        local noteX = calcBeatWidth(Editor.song.timeSig[2]) * (Editor.song:tickToBeat(tick))
-        local noteWidth = calcBeatWidth(Editor.song.timeSig[2]) * (Editor.song:tickToBeat(duration))
-        local wrapperSize = calcPianoRollEditorWrapperSize()
+        if not Editor.activePart or (noteData.instrument == Editor.activePart.instrument and noteData.part == Editor.activePart.index) then
+            local id = noteData.id
+            local note = noteData.note
+            local tick = noteData.time
+            local duration = noteData.duration
+            -- Check if note is within the viewing area
+            local noteX = calcBeatWidth(Editor.song.timeSig[2]) * (Editor.song:tickToBeat(tick))
+            local noteWidth = calcBeatWidth(Editor.song.timeSig[2]) * (Editor.song:tickToBeat(duration))
+            local wrapperSize = calcPianoRollEditorWrapperSize()
 
-        if noteX + noteWidth >= -pianoRollScrollX - pianoRollScrollPopulateWindowSize and noteX <= -pianoRollScrollX + pianoRollScrollPopulateWindowSize + wrapperSize.x then
-            -- Add note to the piano roll
-            pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration))
+            if noteX + noteWidth >= -pianoRollScrollX - pianoRollScrollPopulateWindowSize and noteX <= -pianoRollScrollX + pianoRollScrollPopulateWindowSize + wrapperSize.x then
+                -- Add note to the piano roll
+                pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration))
+            end
+            --pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration))
         end
-        --pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration))
     end
     pianoRollEditorWrapper:update()
 end
@@ -1429,7 +1439,7 @@ noteEventsToNoteMap = function()
                         id = Editor.noteIdCounter,--event.id,
                         note = event.note,
                         velocity = activeNotes[key].velocity,
-                        track = event.track,
+                        part = event.part,
                         instrument = event.instrument,
                         time = activeNotes[key].start,
                         duration = duration,
@@ -1458,7 +1468,7 @@ noteMapToNoteEvents = function()
                 type = 'noteOn',
                 note = noteData.note,
                 velocity = noteData.velocity,
-                track = noteData.track,
+                part = noteData.part,
                 instrument = noteData.instrument,
                 time = noteData.time,
             }
@@ -1469,7 +1479,7 @@ noteMapToNoteEvents = function()
                 type = 'noteOff',
                 note = noteData.note,
                 velocity = 0,
-                track = noteData.track,
+                part = noteData.part,
                 instrument = noteData.instrument,
                 time = noteData.time + noteData.duration,
             }
@@ -1500,7 +1510,9 @@ end
 local function startPlayback(fromStart)
     if not Editor.song then return end
     playback = true
-    playbackStartScrollX = (pianoRollScrollX / Editor.ZOOM_LEVELS[Editor.zoomLevel])
+    if fromStart then
+        playbackStartScrollX = (pianoRollScrollX / Editor.ZOOM_LEVELS[Editor.zoomLevel])
+    end
     Editor.song:resetPlayback()
     if not fromStart then
         Editor.song.playbackTickCurr = Editor.song:beatToTick(-pianoRollScrollX / calcBeatWidth(Editor.song.timeSig[2]))
@@ -1510,10 +1522,13 @@ end
 
 local function stopPlayback()
     playback = false
-    pianoRollScrollX = util.clamp(playbackStartScrollX * Editor.ZOOM_LEVELS[Editor.zoomLevel], -pianoRollScrollXMax, 0)
-    updatePianoRoll()
-    pianoRollScrollLastPopulateX = pianoRollScrollX
-    populateNotes()
+    if playbackStartScrollX then
+        pianoRollScrollX = util.clamp(playbackStartScrollX * Editor.ZOOM_LEVELS[Editor.zoomLevel], -pianoRollScrollXMax, 0)
+        updatePianoRoll()
+        pianoRollScrollLastPopulateX = pianoRollScrollX
+        populateNotes()
+        playbackStartScrollX = nil
+    end
     Editor.song:resetPlayback()
     pianoRollEditorMarkersWrapper:update()
     stopAllSounds()
@@ -1546,7 +1561,7 @@ addSong = function()
     table.insert(songs, song)
     storage.playerSection('Bardcraft'):set('songs/custom', songs)
     setSong(song)
-    setMainContent(getSongManager())]]
+    setMainContent(getSongTab())]]
 end
 
 local function isPowerOfTwo(n)
@@ -1663,8 +1678,21 @@ getSongTab = function()
             if num == nil or type(num) ~= "number" then return nil, rerr end
             return num, nil
         end
-        local middleBox = manager.content[2].content[1].content
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTitle'), Editor.song.title, function(text, self)
+        local middleBox = manager.content[2].content[1].content[2].content
+
+        table.insert(middleBox, createPaddingTemplate(8))
+        table.insert(middleBox, {
+            template = I.MWUI.templates.textHeader,
+            props = {
+                text = l10n('UI_PRoll_SongInfo'),
+                textAlignH = ui.ALIGNMENT.Center,
+                autoSize = false,
+                relativeSize = util.vector2(1, 0),
+                size = util.vector2(0, 32),
+            },
+        })
+
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTitle'), Editor.song.title, 32, function(text, self)
             if not tostring(text) then
                 self.props.text = Editor.song.title
             else
@@ -1673,7 +1701,7 @@ getSongTab = function()
                 redrawPianoRollEditor()
             end
         end))
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTempo'), tostring(Editor.song.tempo), function(text, self)
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTempo'), tostring(Editor.song.tempo), 32, function(text, self)
             if not tonumber(text) then
                 self.props.text = tostring(Editor.song.tempo)
             else
@@ -1682,7 +1710,7 @@ getSongTab = function()
                 redrawPianoRollEditor()
             end
         end))
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTimeSig'), Editor.song.timeSig[1] .. '/' .. Editor.song.timeSig[2], function(text, self)
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTimeSig'), Editor.song.timeSig[1] .. '/' .. Editor.song.timeSig[2], 32, function(text, self)
             local timeSig = parseTimeSignature(text)
             if not timeSig then
                 self.props.text = Editor.song.timeSig[1] .. '/' .. Editor.song.timeSig[2]
@@ -1692,7 +1720,7 @@ getSongTab = function()
                 redrawPianoRollEditor()
             end
         end))
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongLoopStart'), tostring(Editor.song.loopBars[1]), function(text, self)
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongLoopStart'), tostring(Editor.song.loopBars[1]), 32, function(text, self)
             local parsed = parseExp(text)
             if not parsed or parsed < 0 then
                 self.props.text = tostring(Editor.song.loopBars[1])
@@ -1702,7 +1730,7 @@ getSongTab = function()
                 redrawPianoRollEditor()
             end
         end))
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongLoopEnd'), tostring(Editor.song.loopBars[2]), function(text, self)
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongLoopEnd'), tostring(Editor.song.loopBars[2]), 32, function(text, self)
             local parsed = parseExp(text)
             if not parsed or parsed > Editor.song.lengthBars then
                 self.props.text = tostring(Editor.song.loopBars[2])
@@ -1712,7 +1740,7 @@ getSongTab = function()
                 redrawPianoRollEditor()
             end
         end))
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongEnd'), tostring(Editor.song.lengthBars), function(text, self)
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongEnd'), tostring(Editor.song.lengthBars), 32, function(text, self)
             local parsed = parseExp(text)
             if not parsed or parsed < 1 then
                 self.props.text = tostring(Editor.song.lengthBars)
@@ -1755,13 +1783,15 @@ getSongTab = function()
                 {
                     template = createPaddingTemplate(4),
                 },
-                uiTemplates.select(Song.Note, Editor.song.scale.root, 0, function(newVal)
+                uiTemplates.select(Song.Note, Editor.song.scale.root, 0, false, 32, function(newVal)
                     Editor.song.scale.root = newVal
                     updateEditorOverlayRows()
+                    saveSong()
                 end),
-                uiTemplates.select(Song.Mode, Editor.song.scale.mode, 50, function(newVal)
+                uiTemplates.select(Song.Mode, Editor.song.scale.mode, 50, true, 32, function(newVal)
                     Editor.song.scale.mode = newVal
                     updateEditorOverlayRows()
+                    saveSong()
                 end)
             }
         }
@@ -1789,17 +1819,42 @@ getSongTab = function()
                 {
                     template = createPaddingTemplate(4),
                 },
-                uiTemplates.select(Editor.SNAP_LEVELS, Editor.snapLevel, 0, function(newVal)
+                uiTemplates.select(Editor.SNAP_LEVELS, Editor.snapLevel, 0, true, 32, function(newVal)
                     Editor.snapLevel = newVal
                     --pianoRollLastNoteSize = Editor.song.resolution * (4 / Editor.song.timeSig[2])
                     --updatePianoRollBarNumberLabels()
                     --updatePianoRoll()
                 end),
+                {
+                    template = createPaddingTemplate(4),
+                },
+                uiTemplates.checkbox(Editor.snap, 'CheckboxOn', 'CheckboxOff', function(checked)
+                    Editor.snap = checked
+                end),
             }
         }
         table.insert(middleBox, snapSelect)
 
-        table.insert(manager.content[2].content, {
+        table.insert(middleBox, createPaddingTemplate(8))
+        table.insert(middleBox, {
+            template = I.MWUI.templates.textHeader,
+            props = {
+                text = l10n('UI_PRoll_Parts'),
+                textAlignH = ui.ALIGNMENT.Center,
+                autoSize = false,
+                relativeSize = util.vector2(1, 0),
+                size = util.vector2(0, 32),
+            },
+        })
+        for k, v in pairs(Editor.song.parts) do
+            if k ~= 0 then
+                for _, part in ipairs(v) do
+                    table.insert(middleBox, uiTemplates.partDisplay(part))
+                end
+            end
+        end
+
+        --[[table.insert(manager.content[2].content, {
             type = ui.TYPE.Flex,
             name = 'importExport',
             props = {
@@ -1890,7 +1945,7 @@ getSongTab = function()
                     }
                 },
             }
-        })
+        })]]
 
         pianoRollEditorWrapper = ui.create {
             type = ui.TYPE.Widget,
@@ -1926,16 +1981,16 @@ getSongTab = function()
                     if e.button == 1 and pianoRollDragStart then
                         local offset = editorOffsetToRealOffset(e.offset + util.vector2(pianoRollDragOffset and pianoRollDragOffset.x or 0, 0))
                         local note, tick = realOffsetToNote(offset)
-                        local snap = Editor.song.resolution * Editor.SNAP_LEVELS[Editor.snapLevel] * (4 / Editor.song.timeSig[2])
+                        local snap = calcSnapFactor()
                         tick = util.round(tick / snap) * snap + 1
                         
                         local noteData = Editor.noteMap[pianoRollActiveNote]
                         if pianoRollDragType == DragType.MOVE then
                             noteData.time = util.clamp(tick, 1, math.huge)
-                            noteData.note = note
                             if note ~= noteData.note then
                                 playNoteSound(note)
                             end
+                            noteData.note = note
                         elseif pianoRollDragType == DragType.RESIZE_RIGHT then
                             noteData.duration = util.clamp(tick - noteData.time, snap, math.huge)
                         end
@@ -1959,8 +2014,17 @@ getSongTab = function()
                         textFocused = false
                     end
                     if e.button ~= 1 then return end
+                    if e.offset.y < 24 then
+                        -- Set playback pos and start playback
+                        local offset = editorOffsetToRealOffset(e.offset)
+                        playback = true
+                        Editor.song:resetPlayback()
+                        Editor.song.playbackTickCurr = Editor.song:beatToTick(editorOffsetToRealOffset(e.offset).x / calcBeatWidth(Editor.song.timeSig[2]))
+                        Editor.song.playbackTickPrev = Editor.song.playbackTickCurr
+                        return
+                    end
                     local note, tick = realOffsetToNote(editorOffsetToRealOffset(e.offset))
-                    local snap = Editor.song.resolution * Editor.SNAP_LEVELS[Editor.snapLevel] * (4 / Editor.song.timeSig[2])
+                    local snap = calcSnapFactor()
                     tick = math.floor(tick / snap) * snap + 1
                     playNoteSound(note)
                     pianoRollActiveNote = addNote(note, tick, pianoRollLastNoteSize)
@@ -1972,7 +2036,7 @@ getSongTab = function()
                     if e.button == 2 then
                         lastMouseDragPos = nil
                     end
-                    if e.button == 1 then
+                    if e.button == 1 and pianoRollActiveNote then
                         pianoRollDragStart = nil
                         pianoRollDragType = DragType.NONE
                         pianoRollLastNoteSize = Editor.noteMap[pianoRollActiveNote].duration

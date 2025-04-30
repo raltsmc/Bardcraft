@@ -2,10 +2,11 @@ local storage = require('openmw.storage')
 local vfs = require('openmw.vfs')
 
 local MIDI = require('scripts.Bardcraft.util.midi')
-local Song = require('scripts.Bardcraft.util.song')
+local Song = require('scripts.Bardcraft.util.song').Song
 
 local function parseAll()
     local bardData = storage.playerSection('Bardcraft')
+    bardData:set('songs/preset', nil) -- Clear the old data
     local storedSongs = bardData:getCopy('songs/preset') or {}
 
     local midiSongs = {}
@@ -31,7 +32,6 @@ local function parseAll()
         end
     end
     for _, song in pairs(midiSongs) do
-        print(song.sourceFile or '')
         table.insert(storedSongs, song)
     end
     bardData:set('songs/preset', storedSongs)

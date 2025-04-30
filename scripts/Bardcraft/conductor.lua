@@ -3,7 +3,7 @@ local world = require('openmw.world')
 local types = require('openmw.types')
 
 local configGlobal = require('scripts.Bardcraft.config.global')
-local Song = require('scripts.Bardcraft.util.song')
+local Song = require('scripts.Bardcraft.util.song').Song
 local Cell = require('scripts.Bardcraft.cell')
 
 local actorData = {}

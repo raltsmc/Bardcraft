@@ -3,7 +3,7 @@
 
 local vfs = require('openmw.vfs')
 
-local Song = require('scripts.Bardcraft.util.song')
+local Song = require('scripts.Bardcraft.util.song').Song
 
 -- Basic bit operations since Lua 5.1 doesn't have them built-in
 local bit = {}
@@ -256,6 +256,8 @@ function MidiParser:parse()
 
                             local microsecondsPerQuarter = (tempoByte1 * 65536) + (tempoByte2 * 256) + tempoByte3
                             local bpm = 60000000 / microsecondsPerQuarter
+                            -- Round to 3 decimal places
+                            bpm = math.floor(bpm * 1000 + 0.5) / 1000
 
                             local tempoEvent = {
                                 type = "setTempo",

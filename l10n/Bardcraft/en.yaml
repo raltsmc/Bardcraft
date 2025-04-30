@@ -18,17 +18,29 @@ Instr_Drum: "Drum"
 Instr_Ocarina: "Ocarina"
 Instr_BassFlute: "Flute"
 
+UI_Lute: "Lute"
+UI_Drum: "Drum"
+UI_Ocarina: "Ocarina"
+UI_BassFlute: "Flute"
+
 UI_Title: "Bardcraft"
 UI_Tab_Performance: "Performance"
 UI_Tab_Practice: "Practice"
 UI_Tab_Songwriting: "Songwriting"
 UI_Tab_Stats: "Stats"
 
+UI_CheckboxOn: "On"
+UI_CheckboxOff: "Off"
+
 UI_PRoll: "Piano Roll"
 UI_PRoll_NewSong: "New Song"
 UI_PRoll_SaveSong: "Save Song"
 UI_PRoll_LoadSong: "Load Song"
 UI_PRoll_DeleteSong: "Delete Song"
+
+UI_PRoll_SongInfo: "Song Info"
+UI_PRoll_Parts: "Parts"
+
 UI_PRoll_SongTitle: "Title"
 UI_PRoll_SongDescription: "Description"
 UI_PRoll_SongInstruments: "Instruments"
@@ -66,6 +78,18 @@ UI_Argonian: "Argonian"
 UI_Elsweyri: "Elsweyri"
 UI_Daedric: "Daedric"
 UI_PRoll_Snap: "Snap (beats)"
+
+UI_PRoll_PartName: "Name"
+UI_PRoll_PartInstrument: "Instr."
+
+UI_0.03125: "1/32"
+UI_0.0625: "1/16"
+UI_0.125: "1/8"
+UI_0.25: "1/4"
+UI_0.5: "1/2"
+UI_1: "1"
+UI_2: "2"
+UI_4: "4"
 
 UI_Lvl_Performance: "Performance"
 UI_Lvl_Performance_1: "Novice"

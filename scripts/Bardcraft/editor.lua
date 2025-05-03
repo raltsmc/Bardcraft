@@ -7,6 +7,8 @@ local ambient = require('openmw.ambient')
 local core = require('openmw.core')
 local util = require('openmw.util')
 local input = require('openmw.input')
+local nearby = require('openmw.nearby')
+local types = require('openmw.types')
 
 local l10n = core.l10n('Bardcraft')
 
@@ -18,9 +20,8 @@ local Editor = {}
 
 Editor.STATE = {
     PERFORMANCE = 0,
-    PRACTICE = 1,
-    SONG = 2,
-    STATS = 3,
+    SONG = 1,
+    STATS = 2,
 }
 
 Editor.ZOOM_LEVELS = {
@@ -37,51 +38,70 @@ Editor.SNAP_LEVELS = {
     [1] = 1/32,
     [2] = 1/16,
     [3] = 1/8,
-    [4] = 1/4,
-    [5] = 1/2,
-    [6] = 1.0,
-    [7] = 2.0,
-    [8] = 4.0,
+    [4] = 1/6,
+    [5] = 1/4,
+    [6] = 1/3,
+    [7] = 1/2,
+    [8] = 1.0,
+    [9] = 2.0,
+    [10] = 4.0,
+}
+
+Editor.SONGS_MODE = {
+    PRESET = "songs/preset",
+    CUSTOM = "songs/custom"
 }
 
 Editor.active = false
 Editor.song = nil
 Editor.songs = nil
+Editor.songsMode = Editor.SONGS_MODE.PRESET
 Editor.state = nil
 Editor.noteMap = nil
 Editor.snap = true
-Editor.snapLevel = 4
+Editor.snapLevel = 5
 Editor.zoomLevel = 4
-Editor.noteIdCounter = 1
 Editor.activePart = nil
+Editor.partsPlaying = {}
+
+Editor.deletePartIndex = nil
+Editor.deletePartClickCount = 0
+Editor.deletePartConfirmTimer = 0
+Editor.deletePartConfirmResetTime = 1
 
 Editor.windowXOff = 20
 Editor.windowYOff = 200
 Editor.windowCaptionHeight = 20
 Editor.windowTabsHeight = 32
-Editor.windowLeftBoxXMult = 4 / 32
-Editor.windowMiddleBoxXMult = 4 / 32
+Editor.windowLeftBoxXMult = 1 / 16
+Editor.windowLeftBoxXSize = 150
+Editor.windowMiddleBoxXMult = 1 / 16
+Editor.windowMiddleBoxXSize = 150
 
-local uiColors = {
+Editor.uiColors = {
     DEFAULT = util.color.rgb(202 / 255, 165 / 255, 96 / 255),
     DEFAULT_LIGHT = util.color.rgb(223 / 255, 201 / 255, 159 / 255),
     WHITE = util.color.rgb(1, 1, 1),
+    GRAY = util.color.rgb(0.5, 0.5, 0.5),
     BLACK = util.color.rgb(0, 0, 0),
     CYAN = util.color.rgb(0, 1, 1),
     YELLOW = util.color.rgb(1, 1, 0),
     RED = util.color.rgb(1, 0, 0),
+    DARK_RED = util.color.rgb(0.5, 0, 0),
+    RED_DESAT = util.color.rgb(0.7, 0.3, 0.3),
+    DARK_RED_DESAT = util.color.rgb(0.3, 0.05, 0.05),
 }
 
-Editor.noteColor = uiColors.DEFAULT
-Editor.backgroundColor = uiColors.WHITE
-Editor.keyboardColor = uiColors.WHITE
-Editor.keyboardWhiteTextColor = uiColors.BLACK
-Editor.keyboardBlackTextColor = uiColors.WHITE
-Editor.beatLineColor = uiColors.DEFAULT_LIGHT
-Editor.barLineColor = uiColors.DEFAULT_LIGHT
-Editor.loopStartLineColor = uiColors.CYAN
-Editor.loopEndLineColor = uiColors.CYAN
-Editor.playbackLineColor = uiColors.YELLOW
+Editor.noteColor = Editor.uiColors.DEFAULT
+Editor.backgroundColor = Editor.uiColors.WHITE
+Editor.keyboardColor = Editor.uiColors.WHITE
+Editor.keyboardWhiteTextColor = Editor.uiColors.BLACK
+Editor.keyboardBlackTextColor = Editor.uiColors.WHITE
+Editor.beatLineColor = Editor.uiColors.DEFAULT_LIGHT
+Editor.barLineColor = Editor.uiColors.DEFAULT_LIGHT
+Editor.loopStartLineColor = Editor.uiColors.CYAN
+Editor.loopEndLineColor = Editor.uiColors.CYAN
+Editor.playbackLineColor = Editor.uiColors.YELLOW
 
 local function createPaddingTemplate(size)
     size = util.vector2(1, 1) * size
@@ -238,7 +258,7 @@ end
 
 local wrapperElement = nil
 local screenSize = nil
-local blockedKeySound = nil
+local playingNoteSound = nil
 local pianoRollScrollX = 0
 local pianoRollScrollY = 0
 local pianoRollScrollXMax = 0
@@ -252,7 +272,7 @@ local pianoRollEditorWrapper = nil
 local pianoRollEditorMarkersWrapper = nil
 local pianoRoll = nil
 
-local activeDropdown = nil
+local scrollableFocused = nil
 
 function Editor:getScaleTexture()
     if not self.song then return end
@@ -280,12 +300,19 @@ local pianoRollLastNoteSize = 0
 local playback = false
 local playbackStartScrollX = 0
 
+local function getNoteSoundPath(note)
+    if not Editor.activePart then return '' end
+    local profile = Song.getInstrumentProfile(Editor.activePart.instrument)
+    local filePath = 'sound\\Bardcraft\\samples\\' .. profile.name .. '\\' .. profile.name .. '_' .. Song.noteNumberToName(note) .. '.wav'
+    return filePath
+end
+
 local function playNoteSound(note)
-    local noteNames = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
-    local octave = math.floor(note / 12) - 1
-    local noteName = noteNames[(note % 12) + 1]
-    local fileName = 'sound\\Bardcraft\\samples\\Lute\\Lute_' .. noteName .. octave .. '.wav'
-    ambient.playSoundFile(fileName)
+    ambient.playSoundFile(getNoteSoundPath(note))
+end
+
+local function stopNoteSound(note)
+    ambient.stopSoundFile(getNoteSoundPath(note))
 end
 
 --[[local ZoomLevels = {
@@ -326,7 +353,7 @@ local function calcPianoRollWrapperSize()
     if not screenSize then return util.vector2(0, 0) end
     local windowWidth = calcOuterWindowWidth()
     local windowHeight = calcOuterWindowHeight()
-    local width = windowWidth - ((screenSize.x * Editor.windowLeftBoxXMult) + (screenSize.x * Editor.windowMiddleBoxXMult)) - 8
+    local width = windowWidth - ((screenSize.x * Editor.windowLeftBoxXMult + Editor.windowLeftBoxXSize) + (screenSize.x * Editor.windowMiddleBoxXMult + Editor.windowMiddleBoxXSize)) - 8
     local height = windowHeight - (Editor.windowCaptionHeight + Editor.windowTabsHeight) - 8
     return util.vector2(width, height)
 end
@@ -402,11 +429,12 @@ end
 local function updatePianoRollBarNumberLabels()
     -- First, calculate which bar lines are visible
     local barWidth = calcBarWidth()
-    local barCount = math.floor(calcPianoRollEditorWidth() / barWidth) + 1
+    local editorSize = calcPianoRollEditorWrapperSize()
+    local barCount = math.floor(editorSize.x / barWidth) + 1
     local barLines = {
         type = ui.TYPE.Widget,
         props = {
-            size = util.vector2(calcPianoRollEditorWidth(), calcPianoRollEditorHeight()),
+            size = editorSize,
         },
         content = ui.content {},
     }
@@ -425,7 +453,7 @@ local function updatePianoRollBarNumberLabels()
                     props = {
                         text = tostring(barNumber),
                         textSize = 16,
-                        textColor = uiColors.DEFAULT_LIGHT,
+                        textColor = Editor.uiColors.DEFAULT_LIGHT,
                     },
                 },
             }
@@ -434,12 +462,11 @@ local function updatePianoRollBarNumberLabels()
     pianoRollEditorMarkersWrapper.layout.content[2] = barLines
 end
 
+local editorOverlay, editorMarkers, editorNotes = nil, nil, nil
+
 local function updatePianoRoll()
     if not Editor.song then return end
     if not pianoRollWrapper or not pianoRollEditorWrapper or not pianoRollEditorWrapper.layout or not pianoRollEditorMarkersWrapper or not pianoRollEditorMarkersWrapper.layout then return end
-    local editorOverlay = pianoRollEditorWrapper.layout.content[1].content.pianoRollOverlay
-    local editorMarkers = pianoRollEditorMarkersWrapper.layout.content.pianoRollMarkers
-    local editorNotes = pianoRollEditorWrapper.layout.content[1].content.pianoRollNotes
     local barWidth = calcBarWidth()
     local octaveHeight = calcOctaveHeight()
     pianoRollKeyboardWrapper.layout.content[1].props.position = util.vector2(0, pianoRollScrollY)
@@ -482,7 +509,6 @@ end
 
 local addNote, removeNote, initNotes, saveNotes
 local addSong, saveSong, setSong
-local noteEventsToNoteMap, noteMapToNoteEvents
 
 local uiTemplates
 
@@ -555,9 +581,6 @@ uiTemplates = {
                                                     uiButton(l10n('UI_Tab_Performance'), function()
                                                         Editor:setState(Editor.STATE.PERFORMANCE)
                                                     end),
-                                                    uiButton(l10n('UI_Tab_Practice'), function()
-                                                        Editor:setState(Editor.STATE.PRACTICE)
-                                                    end),
                                                     uiButton(l10n('UI_Tab_Songwriting'), function()
                                                         Editor:setState(Editor.STATE.SONG)
                                                     end),
@@ -595,7 +618,7 @@ uiTemplates = {
             {
                 template = I.MWUI.templates.borders,
                 props = {
-                    size = util.vector2(ui.screenSize().x * Editor.windowLeftBoxXMult, 0),
+                    size = util.vector2(ui.screenSize().x * Editor.windowLeftBoxXMult + Editor.windowLeftBoxXSize, 0),
                     relativeSize = util.vector2(0, 1),
                 },
                 content = ui.content {
@@ -615,7 +638,7 @@ uiTemplates = {
             {
                 template = I.MWUI.templates.borders,
                 props = {
-                    size = util.vector2(ui.screenSize().x * Editor.windowMiddleBoxXMult, 0),
+                    size = util.vector2(ui.screenSize().x * Editor.windowMiddleBoxXMult + Editor.windowMiddleBoxXSize, 0),
                     relativeSize = util.vector2(0, 1),
                 },
                 content = ui.content {
@@ -692,7 +715,8 @@ uiTemplates = {
                             autoSize = false,
                             relativeSize = util.vector2(1, 1),
                             grow = 1,
-                            stretch = 1
+                            stretch = 1,
+                            arrange = ui.ALIGNMENT.Center,
                         },
                         content = ui.content {},
                     },
@@ -767,11 +791,15 @@ uiTemplates = {
         local itemCount = #items
 
         local function getLabel()
-            local label = tostring(items[index])
+            local label = items[index]
+            if type(label) == 'number' then
+                -- Round to 8 decimal places
+                label = math.floor(label * 1e8 + 0.5) / 1e8
+            end
             if localize then
                 label = l10n('UI_' .. label)
             end
-            return label
+            return tostring(label)
         end
 
         local label = getLabel()
@@ -959,11 +987,113 @@ uiTemplates = {
                                 stretch = 1,
                             },
                             content = ui.content {}
+                        },
+                        {
+                            template = I.MWUI.templates.borders,
+                            props = {
+                                size = util.vector2(24, 0),
+                            },
+                            external = {
+                                stretch = 1,
+                            },
+                            content = ui.content {
+                                {
+                                    type = ui.TYPE.Image,
+                                    props = {
+                                        anchor = util.vector2(0.5, 0.5),
+                                        relativePosition = util.vector2(0.5, 0.5),
+                                        resource = ui.texture { path = 'textures/Bardcraft/ui/' .. (Editor.partsPlaying[part.index] and 'part-vol-on.dds' or 'part-vol-off.dds') },
+                                        color = Editor.uiColors.DEFAULT,
+                                        alpha = Editor.partsPlaying[part.index] and 1 or 0.5,
+                                        size = util.vector2(16, 16),
+                                    }
+                                }
+                            },
+                            events = {}
+                        },
+                        {
+                            template = I.MWUI.templates.borders,
+                            props = {
+                                size = util.vector2(24, 0),
+                            },
+                            external = {
+                                stretch = 1,
+                            },
+                            content = ui.content {
+                                {
+                                    type = ui.TYPE.Image,
+                                    props = {
+                                        anchor = util.vector2(0.5, 0.5),
+                                        relativePosition = util.vector2(0.5, 0.5),
+                                        resource = ui.texture { path = 'textures/Bardcraft/ui/part-delete.dds' },
+                                        color = Editor.uiColors.RED_DESAT,
+                                        size = util.vector2(16, 16),
+                                    }
+                                }
+                            },
+                            events = {
+                                mouseClick = async:callback(function()
+                                    if Editor.deletePartClickCount >= 2 then
+                                        Editor.deletePartClickCount = 0
+                                        if part == Editor.activePart then
+                                            Editor.activePart = nil
+                                        end
+                                        if part then
+                                            Editor.song:removePart(part.index)
+                                            saveSong()
+                                            Editor:destroyUI()
+                                            Editor:createUI()
+                                        end
+                                        return
+                                    end
+                                    if Editor.deletePartIndex ~= part.index then
+                                        Editor.deletePartIndex = part.index
+                                        Editor.deletePartClickCount = 0
+                                    end
+                                    Editor.deletePartClickCount = Editor.deletePartClickCount + 1
+                                    Editor.deletePartConfirmTimer = Editor.deletePartConfirmResetTime
+                                    ui.showMessage(l10n('UI_PRoll_DeletePartMsg'):gsub('%%{count}', tostring(3 - Editor.deletePartClickCount)))
+                                end),
+                            }
                         }
                     }
                 }
             },
         }
+
+        partDisplay.layout.content[1].content[3].events.mousePress = async:callback(function(e)
+            -- Left mouse button: Mute/unmute, Right mouse button: Toggle solo
+            if e.button == 1 then
+                Editor.partsPlaying[part.index] = not Editor.partsPlaying[part.index]
+                partDisplay.layout.content[1].content[3].content[1].props.resource = ui.texture { path = 'textures/Bardcraft/ui/' .. (Editor.partsPlaying[part.index] and 'part-vol-on.dds' or 'part-vol-off.dds') }
+                partDisplay.layout.content[1].content[3].content[1].props.alpha = Editor.partsPlaying[part.index] and 1 or 0.5
+                partDisplay:update()
+            elseif e.button == 3 then
+                local soloCount = 0
+                local targetSoloed = false
+                for i, isPlaying in pairs(Editor.partsPlaying) do
+                    if isPlaying then
+                        soloCount = soloCount + 1
+                        if i == part.index then
+                            targetSoloed = true
+                        end
+                    end
+                end
+
+                if soloCount == 1 and targetSoloed then
+                    for i, _ in pairs(Editor.partsPlaying) do
+                        Editor.partsPlaying[i] = true
+                    end
+                else
+                    for i, _ in pairs(Editor.partsPlaying) do
+                        Editor.partsPlaying[i] = i == part.index
+                    end
+                end
+                
+                Editor:destroyUI()
+                Editor:createUI()
+            end
+        end)
 
         partDisplay.layout.content[1].content[1].events.mouseClick = async:callback(function()
             Editor.activePart = part
@@ -991,6 +1121,217 @@ uiTemplates = {
         }
         return partDisplay
     end,
+    partDisplaySmall = function(part, itemHeight, thickBorders, confidence, onClick)
+        local function getInstrumentName()
+            return Song.getInstrumentProfile(part.instrument).name
+        end
+
+        local partDisplaySmall = ui.create {
+            template = (thickBorders and I.MWUI.templates.bordersThick or I.MWUI.templates.borders),
+            props = {
+                size = util.vector2(0, itemHeight),
+            },
+            external = {
+                stretch = 1,
+            },
+            content = ui.content {
+                {
+                    type = ui.TYPE.Flex,
+                    props = {
+                        horizontal = true,
+                        autoSize = false,
+                        size = util.vector2(0, itemHeight),
+                        relativeSize = util.vector2(1, 0),
+                        arrange = ui.ALIGNMENT.Center,
+                    },
+                    content = ui.content {
+                        {
+                            type = ui.TYPE.Image,
+                            props = {
+                                resource = ui.texture { path = Instruments[getInstrumentName()].icon },
+                                size = util.vector2(itemHeight - 8, itemHeight - 8),
+                            },
+                        },
+                        {
+                            template = createPaddingTemplate(4),
+                        },
+                        {
+                            type = ui.TYPE.Flex,
+                            external = {
+                                grow = 1,
+                                stretch = 1,
+                            },
+                            content = ui.content {
+                                {
+                                    template = I.MWUI.templates.textNormal,
+                                    props = {
+                                        text = part.title,
+                                        textColor = thickBorders and Editor.uiColors.WHITE or Editor.uiColors.DEFAULT,
+                                    },
+                                },
+                                {
+                                    template = I.MWUI.templates.textNormal,
+                                    props = {
+                                        text = l10n('UI_PartConfidence'):gsub('%%{confidence}', string.format('%.2f', confidence)),
+                                        textColor = Editor.uiColors.DEFAULT,
+                                    },
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            events = {
+                mouseClick = async:callback(function()
+                    if onClick then
+                        onClick()
+                    end
+                end),
+            }
+        }
+        
+        return partDisplaySmall
+    end,
+    songDisplay = function(song, itemHeight, thickBorders, onClick)
+        return {
+            template = (thickBorders and I.MWUI.templates.bordersThick or I.MWUI.templates.borders),
+            props = {
+                size = util.vector2(0, itemHeight),
+            },
+            external = {
+                stretch = 1,
+            },
+            content = ui.content {
+                {
+                    type = ui.TYPE.Image,
+                    props = {
+                        resource = ui.texture { path = 'textures/Bardcraft/ui/songbgr/' .. song.texture .. '.dds' },
+                        relativeSize = util.vector2(1, 1),
+                        color = Editor.uiColors.GRAY,
+                    },
+                },
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = song.title,
+                        textColor = thickBorders and Editor.uiColors.WHITE or Editor.uiColors.DEFAULT,
+                        anchor = util.vector2(0.5, 0.5),
+                        relativePosition = util.vector2(0.5, 0.5),
+                    },
+                },
+            },
+            events = {
+                mouseClick = async:callback(function()
+                    if onClick then
+                        onClick()
+                    end
+                end),
+            }
+        }
+    end,
+    performerDisplay = function(npc, itemHeight, thickBorders, onClick)
+        return {
+            template = (thickBorders and I.MWUI.templates.bordersThick or I.MWUI.templates.borders),
+            props = {
+                size = util.vector2(0, itemHeight),
+            },
+            external = {
+                stretch = 1,
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = types.NPC.record(npc).name,
+                        textColor = thickBorders and Editor.uiColors.WHITE or Editor.uiColors.DEFAULT,
+                        anchor = util.vector2(0.5, 0.5),
+                        relativePosition = util.vector2(0.5, 0.5),
+                    },
+                },
+            },
+            events = {
+                mouseClick = async:callback(function()
+                    if onClick then
+                        onClick()
+                    end
+                end),
+            }
+        }
+    end,
+    button = function(text, size, callback)
+        return {
+            template = I.MWUI.templates.bordersThick,
+            props = {
+                size = size or util.vector2(0, 0),
+            },
+            content = ui.content {
+                {
+                    type = ui.TYPE.Flex,
+                    props = {
+                        autoSize = false,
+                        relativeSize = util.vector2(1, 1),
+                        arrange = ui.ALIGNMENT.Center,
+                        align = ui.ALIGNMENT.Center,
+                    },
+                    content = ui.content {
+                        {
+                            template = I.MWUI.templates.textNormal,
+                            props = {
+                                text = text,
+                            },
+                        },
+                    },
+                },
+            },
+            events = {
+                mouseClick = async:callback(function()
+                    if callback then
+                        callback()
+                    end
+                end),
+            }
+        }
+    end,
+    scrollable = function(size, content, flexSize)
+        local scrollLimit = flexSize and (flexSize.y - size.y) or math.huge
+        local canScroll
+        if flexSize then
+            canScroll = flexSize.y > size.y
+        else
+            canScroll = true
+        end
+        local scrollWidget = ui.create {
+            template = I.MWUI.templates.borders,
+            props = {
+                size = size,
+                scrollLimit = scrollLimit,
+                canScroll = canScroll,
+            },
+            content = ui.content {
+                {
+                    type = ui.TYPE.Flex,
+                    props = {
+                        autoSize = flexSize == nil,
+                        size = flexSize or util.vector2(0, 0),
+                        relativeSize = flexSize and util.vector2(1, 0) or util.vector2(0, 0),
+                        position = util.vector2(0, 0),
+                    },
+                    content = content or ui.content{},
+                }
+            },
+        }
+        scrollWidget.layout.events = {
+            focusGain = async:callback(function()
+                scrollableFocused = scrollWidget
+            end),
+            focusLoss = async:callback(function(self)
+                if scrollableFocused == scrollWidget then
+                    scrollableFocused = nil
+                end
+            end),
+        }
+        return scrollWidget
+    end,
     pianoRollKeyboard = function(timeSig)
         local bar = {
             type = ui.TYPE.Widget,
@@ -1001,29 +1342,41 @@ uiTemplates = {
             content = ui.content {},
             events = {
                 mouseMove = async:callback(function(e)
-                    if e.button == 1 then
+                    if e.button == 1 and Editor.activePart then
                         local noteIndex = math.floor((128 - (e.offset.y / 16)))
-                        local octave = math.floor(noteIndex / 12) - 1
+                        --[[local octave = math.floor(noteIndex / 12) - 1
                         local noteNames = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
                         local noteName = noteNames[(noteIndex % 12) + 1]
-                        local fileName = 'sound\\Bardcraft\\samples\\Lute\\Lute_' .. noteName .. octave .. '.wav'
-                        if blockedKeySound ~= fileName then
+                        local fileName = 'sound\\Bardcraft\\samples\\Lute\\Lute_' .. noteName .. octave .. '.wav']]
+                        local fileName = getNoteSoundPath(noteIndex)
+                        if playingNoteSound ~= fileName then
                             ambient.playSoundFile(fileName)
-                            blockedKeySound = fileName
+                            if playingNoteSound and not Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
+                                ambient.stopSoundFile(playingNoteSound)
+                            end
+                            playingNoteSound = fileName
                         end
                     end
                 end),
                 mousePress = async:callback(function(e)
-                    if e.button == 1 then
+                    if e.button == 1 and Editor.activePart then
                         local noteIndex = math.floor((128 - (e.offset.y / 16)))
-                        local octave = math.floor(noteIndex / 12) - 1
+                        --[[local octave = math.floor(noteIndex / 12) - 1
                         local noteNames = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
                         local noteName = noteNames[(noteIndex % 12) + 1]
-                        local fileName = 'sound\\Bardcraft\\samples\\Lute\\Lute_' .. noteName .. octave .. '.wav'
+                        local fileName = 'sound\\Bardcraft\\samples\\Lute\\Lute_' .. noteName .. octave .. '.wav']]
+                        local fileName = getNoteSoundPath(noteIndex)
                         ambient.playSoundFile(fileName)
-                        blockedKeySound = fileName
+                        playingNoteSound = fileName
                     end
-                end)
+                end),
+                mouseRelease = async:callback(function(e)
+                    if e.button == 1 and Editor.activePart then
+                        if playingNoteSound and not Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
+                            ambient.stopSoundFile(playingNoteSound)
+                        end
+                    end
+                end),
             }
         }
         bar.content:add({
@@ -1195,15 +1548,19 @@ uiTemplates = {
         editor.content:add(editorNotes)
         return editor
     end,
-    pianoRollNote = function(id, note, tick, duration)
+    pianoRollNote = function(id, note, tick, duration, active)
         local noteWidth = calcBeatWidth(Editor.song.timeSig[2]) * (Editor.song:tickToBeat(duration))
         local noteHeight = calcOctaveHeight() / 12
         local noteX = calcBeatWidth(Editor.song.timeSig[2]) * (Editor.song:tickToBeat(tick))
         local noteY = (127 - note) * noteHeight
-        return {
+        if active == nil then
+            active = true
+        end
+        local noteLayout = {
             type = ui.TYPE.Image,
             name = tostring(id),
             props = {
+                active = active,
                 resource = uiTextures.pianoRollNote,
                 size = util.vector2(noteWidth, noteHeight),
                 tileH = true,
@@ -1211,54 +1568,82 @@ uiTemplates = {
                 color = Editor.noteColor,
                 position = util.vector2(noteX, noteY),
             },
-            events = {
-                mousePress = async:callback(function(e, self)
-                    if e.button == 3 then
-                        removeNote(self)
-                        saveNotes()
-                        return
-                    end
-                    if e.button == 1 then
-                        pianoRollLastNoteSize = duration
-                        pianoRollActiveNote = tonumber(self.name)
-                        pianoRollDragStart = editorOffsetToRealOffset(self.props.position + e.offset)
-                        local resizeArea = math.min(8, noteWidth / 2)
-                        local distFromEnd = noteWidth - e.offset.x
-                        if distFromEnd < resizeArea then
-                            pianoRollDragType = DragType.RESIZE_RIGHT
-                            pianoRollDragOffset = util.vector2(0, 0)
-                        else
-                            pianoRollDragType = DragType.MOVE
-                            pianoRollDragOffset = -e.offset
-                        end
-                    end
-                end),
-            }
+            events = {}
         }
-    end,
+        if active then
+            noteLayout.events.mousePress = async:callback(function(e, self)
+                if not self.props.active then return end
+                if e.button == 3 then
+                    removeNote(self)
+                    saveNotes()
+                    return
+                end
+                if e.button == 1 then
+                    pianoRollLastNoteSize = duration
+                    pianoRollActiveNote = tonumber(self.name)
+                    pianoRollDragStart = editorOffsetToRealOffset(self.props.position + e.offset)
+                    local resizeArea = math.min(8, noteWidth / 2)
+                    local distFromEnd = noteWidth - e.offset.x
+                    if distFromEnd < resizeArea then
+                        pianoRollDragType = DragType.RESIZE_RIGHT
+                        pianoRollDragOffset = util.vector2(0, 0)
+                    else
+                        pianoRollDragType = DragType.MOVE
+                        pianoRollDragOffset = -e.offset
+                    end
+                end
+            end)
+        end
+        return noteLayout
+    end
 }
 
-addNote = function(note, tick, duration, instrument)
+local function populateNotes()
+    if not pianoRollEditorWrapper then return end
+    pianoRollEditorWrapper.layout.content[1].content[3].content = ui.content{}
+    for _, noteData in pairs(Editor.noteMap) do
+        local active = not Editor.activePart or (noteData.part == Editor.activePart.index)
+        local id = noteData.id
+        local note = noteData.note
+        local tick = noteData.time
+        local duration = noteData.duration
+        -- Check if note is within the viewing area
+        local noteX = calcBeatWidth(Editor.song.timeSig[2]) * (Editor.song:tickToBeat(tick))
+        local noteWidth = calcBeatWidth(Editor.song.timeSig[2]) * (Editor.song:tickToBeat(duration))
+        local wrapperSize = calcPianoRollEditorWrapperSize()
+
+        if noteX + noteWidth >= -pianoRollScrollX - pianoRollScrollPopulateWindowSize and noteX <= -pianoRollScrollX + pianoRollScrollPopulateWindowSize + wrapperSize.x then
+            -- Add note to the piano roll
+            local template = uiTemplates.pianoRollNote(id, note, tick, duration, active)
+            template.props.alpha = active and 1 or 0.2
+            template.props.active = active
+            pianoRollEditorWrapper.layout.content[1].content[3].content:add(template)
+        end
+        --pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration))
+    end
+    pianoRollEditorWrapper:update()
+end
+
+addNote = function(note, tick, duration, active)
     if not Editor.song then return end
     duration = duration or Editor.song.resolution * (4 / Editor.song.timeSig[2])
-    instrument = instrument or 24
+    local id = #Editor.noteMap + 1
     local noteData = {
-        id = Editor.noteIdCounter,
+        id = id,
         note = note,
         velocity = 127,
-        track = 1,
-        instrument = instrument,
+        part = Editor.activePart.index,
         time = tick,
         duration = duration,
     }
     table.insert(Editor.noteMap, noteData)
-    pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(Editor.noteIdCounter, note, tick, duration))
-    Editor.noteIdCounter = Editor.noteIdCounter + 1
+    pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration, active))
+    Editor.song.noteIdCounter = Editor.song.noteIdCounter + 1
     pianoRollEditorWrapper:update()
     --[[table.sort(Editor.noteMap, function(a, b)
         return a.time < b.time
     end)]]
-    return #Editor.noteMap
+    return id
 end
 
 removeNote = function(element)
@@ -1282,44 +1667,19 @@ removeNote = function(element)
     pianoRollEditorWrapper:update()
 end
 
-local function populateNotes()
-    pianoRollEditorWrapper.layout.content[1].content[3].content = ui.content{}
-    for _, noteData in pairs(Editor.noteMap) do
-        if not Editor.activePart or (noteData.instrument == Editor.activePart.instrument and noteData.part == Editor.activePart.index) then
-            local id = noteData.id
-            local note = noteData.note
-            local tick = noteData.time
-            local duration = noteData.duration
-            -- Check if note is within the viewing area
-            local noteX = calcBeatWidth(Editor.song.timeSig[2]) * (Editor.song:tickToBeat(tick))
-            local noteWidth = calcBeatWidth(Editor.song.timeSig[2]) * (Editor.song:tickToBeat(duration))
-            local wrapperSize = calcPianoRollEditorWrapperSize()
-
-            if noteX + noteWidth >= -pianoRollScrollX - pianoRollScrollPopulateWindowSize and noteX <= -pianoRollScrollX + pianoRollScrollPopulateWindowSize + wrapperSize.x then
-                -- Add note to the piano roll
-                pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration))
-            end
-            --pianoRollEditorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration))
-        end
-    end
-    pianoRollEditorWrapper:update()
-end
-
 initNotes = function()
     if not Editor.song then return end
-    Editor.noteIdCounter = 1
-    noteEventsToNoteMap()
+    Editor.noteMap = Editor.song:noteEventsToNoteMap(Editor.song.notes)
     populateNotes()
 end
 
 saveNotes = function()
     if not Editor.song then return end
-    local noteEvents = noteMapToNoteEvents()
-    Editor.song.notes = noteEvents
+    Editor.song.notes = Editor.song:noteMapToNoteEvents(Editor.noteMap)
     saveSong()
 end
 
-local getSongTab, getPerformanceTab, getPracticeTab, getStatsTab
+local getSongTab, getPerformanceTab, getStatsTab
 
 local function setMainContent(content)
     if wrapperElement then
@@ -1412,87 +1772,20 @@ local function redrawPianoRollEditor()
     pianoRollEditorWrapper.layout.content[1] = uiTemplates.pianoRollEditor()
     updatePianoRollBarNumberLabels()
     initNotes()
+
+    editorOverlay = pianoRollEditorWrapper.layout.content[1].content.pianoRollOverlay
+    editorMarkers = pianoRollEditorMarkersWrapper.layout.content.pianoRollMarkers
+    editorNotes = pianoRollEditorWrapper.layout.content[1].content.pianoRollNotes
 end
 
-noteEventsToNoteMap = function()
-    if not Editor.song then return end
-    -- In this function, we will go through the list of note starts and note ends, and pair them up
-    Editor.noteMap = {}
-    local noteEvents = Editor.song.notes
-    local activeNotes = {}
-
-    Editor.noteIdCounter = 1
-
-    for _, event in ipairs(noteEvents) do
-        if event.type == 'noteOn' and event.velocity > 0 then
-            local key = event.note .. '_' .. event.instrument
-            activeNotes[key] = {
-                start = event.time,
-                velocity = event.velocity,
-            }
-        elseif (event.type == 'noteOff') or (event.type == 'noteOn' and event.velocity == 0) then
-            local key = event.note .. '_' .. event.instrument
-            if activeNotes[key] then
-                local duration = event.time - activeNotes[key].start
-                if duration > 0 then
-                    local noteData = {
-                        id = Editor.noteIdCounter,--event.id,
-                        note = event.note,
-                        velocity = activeNotes[key].velocity,
-                        part = event.part,
-                        instrument = event.instrument,
-                        time = activeNotes[key].start,
-                        duration = duration,
-                    }
-                    --table.insert(Editor.noteMap, noteData)
-                    Editor.noteMap[noteData.id] = noteData
-                    activeNotes[key] = nil
-                    Editor.noteIdCounter = math.max(Editor.noteIdCounter, noteData.id + 1)
-                end
-            end
+local function stopSounds(instrument)
+    local profile = Song.getInstrumentProfile(instrument)
+    for j = 0, 127 do
+        local filePath = 'sound\\Bardcraft\\samples\\' .. profile.name .. '\\' .. profile.name .. '_' .. Song.noteNumberToName(j) .. '.wav'
+        if ambient.isSoundFilePlaying(filePath) then
+            ambient.stopSoundFile(filePath)
         end
     end
-    --[[table.sort(Editor.noteMap, function(a, b)
-        return a.time < b.time
-    end)]]
-end
-
-noteMapToNoteEvents = function()
-    if not Editor.noteMap then return {} end
-    -- This converts the merged note map back to a list of on/off note events
-    local noteEvents = {}
-    for _, noteData in pairs(Editor.noteMap) do
-        if noteData then
-            local noteOnEvent = {
-                id = noteData.id,
-                type = 'noteOn',
-                note = noteData.note,
-                velocity = noteData.velocity,
-                part = noteData.part,
-                instrument = noteData.instrument,
-                time = noteData.time,
-            }
-            table.insert(noteEvents, noteOnEvent)
-
-            local noteOffEvent = {
-                id = noteData.id,
-                type = 'noteOff',
-                note = noteData.note,
-                velocity = 0,
-                part = noteData.part,
-                instrument = noteData.instrument,
-                time = noteData.time + noteData.duration,
-            }
-            table.insert(noteEvents, noteOffEvent)
-        end
-    end
-    table.sort(noteEvents, function(a, b)
-        if a.time == b.time then
-            return (a.type == "noteOff" and b.type == "noteOn")
-        end
-        return a.time < b.time
-    end)
-    return noteEvents
 end
 
 local function stopAllSounds()
@@ -1538,6 +1831,21 @@ setSong = function(song)
     if song then
         Editor.song = song
         setmetatable(Editor.song, Song)
+        Editor.activePart = nil
+        pianoRollScrollX = 0
+        local partKeys = {}
+        for i, _ in pairs(Editor.song.parts) do
+            if i ~= 0 then
+                table.insert(partKeys, i)
+            end
+        end
+        table.sort(partKeys, function(a, b)
+            return a < b
+        end)
+        Editor.activePart = partKeys[1] and Editor.song.parts[partKeys[1]][1] or nil
+        for _, part in pairs(Editor.song.parts) do
+            Editor.partsPlaying[part.index] = true
+        end
         redrawPianoRollEditor()
         stopPlayback()
         pianoRollLastNoteSize = Editor.song.resolution * (4 / Editor.song.timeSig[2])
@@ -1545,23 +1853,23 @@ setSong = function(song)
 end
 
 saveSong = function()
-    --[[local songs = storage.playerSection('Bardcraft'):getCopy('songs/custom') or {}
+    local songs = storage.playerSection('Bardcraft'):getCopy(Editor.songsMode) or {}
     for i, song in ipairs(songs) do
         if song.id == Editor.song.id then
             songs[i] = Editor.song
             break
         end
     end
-    storage.playerSection('Bardcraft'):set('songs/custom', songs)]]
+    storage.playerSection('Bardcraft'):set(Editor.songsMode, songs)
 end
 
 addSong = function()
-    --[[local song = Song.new()
-    local songs = storage.playerSection('Bardcraft'):getCopy('songs/custom') or {}
+    local song = Song.new()
+    local songs = storage.playerSection('Bardcraft'):getCopy(Editor.songsMode) or {}
     table.insert(songs, song)
-    storage.playerSection('Bardcraft'):set('songs/custom', songs)
+    storage.playerSection('Bardcraft'):set(Editor.songsMode, songs)
     setSong(song)
-    setMainContent(getSongTab())]]
+    setMainContent(getSongTab())
 end
 
 local function isPowerOfTwo(n)
@@ -1590,10 +1898,37 @@ end
 
 local lastMouseDragPos = nil
 
+Editor.performanceSelectedSong = nil
+Editor.performanceSelectedPerformer = nil
+Editor.performanceSelectedPart = nil
+Editor.performancePartAssignments = {}
+Editor.performersInfo = {}
+Editor.canPerform = false
+
+local function startPerformance(isPractice)
+    if Editor.performanceSelectedSong then
+        local partCount = 0
+        local performers = {}
+        for id, part in pairs(Editor.performancePartAssignments) do
+            table.insert(performers, { actorId = id, part = part })
+            partCount = partCount + 1
+        end
+        if partCount == 0 then
+            return
+        end
+
+        core.sendGlobalEvent('BO_StartPerformance', {
+            song = Editor.performanceSelectedSong,
+            performers = performers,
+        })
+        Editor:onToggle()
+    end
+end
+
 getSongTab = function()
     local manager = auxUi.deepLayoutCopy(uiTemplates.songManager)
     local leftBox = manager.content[1].content[1].content
-    Editor.songs = storage.playerSection('Bardcraft'):getCopy('songs/preset') or {}
+    Editor.songs = storage.playerSection('Bardcraft'):getCopy(Editor.songsMode) or {}
     local songs = {}
     for _, song in ipairs(Editor.songs) do
         table.insert(songs, song)
@@ -1788,7 +2123,7 @@ getSongTab = function()
                     updateEditorOverlayRows()
                     saveSong()
                 end),
-                uiTemplates.select(Song.Mode, Editor.song.scale.mode, 50, true, 32, function(newVal)
+                uiTemplates.select(Song.Mode, Editor.song.scale.mode, 75, true, 32, function(newVal)
                     Editor.song.scale.mode = newVal
                     updateEditorOverlayRows()
                     saveSong()
@@ -1846,13 +2181,55 @@ getSongTab = function()
                 size = util.vector2(0, 32),
             },
         })
-        for k, v in pairs(Editor.song.parts) do
-            if k ~= 0 then
-                for _, part in ipairs(v) do
-                    table.insert(middleBox, uiTemplates.partDisplay(part))
-                end
-            end
+        local parts = {}
+        for _, v in ipairs(Editor.song.parts) do
+            table.insert(parts, v)
         end
+        table.sort(parts, function(a, b)
+            return a.instrument < b.instrument
+        end)
+        for _, part in ipairs(parts) do
+            table.insert(middleBox, uiTemplates.partDisplay(part))
+        end
+
+        table.insert(middleBox, {
+            type = ui.TYPE.Flex,
+            props = {
+                autoSize = false,
+                size = util.vector2(0, 32),
+                relativeSize = util.vector2(1, 0),
+                align = ui.ALIGNMENT.Start,
+                relativePosition = util.vector2(0, 1),
+                anchor = util.vector2(0, 1),
+                position = util.vector2(0, -32),
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.bordersThick,
+                    props = {
+                        size = util.vector2(0, 32),
+                        relativeSize = util.vector2(1, 0),
+                    },
+                    content = ui.content {
+                        {
+                            template = I.MWUI.templates.textNormal,
+                            props = {
+                                text = '+ New Part',
+                                anchor = util.vector2(0.5, 0.5),
+                                relativePosition = util.vector2(0.5, 0.5),
+                            },
+                        },
+                    },
+                    events = {
+                        mouseClick = async:callback(function()
+                            Editor.activePart = Editor.song:createNewPart()
+                            Editor:destroyUI()
+                            Editor:createUI()
+                        end),
+                    }
+                },
+            }
+        })
 
         --[[table.insert(manager.content[2].content, {
             type = ui.TYPE.Flex,
@@ -1989,6 +2366,10 @@ getSongTab = function()
                             noteData.time = util.clamp(tick, 1, math.huge)
                             if note ~= noteData.note then
                                 playNoteSound(note)
+                                playingNoteSound = note
+                                if not Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
+                                    stopNoteSound(noteData.note)
+                                end
                             end
                             noteData.note = note
                         elseif pianoRollDragType == DragType.RESIZE_RIGHT then
@@ -2017,20 +2398,23 @@ getSongTab = function()
                     if e.offset.y < 24 then
                         -- Set playback pos and start playback
                         local offset = editorOffsetToRealOffset(e.offset)
+                        stopAllSounds()
                         playback = true
                         Editor.song:resetPlayback()
                         Editor.song.playbackTickCurr = Editor.song:beatToTick(editorOffsetToRealOffset(e.offset).x / calcBeatWidth(Editor.song.timeSig[2]))
                         Editor.song.playbackTickPrev = Editor.song.playbackTickCurr
                         return
+                    elseif Editor.activePart then
+                        local note, tick = realOffsetToNote(editorOffsetToRealOffset(e.offset))
+                        local snap = calcSnapFactor()
+                        tick = math.floor(tick / snap) * snap + 1
+                        playNoteSound(note)
+                        playingNoteSound = note
+                        pianoRollActiveNote = addNote(note, tick, pianoRollLastNoteSize, true)
+                        pianoRollDragStart = editorOffsetToRealOffset(e.offset)
+                        pianoRollDragOffset = util.vector2(0, 0)
+                        pianoRollDragType = DragType.MOVE
                     end
-                    local note, tick = realOffsetToNote(editorOffsetToRealOffset(e.offset))
-                    local snap = calcSnapFactor()
-                    tick = math.floor(tick / snap) * snap + 1
-                    playNoteSound(note)
-                    pianoRollActiveNote = addNote(note, tick, pianoRollLastNoteSize)
-                    pianoRollDragStart = editorOffsetToRealOffset(e.offset)
-                    pianoRollDragOffset = util.vector2(0, 0)
-                    pianoRollDragType = DragType.MOVE
                 end),
                 mouseRelease = async:callback(function(e)
                     if e.button == 2 then
@@ -2042,6 +2426,10 @@ getSongTab = function()
                         pianoRollLastNoteSize = Editor.noteMap[pianoRollActiveNote].duration
                         pianoRollActiveNote = nil
                         pianoRollActiveNoteElement = nil
+                        if playingNoteSound and not Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
+                            stopNoteSound(playingNoteSound)
+                            playingNoteSound = nil
+                        end
                         pianoRollEditorWrapper:update()
                         saveNotes()
                     end
@@ -2087,18 +2475,232 @@ getSongTab = function()
                 },
         }
         table.insert(manager.content[3].content, pianoRollWrapper)
+        editorOverlay = pianoRollEditorWrapper.layout.content[1].content.pianoRollOverlay
+        editorMarkers = pianoRollEditorMarkersWrapper.layout.content.pianoRollMarkers
+        editorNotes = pianoRollEditorWrapper.layout.content[1].content.pianoRollNotes
     end
     return manager
 end
 
 getPerformanceTab = function()
     local performance = auxUi.deepLayoutCopy(uiTemplates.baseTab)
-    return performance
-end
+    local flexContent = performance.content[1].content[1].content
+    
+    if not Editor.songs or #Editor.songs == 0 then
+        Editor.songs = storage.playerSection('Bardcraft'):getCopy(Editor.songsMode) or {}
+        local songs = {}
+        for _, song in ipairs(Editor.songs) do
+            table.insert(songs, song)
+        end
+        table.sort(songs, function(a, b)
+            return a.title < b.title
+        end)
+        Editor.songs = songs
+    end
+    local scrollableSongContent = ui.content{}
+    local itemHeight = 48
+    local scrollableHeight = 450 * screenSize.y / 1080
+    local scrollableWidth = 300 * screenSize.x / 1920
+    for i, song in ipairs(Editor.songs) do
+        scrollableSongContent:add(uiTemplates.songDisplay(song, itemHeight, song == Editor.performanceSelectedSong, function()
+            if Editor.performanceSelectedSong and Editor.performanceSelectedSong.id == song.id then
+                Editor.performanceSelectedSong = nil
+            else
+                Editor.performanceSelectedSong = song
+            end
+            Editor.performanceSelectedPart = nil
+            Editor.performancePartAssignments = {}
+            setMainContent(getPerformanceTab())
+        end))
+    end
+    local scrollableSong = uiTemplates.scrollable(util.vector2(scrollableWidth, scrollableHeight), scrollableSongContent, util.vector2(0, itemHeight * #scrollableSongContent + 4))
 
-getPracticeTab = function()
-    local practice = auxUi.deepLayoutCopy(uiTemplates.baseTab)
-    return practice
+    local scrollablePerformersContent = ui.content{}
+    local performers = {}
+    for _, v in ipairs(nearby.actors) do
+        if v.type == types.NPC or v.type == types.Player then
+            scrollablePerformersContent:add(uiTemplates.performerDisplay(v, itemHeight, Editor.performanceSelectedPerformer and (v.id == Editor.performanceSelectedPerformer.id), function()
+                if Editor.performanceSelectedPerformer and Editor.performanceSelectedPerformer.id == v.id then
+                    Editor.performanceSelectedPerformer = nil
+                else
+                    Editor.performanceSelectedPerformer = v
+                end
+                setMainContent(getPerformanceTab())
+            end))
+        end
+    end
+    local scrollablePerformers = uiTemplates.scrollable(util.vector2(scrollableWidth, scrollableHeight), scrollablePerformersContent, util.vector2(0, itemHeight * #scrollablePerformersContent + 4))
+
+    local scrollablePartsContent = ui.content{}
+    if Editor.performanceSelectedSong then
+        local parts = {}
+        for _, v in ipairs(Editor.performanceSelectedSong.parts) do
+            table.insert(parts, v)
+        end
+        table.sort(parts, function(a, b)
+            return a.instrument < b.instrument or (a.instrument == b.instrument and a.title < b.title)
+        end)
+        for _, part in ipairs(parts) do
+            local selected = false
+            local confidence = 0
+            if Editor.performanceSelectedPerformer then
+                selected = part.index == Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id]
+                if Editor.performersInfo[Editor.performanceSelectedPerformer.id] then
+                    local knownSong = Editor.performersInfo[Editor.performanceSelectedPerformer.id].knownSongs[Editor.performanceSelectedSong.id]
+                    if knownSong then
+                        confidence = knownSong.partConfidences[part.index] or 0
+                    end
+                end
+            end
+            scrollablePartsContent:add(uiTemplates.partDisplaySmall(part, itemHeight, selected, confidence * 100, function()
+                if not Editor.performanceSelectedPerformer then return end
+                if Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id] == part.index then
+                    Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id] = nil
+                else
+                    Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id] = part.index
+                end
+                setMainContent(getPerformanceTab())
+            end))
+        end
+    end
+    local scrollableParts = uiTemplates.scrollable(util.vector2(scrollableWidth, scrollableHeight), scrollablePartsContent, util.vector2(0, itemHeight * #scrollablePartsContent + 4))
+
+    local selectedSongInfoTitle, selectedSongInfoDescription, selectedSongPerformButtons = {}, {}, {}
+    if Editor.performanceSelectedSong then
+        selectedSongInfoTitle = {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.textHeader,
+                    props = {
+                        text = l10n('UI_PRoll_SongTitle') .. ': ',
+                    }
+                },
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = Editor.performanceSelectedSong.title,
+                    }
+                },
+            }
+        }
+        selectedSongInfoDescription = {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+            },
+            external = {
+                grow = 1,
+                stretch = 1,
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.textHeader,
+                    props = {
+                        text = l10n('UI_PRoll_SongDescription') .. ': ',
+                    }
+                },
+                {
+                    template = I.MWUI.templates.textParagraph,
+                    props = {
+                        text = Editor.performanceSelectedSong.desc or 'No description',
+                    },
+                    external = {
+                        grow = 1,
+                        stretch = 1,
+                    },
+                },
+            }
+        }
+        selectedSongPerformButtons = {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+                autoSize = false,
+                relativeSize = util.vector2(1, 0),
+                size = util.vector2(0, 32),
+                align = ui.ALIGNMENT.Center,
+                relativePosition = util.vector2(0, 1),
+                anchor = util.vector2(0, 1),
+                position = util.vector2(0, -96),
+            },
+            content = ui.content {
+                uiTemplates.button(l10n('UI_Button_Perform'), util.vector2(192, 32)),
+                {
+                    template = I.MWUI.templates.interval,
+                },
+                uiTemplates.button(l10n('UI_Button_Practice'), util.vector2(192, 32), function()
+                    startPerformance()
+                end),
+            }
+        }
+    end
+
+    table.insert(flexContent, {
+        type = ui.TYPE.Flex,
+        props = {
+            autoSize = false,
+            relativeSize = util.vector2(1, 1),
+            align = ui.ALIGNMENT.Start,
+            arrange = ui.ALIGNMENT.Center,
+        },
+        content = ui.content {
+            {
+                template = I.MWUI.templates.textNormal,
+                props = {
+                    text = l10n('UI_Tab_Performance'),
+                },
+            },
+            {
+                template = createPaddingTemplate(16),
+                props = {
+                    anchor = util.vector2(0.5, 0.5),
+                },
+                content = ui.content {
+                    {
+                        type = ui.TYPE.Flex,
+                        content = ui.content {
+                            {
+                                type = ui.TYPE.Flex,
+                                props = {
+                                    horizontal = true,
+                                },
+                                content = ui.content {
+                                    scrollableSong,
+                                    {
+                                        template = I.MWUI.templates.interval
+                                    },
+                                    scrollablePerformers,
+                                    {
+                                        template = I.MWUI.templates.interval
+                                    },
+                                    scrollableParts
+                                }
+                            },
+                            {
+                                template = I.MWUI.templates.interval,
+                            },
+                            {
+                                type = ui.TYPE.Flex,
+                                external = {
+                                    stretch = 1,
+                                },
+                                content = ui.content {
+                                    selectedSongInfoTitle,
+                                    selectedSongInfoDescription,
+                                }
+                            },
+                        }
+                    },
+                },
+            },        
+        }
+    })
+    table.insert(performance.content[1].content, selectedSongPerformButtons)
+    return performance
 end
 
 getStatsTab = function()
@@ -2126,7 +2728,7 @@ getStatsTab = function()
                     {
                         template = I.MWUI.templates.textNormal,
                         props = {
-                            text = 'Stats',
+                            text = l10n('UI_Tab_Stats'),
                         },
                     },
                 },
@@ -2157,15 +2759,25 @@ end
 local function tickPlayback(dt)
     if not Editor.song then return end
     if playback then
-        Editor.song:tickPlayback(dt, 
-        function(filePath, velocity, instrument)
-            if velocity > 0 then
+        if not Editor.song:tickPlayback(dt, 
+        function(filePath, velocity, instrument, note, part)
+            local profile = Song.getInstrumentProfile(instrument)
+            if not profile.polyphonic then
+                stopSounds(instrument)
+            end
+            if velocity > 0 and Editor.partsPlaying[part] then
                 ambient.playSoundFile(filePath, { volume = velocity / 127 })
             end
         end, 
-        function(filePath)
-            ambient.stopSoundFile(filePath)
-        end)
+        function(filePath, instrument)
+            local profile = Song.getInstrumentProfile(instrument)
+            if not profile.sustain then
+                ambient.stopSoundFile(filePath)
+            end
+        end) then
+            playback = false
+            Editor.song:resetPlayback()
+        end
         updatePlaybackMarker()
     end
 end
@@ -2182,8 +2794,6 @@ function Editor:setContent()
         updatePianoRoll()
     elseif self.state == self.STATE.PERFORMANCE then
         setMainContent(getPerformanceTab())
-    elseif self.state == self.STATE.PRACTICE then
-        setMainContent(getPracticeTab())
     elseif self.state == self.STATE.STATS then
         setMainContent(getStatsTab())
     end
@@ -2192,7 +2802,7 @@ end
 function Editor:createUI()
     local wrapper = uiTemplates.wrapper
     screenSize = ui.screenSize()
-    self.windowXOff = self.state == self.STATE.SONG and 20 or (screenSize.x * 2 / 3)
+    self.windowXOff = self.state == self.STATE.SONG and 20 or (screenSize.x * 1 / 3)
     wrapper.content[1].props.size = util.vector2(screenSize.x-Editor.windowXOff, screenSize.y - Editor.windowYOff)
     wrapperElement = ui.create(wrapper)
     Editor:setContent()
@@ -2254,6 +2864,12 @@ end
 
 function Editor:onFrame()
     alreadyRedrewThisFrame = false
+    if self.deletePartConfirmTimer > 0 then
+        self.deletePartConfirmTimer = self.deletePartConfirmTimer - core.getRealFrameDuration()
+    else
+        self.deletePartClickCount = 0
+        self.deletePartIndex = nil
+    end
     if self.active and playback and self.state == self.STATE.SONG then
         tickPlayback(core.getRealFrameDuration())
     end
@@ -2271,7 +2887,12 @@ function Editor:onFrame()
 end
 
 function Editor:onMouseWheel(vertical, horizontal)
-    if pianoRollFocused then
+    if scrollableFocused then
+        if not scrollableFocused.layout.props.canScroll then return end
+        local pos = scrollableFocused.layout.content[1].props.position
+        scrollableFocused.layout.content[1].props.position = util.vector2(pos.x, util.clamp(pos.y + vertical * 8, -scrollableFocused.layout.props.scrollLimit, 0))
+        scrollableFocused:update()
+    elseif pianoRollFocused then
         if input.isCtrlPressed() then
             local currZoom = self.ZOOM_LEVELS[self.zoomLevel]
             self.zoomLevel = util.clamp(self.zoomLevel + vertical, 1, #self.ZOOM_LEVELS)

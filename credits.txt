@@ -1,2 +1,6 @@
 Piano keys texture: https://www.freepik.com/free-photo/close-up-piano-keys_1007634.htm Image by jannoon028 on Freepik
 Ocarina texture: https://commons.wikimedia.org/wiki/File:Ocarina_SopranoF_AltoC.jpg (Public domain)
+
+Muted icon: https://www.flaticon.com/free-icons/mute Created by Pixel perfect - Flaticon
+Unmuted icon: https://www.flaticon.com/free-icons/speaker Created by Pixel perfect - Flaticon
+Delete icon: https://www.flaticon.com/free-icons/trash-can Created by Freepik - Flaticon

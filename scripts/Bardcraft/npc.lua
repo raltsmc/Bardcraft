@@ -5,8 +5,11 @@ local Performer = require('scripts.Bardcraft.performer')
 
 return {
     engineHandlers = {
-        onLoad = function()
-            anim.removeAllVfx(self)
+        onSave = function()
+            return Performer:onSave()
+        end,
+        onLoad = function(data)
+            Performer:onLoad(data)
         end,
         onUpdate = function(dt)
             Performer.handleMovement(dt)

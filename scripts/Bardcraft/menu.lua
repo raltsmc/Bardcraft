@@ -1,12 +1,20 @@
 local storage = require('openmw.storage')
 local vfs = require('openmw.vfs')
+local markup = require('openmw.markup')
 
 local MIDI = require('scripts.Bardcraft.util.midi')
 local Song = require('scripts.Bardcraft.util.song').Song
 
 local function parseAll()
+    local metadataPath = 'midi/metadata.yaml'
+    local exists = vfs.fileExists(metadataPath)
+    local metadata = exists and markup.loadYaml(metadataPath) or {}
+    if not exists then
+        print("WARNING: metadata.yaml missing")
+    end
+
     local bardData = storage.playerSection('Bardcraft')
-    bardData:set('songs/preset', nil) -- Clear the old data
+    --bardData:set('songs/preset', nil) -- Clear the old data
     local storedSongs = bardData:getCopy('songs/preset') or {}
 
     local midiSongs = {}
@@ -25,7 +33,7 @@ local function parseAll()
             if not alreadyParsed then
                 local parser = MIDI.parseMidiFile(fileName)
                 if parser then
-                    local song = Song.fromMidiParser(parser)
+                    local song = Song.fromMidiParser(parser, metadata[fileName])
                     midiSongs[fileName] = song
                 end
             end

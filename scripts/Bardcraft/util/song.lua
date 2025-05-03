@@ -1,3 +1,6 @@
+local core = require('openmw.core')
+local l10n = core.l10n('Bardcraft')
+
 local drumChannelMappings = {
     [35] = 46,
     [36] = 47,
@@ -26,6 +29,7 @@ local instrumentProfiles = {
         loop = false,
         sustain = true,
         transpose = true,
+        polyphonic = true, 
         volume = 1.0,
     },
     [73] = {
@@ -33,6 +37,7 @@ local instrumentProfiles = {
         loop = true,
         sustain = false,
         transpose = true,
+        polyphonic = false,
         volume = 1,
     },
     [79] = {
@@ -40,6 +45,7 @@ local instrumentProfiles = {
         loop = true,
         sustain = false,
         transpose = true,
+        polyphonic = false,
         volume = 1,
     },
     [116] = {
@@ -47,6 +53,7 @@ local instrumentProfiles = {
         loop = false,
         sustain = true,
         transpose = false,
+        polyphonic = true,
         volume = 1,
     },
     [0] = {
@@ -54,6 +61,7 @@ local instrumentProfiles = {
         loop = false,
         sustain = false,
         transpose = false,
+        polyphonic = false,
         volume = 1,
     },
 }
@@ -125,11 +133,11 @@ Part.__eq = function(a, b)
     return a.index == b.index and a.instrument == b.instrument and a.title == b.title
 end
 
-function Part.new(index, instrument)
+function Part.new(index, instrument, title)
     local self = setmetatable({}, Part)
     self.index = index
-    self.instrument = instrument or 0
-    self.title = instrumentProfiles[instrument].name .. ' ' .. index
+    self.instrument = instrument
+    self.title = title or (l10n('Instr_' .. instrumentProfiles[instrument].name) .. ' ' .. index)
     return self
 end
 
@@ -144,20 +152,22 @@ for i, note in ipairs(Song.Note) do
 end
 
 Song.Mode = {
-    "Ionian",  -- Major (W W H W W W H)
-    "Aeolian", -- Natural Minor (W H W W H W W)
-    "Resdayn", --  Phrygian Dominant (H WH H W H W W)
-    "Nordic", -- Dorian (W H W W W H W)
-    "Imperial", -- Lydian Dominant/Acoustic (W W W H W H W)
-    "Yokudan", -- Double Harmonic Minor (W H WH H H WH H)
-    "Direnni", -- Harmonic Major (W W H W H WH H)
-    "Altmeri", -- Lydian Augmented (W W W W H W H)
-    "Bosmeri", -- Mixolydian (W W H W W H W)
+    "Major",  -- Major (W W H W W W H)
+    "Minor", -- Natural Minor (W H W W H W W)
+    "Velothi", --  Phrygian Dominant (H WH H W H W W)
+    "Ysgramoric", -- Dorian (W H W W W H W)
+    "Alessian", -- Lydian Dominant/Acoustic (W W W H W H W)
+    "Remanite", -- Dorian #4 (W H WH H W H W)
+    "Marukhic", -- Locrian nat6 (H W W H WH H W)
+    "Frandaric", -- Double Harmonic Minor (W H WH H H WH H)
+    "Ryainic", -- Harmonic Major (W W H W H WH H)
+    "Aurielic", -- Lydian Augmented (W W W W H W H)
+    "Yffreic", -- Mixolydian (W W H W W H W)
+    "Wrothgarian", -- Minor Pentatonic (WH W W WH W)
+    "Histic", -- Whole Tone (W W W W W W W)
+    "Rajhinic", -- Hirajoshi (W H WW H WW)
     "Dwemeri", -- Octatonic (H W H W H W H W)
-    "Wrothgarian", -- Superlocrian Maj7 (H W H W W WH H)
-    "Argonian", -- Whole Tone (W W W W W W W)
-    "Elsweyri", -- Hirajoshi (W H WW H WW)
-    "Daedric", -- Ultralocrian (H W H W W WW)
+    "Mehrunic", -- Ultralocrian (H W H W W WW)
 }
 -- Create index lookup for scales
 Song.ModeIndex = {}
@@ -168,6 +178,7 @@ end
 Song.playbackTickPrev = 0
 Song.playbackTickCurr = 0
 Song.playbackNoteIndex = 1
+Song.loopCount = 0
 
 function Song.new(title, desc, tempo, timeSig)
     local self = setmetatable({}, Song)
@@ -185,48 +196,160 @@ function Song.new(title, desc, tempo, timeSig)
     self.loopBars = {0, 4}
     self.resolution = 96
     self.id = self.title .. '_' .. os.time() + math.random(10000)
+    self.noteIdCounter = 1
+    self.tempoMod = 1
+    self.texture = "tavern"
+    self.startUnlocked = false
     return self
 end
 
-function Song.fromMidiParser(parser)
+function Song:getPart(index)
+    for _, part in ipairs(self.parts) do
+        if part.index == index then
+            return part
+        end
+    end
+    return nil
+end
+
+function Song:noteEventsToNoteMap(noteEvents)
+    if not noteEvents then return end
+    -- In this function, we will go through the list of note starts and note ends, and pair them up
+    local map = {}
+    local activeNotes = {}
+
+    self.noteIdCounter = 1
+
+    for _, event in ipairs(noteEvents) do
+        if event.type == 'noteOn' and event.velocity > 0 then
+            local key = event.note .. '_' .. event.part
+            activeNotes[key] = {
+                start = event.time,
+                velocity = event.velocity,
+            }
+        elseif (event.type == 'noteOff') or (event.type == 'noteOn' and event.velocity == 0) then
+            local key = event.note .. '_' .. event.part
+            if activeNotes[key] then
+                local duration = event.time - activeNotes[key].start
+                if duration > 0 then
+                    local noteData = {
+                        id = event.id,
+                        note = event.note,
+                        velocity = activeNotes[key].velocity,
+                        part = event.part,
+                        time = activeNotes[key].start,
+                        duration = duration,
+                    }
+                    map[noteData.id] = noteData
+                    activeNotes[key] = nil
+                    self.noteIdCounter = math.max(self.noteIdCounter, noteData.id + 1)
+                end
+            end
+        end
+    end
+    return map
+end
+
+function Song:noteMapToNoteEvents(noteMap)
+    if not noteMap then return {} end
+    -- This converts the merged note map back to a list of on/off note events
+    local noteEvents = {}
+    for _, noteData in pairs(noteMap) do
+        if noteData then
+            local noteOnEvent = {
+                id = noteData.id,
+                type = 'noteOn',
+                note = noteData.note,
+                velocity = noteData.velocity,
+                part = noteData.part,
+                time = noteData.time,
+            }
+            table.insert(noteEvents, noteOnEvent)
+
+            local noteOffEvent = {
+                id = noteData.id,
+                type = 'noteOff',
+                note = noteData.note,
+                velocity = 0,
+                part = noteData.part,
+                time = noteData.time + noteData.duration,
+            }
+            table.insert(noteEvents, noteOffEvent)
+        end
+    end
+    table.sort(noteEvents, function(a, b)
+        if a.time == b.time then
+            return (a.type == "noteOff" and b.type == "noteOn")
+        end
+        return a.time < b.time
+    end)
+    return noteEvents
+end
+
+function Song.fromMidiParser(parser, metadata)
     local fileName = string.match(parser.filename, "([^\\]+)%.mid$")
-    local title = fileName:gsub("%f[%a].", string.upper)
+    local title = (metadata and metadata.title) or fileName:gsub("%f[%a].", string.upper)
+    local desc = (metadata and metadata.description) or 'Imported from MIDI file'
     local self = Song.new(
         title,
-        'Imported from MIDI file',
+        desc,
         parser:getInitialTempo(),
         {parser:getInitialTimeSignature()}
     )
+    if metadata and metadata.scale then
+        self.scale.root = Song.NoteIndex[metadata.scale.root] or 1
+        self.scale.mode = Song.ModeIndex[metadata.scale.mode] or 1
+    end
     --self.timeSig[1], self.timeSig[2] = parser:getInitialTimeSignature()
     self.sourceFile = string.match(parser.filename, "([^\\]+)$")
     local id = 1
+
+    local partIndex = {}
     for _, note in ipairs(parser:getNotes()) do
         if note.channel == 9 then
             note.note = mapDrumNote(note.note)
         end
         local instrument = (note.channel == 9 and 116) or getInstrumentMapping(parser.instruments[note.channel])
-        if not self.parts[instrument] then
-            self.parts[instrument] = {
-                Part.new(1, instrument),
-            }
+        if not metadata then
+            note.track = 1
         end
-        local noteData = {
-            id = id,
-            type = note.type,
-            note = note.note,
-            velocity = note.velocity,
-            part = 1,
-            instrument = instrument,
-            time = math.floor(note.time * self.resolution / parser.division),
-        }
-        id = id + 1
-        table.insert(self.notes, noteData)
+        if instrument ~= 0 then
+            if not partIndex[instrument] or not partIndex[instrument][note.track] then
+                partIndex[instrument] = partIndex[instrument] or {}
+                local index = #self.parts + 1
+                local countOfType = 0
+                for _, part in ipairs(self.parts) do
+                    if part.instrument == instrument then
+                        countOfType = countOfType + 1
+                    end
+                end
+                local title = l10n('Instr_' .. instrumentProfiles[instrument].name) .. ' ' .. (countOfType + 1)
+                table.insert(self.parts, Part.new(index, instrument, title))
+                partIndex[instrument][note.track] = index
+            end
+            local noteData = {
+                id = id,
+                type = note.type,
+                note = note.note,
+                velocity = note.velocity,
+                part = partIndex[instrument][note.track],
+                time = math.floor(note.time * self.resolution / parser.division),
+            }
+            id = id + 1
+            table.insert(self.notes, noteData)
+        end
     end
     local lastNoteTime = self.notes[#self.notes].time / 96
     local quarterNotesPerBar = self.timeSig[1] * (4 / self.timeSig[2])
     local barCount = math.ceil(lastNoteTime / quarterNotesPerBar)
     self.lengthBars = barCount
-    self.loopBars = {0, barCount}
+    self.loopBars = (metadata and metadata.loopBars) or {0, barCount}
+    self.tempoMod = (metadata and metadata.tempoMod) or 1
+    if not metadata or metadata.startUnlocked == true then
+        self.startUnlocked = true
+    end
+    self.texture = (metadata and metadata.texture) or "tavern"
+    self.notes = self:noteMapToNoteEvents(self:noteEventsToNoteMap(self.notes))
     return self
 end
 
@@ -247,6 +370,7 @@ function Song:resetPlayback()
     self.playbackTickPrev = 0
     self.playbackTickCurr = 0
     self.playbackNoteIndex = 1
+    self.loopCount = 1
 end
 
 function Song.getInstrumentProfile(instrument)
@@ -276,9 +400,53 @@ function Song.getInstrumentNumber(instrumentName)
     return 0
 end
 
+function Song:createNewPart()
+    local instrument = 24
+    local highestIndex = 0
+    for _, part in ipairs(self.parts) do
+        if part.index > highestIndex then
+            highestIndex = part.index
+        end
+    end
+    local countOfType = 0
+    for _, part in ipairs(self.parts) do
+        if part.instrument == instrument then
+            countOfType = countOfType + 1
+        end
+    end
+    local title = l10n('Instr_' .. instrumentProfiles[instrument].name) .. ' ' .. (countOfType + 1)
+    local part = Part.new(highestIndex + 1, instrument, title)
+    table.insert(self.parts, part)
+    return part
+end
+
+function Song:removePart(index)
+    for i, part in pairs(self.parts) do
+        if part.index == index then
+            table.remove(self.parts, i)
+            break
+        end
+    end
+    local notesToRemove = {}
+    for i, note in pairs(self.notes) do
+        if note.part == index then
+            table.insert(notesToRemove, i)
+        end
+    end
+    table.sort(notesToRemove, function(a, b) return a > b end)
+    for _, i in ipairs(notesToRemove) do
+        table.remove(self.notes, i)
+    end
+end
+
 function Song:secondsToTicks(seconds)
     local ticksPerSecond = (self.resolution * self.tempo) / 60
     return seconds * ticksPerSecond
+end
+
+function Song:ticksToSeconds(ticks)
+    local ticksPerSecond = (self.resolution * self.tempo) / 60
+    return ticks / ticksPerSecond
 end
 
 function Song:tickToBeat(tick)
@@ -315,30 +483,34 @@ function Song:tickPlayback(dt, noteOnHandler, noteOffHandler)
         if event.time >= self.playbackTickPrev then
             local noteNumber = event.note + 1
             local noteName = self.noteNumberToName(noteNumber - 1)
-            local profile = self.getInstrumentProfile(event.instrument)
+            local instrument = self:getPart(event.part).instrument
+            local profile = self.getInstrumentProfile(instrument)
             local filePath = 'sound\\Bardcraft\\samples\\' .. profile.name .. '\\' .. profile.name .. '_' .. noteName .. '.wav'
             if event.type == 'noteOn' and event.velocity > 0 then
-                noteOnHandler(filePath, event.velocity, event.instrument, event.note)
-            elseif not profile.sustain and (event.type == 'noteOff' or (event.type == 'noteOn' and event.velocity == 0)) then
-                noteOffHandler(filePath, event.instrument)
+                noteOnHandler(filePath, event.velocity, instrument, event.note, event.part, event.id)
+            elseif event.type == 'noteOff' or (event.type == 'noteOn' and event.velocity == 0) then
+                noteOffHandler(filePath, instrument, event.note, event.part, event.id)
             end
         end
         self.playbackNoteIndex = self.playbackNoteIndex + 1
     end
     local bars = self.lengthBars
     local lengthInTicks = bars * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
-    if self.playbackNoteIndex > #noteEvents or self.playbackTickCurr > lengthInTicks then
-        self.playbackNoteIndex = 1
-        -- Get loop start point
-        local loopBars = self.loopBars
-        if loopBars and #loopBars == 2 then
-            local loopStart = loopBars[1] * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
+    local loopEnd = self.loopBars[2] * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
+    if (self.playbackTickCurr > loopEnd and self.loopCount > 0) or self.playbackTickCurr > lengthInTicks then
+        if self.loopCount > 0 then
+            self.loopCount = self.loopCount - 1
+            local loopStart = self.loopBars[1] * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
+            self.playbackNoteIndex = 1
             self.playbackTickCurr = loopStart
+            self.playbackTickPrev = self.playbackTickCurr
+            return true
         else
-            self.playbackTickCurr = 0
+            return false
         end
-        self.playbackTickPrev = self.playbackTickCurr
     end
+
+    return true
 end
 
 -- Song serialization and deserialization
@@ -392,7 +564,7 @@ function Song:encode()
 
     local noteStrings = {}
     for _, note in ipairs(self.notes) do
-        table.insert(noteStrings, string.format('%d|%s|%d|%d|%d|%d|%d', note.id, note.type, note.note, note.velocity, note.track, note.instrument, note.time))
+        table.insert(noteStrings, string.format('%d|%s|%d|%d|%d|%d|%d', note.id, note.type, note.note, note.velocity, note.part, note.time))
     end
     local notesString = table.concat(noteStrings, ',')
 
@@ -406,6 +578,7 @@ function Song:encode()
 		loopBars = self.loopBars,
 		resolution = self.resolution,
 		notes = notesString,
+        parts = self.parts,
 	}
 
 	return toBase64(jsonEncode(songData))
@@ -498,14 +671,13 @@ function Song.decode(encoded)
 
     local notes = {}
     for noteString in string.gmatch(data.notes, '([^,]+)') do
-        local id, type, note, velocity, track, instrument, time = noteString:match('(%d+)|([^|]+)|(%d+)|(%d+)|(%d+)|(%d+)|(%d+)')
+        local id, type, note, velocity, part, time = noteString:match('(%d+)|([^|]+)|(%d+)|(%d+)|(%d+)|(%d+)')
         table.insert(notes, {
             id = tonumber(id),
             type = type,
             note = tonumber(note),
             velocity = tonumber(velocity),
-            track = tonumber(track),
-            instrument = tonumber(instrument),
+            part = tonumber(part),
             time = tonumber(time),
         })
     end
@@ -516,6 +688,7 @@ function Song.decode(encoded)
 	song.loopBars = data.loopBars
 	song.resolution = data.resolution
 	song.notes = notes
+    song.parts = data.parts
 
 	return song
 end

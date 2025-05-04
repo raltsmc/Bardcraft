@@ -55,7 +55,7 @@ Editor.SONGS_MODE = {
 Editor.active = false
 Editor.song = nil
 Editor.songs = nil
-Editor.songsMode = Editor.SONGS_MODE.PRESET
+Editor.songsMode = Editor.SONGS_MODE.CUSTOM
 Editor.state = nil
 Editor.noteMap = nil
 Editor.snap = true
@@ -1126,6 +1126,27 @@ uiTemplates = {
             return Song.getInstrumentProfile(part.instrument).name
         end
 
+        -- Generate RGB from confidence; 0 is gray, then blend from red to green
+        local function blendRedToGreen(value)
+            -- Input validation:  Check if the input is within the valid range.
+            if not value or value < 0 or value > 1 then
+                -- Return a default gray color for invalid input.  This is robust.
+                return util.color.rgb(0.5, 0.5, 0.5)
+            end
+          
+            if value == 0 then
+                -- Return gray for value of 0
+                return util.color.rgb(0.5, 0.5, 0.5)
+            else
+                -- Blend from red to green
+                local red = 1 - value
+                local green = value
+                local blue = 0 -- Blue component is always 0 in this blend.
+                return util.color.rgb(red, green, blue)
+            end
+        end
+        local color = blendRedToGreen(confidence / 100)
+
         local partDisplaySmall = ui.create {
             template = (thickBorders and I.MWUI.templates.bordersThick or I.MWUI.templates.borders),
             props = {
@@ -1173,7 +1194,7 @@ uiTemplates = {
                                     template = I.MWUI.templates.textNormal,
                                     props = {
                                         text = l10n('UI_PartConfidence'):gsub('%%{confidence}', string.format('%.2f', confidence)),
-                                        textColor = Editor.uiColors.DEFAULT,
+                                        textColor = color,
                                     },
                                 }
                             }
@@ -1853,21 +1874,21 @@ setSong = function(song)
 end
 
 saveSong = function()
-    local songs = storage.playerSection('Bardcraft'):getCopy(Editor.songsMode) or {}
+    local songs = storage.playerSection('Bardcraft'):getCopy('songs/drafts') or {}
     for i, song in ipairs(songs) do
         if song.id == Editor.song.id then
             songs[i] = Editor.song
             break
         end
     end
-    storage.playerSection('Bardcraft'):set(Editor.songsMode, songs)
+    storage.playerSection('Bardcraft'):set('songs/drafts', songs)
 end
 
 addSong = function()
     local song = Song.new()
-    local songs = storage.playerSection('Bardcraft'):getCopy(Editor.songsMode) or {}
+    local songs = storage.playerSection('Bardcraft'):getCopy('songs/drafts') or {}
     table.insert(songs, song)
-    storage.playerSection('Bardcraft'):set(Editor.songsMode, songs)
+    storage.playerSection('Bardcraft'):set('songs/drafts', songs)
     setSong(song)
     setMainContent(getSongTab())
 end
@@ -1905,7 +1926,7 @@ Editor.performancePartAssignments = {}
 Editor.performersInfo = {}
 Editor.canPerform = false
 
-local function startPerformance(isPractice)
+local function startPerformance(type)
     if Editor.performanceSelectedSong then
         local partCount = 0
         local performers = {}
@@ -1920,23 +1941,44 @@ local function startPerformance(isPractice)
         core.sendGlobalEvent('BO_StartPerformance', {
             song = Editor.performanceSelectedSong,
             performers = performers,
+            type = type
         })
         Editor:onToggle()
     end
 end
 
+local function getSongs()
+    local merged = {}
+    local presetSongs = storage.globalSection('Bardcraft'):getCopy(Editor.SONGS_MODE.PRESET) or {}
+    local customSongs = storage.playerSection('Bardcraft'):getCopy(Editor.SONGS_MODE.CUSTOM) or {}
+    for _, song in ipairs(presetSongs) do
+        table.insert(merged, song)
+    end
+    for _, song in ipairs(customSongs) do
+        table.insert(merged, song)
+    end
+    table.sort(merged, function(a, b)
+        return a.title < b.title
+    end)
+    return merged
+end
+
+local function getDrafts()
+    local drafts = {}
+    local draftSongs = storage.playerSection('Bardcraft'):getCopy('songs/drafts') or {}
+    for _, song in ipairs(draftSongs) do
+        table.insert(drafts, song)
+    end
+    table.sort(drafts, function(a, b)
+        return a.title < b.title
+    end)
+    return drafts
+end
+
 getSongTab = function()
     local manager = auxUi.deepLayoutCopy(uiTemplates.songManager)
     local leftBox = manager.content[1].content[1].content
-    Editor.songs = storage.playerSection('Bardcraft'):getCopy(Editor.songsMode) or {}
-    local songs = {}
-    for _, song in ipairs(Editor.songs) do
-        table.insert(songs, song)
-    end
-    table.sort(songs, function(a, b)
-        return a.title < b.title
-    end)
-    Editor.songs = songs
+    Editor.songs = getDrafts()
     for i, song in ipairs(Editor.songs) do
         local selected = Editor.song and (song.id == Editor.song.id)
         leftBox[i] = {
@@ -2486,32 +2528,36 @@ getPerformanceTab = function()
     local performance = auxUi.deepLayoutCopy(uiTemplates.baseTab)
     local flexContent = performance.content[1].content[1].content
     
-    if not Editor.songs or #Editor.songs == 0 then
-        Editor.songs = storage.playerSection('Bardcraft'):getCopy(Editor.songsMode) or {}
-        local songs = {}
-        for _, song in ipairs(Editor.songs) do
-            table.insert(songs, song)
-        end
-        table.sort(songs, function(a, b)
-            return a.title < b.title
-        end)
-        Editor.songs = songs
-    end
+    Editor.songs = getSongs()
     local scrollableSongContent = ui.content{}
     local itemHeight = 48
     local scrollableHeight = 450 * screenSize.y / 1080
     local scrollableWidth = 300 * screenSize.x / 1920
+
+    if screenSize.y <= 720 then
+        scrollableHeight = scrollableHeight / 2
+        itemHeight = 40
+    end
+
+    local knownSongs = {}
+    local player = nearby.players[1]
+    if player then
+        knownSongs = Editor.performersInfo[player.id] and Editor.performersInfo[player.id].knownSongs or {}
+    end
+
     for i, song in ipairs(Editor.songs) do
-        scrollableSongContent:add(uiTemplates.songDisplay(song, itemHeight, song == Editor.performanceSelectedSong, function()
-            if Editor.performanceSelectedSong and Editor.performanceSelectedSong.id == song.id then
-                Editor.performanceSelectedSong = nil
-            else
-                Editor.performanceSelectedSong = song
-            end
-            Editor.performanceSelectedPart = nil
-            Editor.performancePartAssignments = {}
-            setMainContent(getPerformanceTab())
-        end))
+        if knownSongs[song.id] then
+            scrollableSongContent:add(uiTemplates.songDisplay(song, itemHeight, Editor.performanceSelectedSong and song.id == Editor.performanceSelectedSong.id, function()
+                if Editor.performanceSelectedSong and Editor.performanceSelectedSong.id == song.id then
+                    Editor.performanceSelectedSong = nil
+                else
+                    Editor.performanceSelectedSong = song
+                end
+                Editor.performanceSelectedPart = nil
+                Editor.performancePartAssignments = {}
+                setMainContent(getPerformanceTab())
+            end))
+        end
     end
     local scrollableSong = uiTemplates.scrollable(util.vector2(scrollableWidth, scrollableHeight), scrollableSongContent, util.vector2(0, itemHeight * #scrollableSongContent + 4))
 
@@ -2628,12 +2674,14 @@ getPerformanceTab = function()
                 position = util.vector2(0, -96),
             },
             content = ui.content {
-                uiTemplates.button(l10n('UI_Button_Perform'), util.vector2(192, 32)),
+                uiTemplates.button(l10n('UI_Button_Perform'), util.vector2(192, 32), function()
+                    startPerformance(Song.PerformanceType.Perform)
+                end),
                 {
                     template = I.MWUI.templates.interval,
                 },
                 uiTemplates.button(l10n('UI_Button_Practice'), util.vector2(192, 32), function()
-                    startPerformance()
+                    startPerformance(Song.PerformanceType.Practice)
                 end),
             }
         }
@@ -2890,7 +2938,7 @@ function Editor:onMouseWheel(vertical, horizontal)
     if scrollableFocused then
         if not scrollableFocused.layout.props.canScroll then return end
         local pos = scrollableFocused.layout.content[1].props.position
-        scrollableFocused.layout.content[1].props.position = util.vector2(pos.x, util.clamp(pos.y + vertical * 8, -scrollableFocused.layout.props.scrollLimit, 0))
+        scrollableFocused.layout.content[1].props.position = util.vector2(pos.x, util.clamp(pos.y + vertical * 32, -scrollableFocused.layout.props.scrollLimit, 0))
         scrollableFocused:update()
     elseif pianoRollFocused then
         if input.isCtrlPressed() then

@@ -1,54 +1,59 @@
-scales.mid:
-  title: Scales
-  description: A basic exercise for practicing ascending and descending scales. You could perform this... if you really wanted to?
-  scale:
-    root: C
-    mode: Major
-  texture: tavern
-  startUnlocked: true
-vivecnights.mid:
-  title: Little Vivec Nights
-  description: A cheerful ascending waltz typically taught to Dunmer children as a lullaby, but also serviceable as a tavern jig when played uptempo.
-  loopBars:
-    - 0
-    - 16
-  scale:
-    root: D
-    mode: Major
-  tempoMod: 0.5
-  texture: vivec
-  startUnlocked: true
-greensleeves.mid:
-  title: Greensleeves
-  description: A traditional folk melody of uncertain origin, a staple in taverns throughout the provinces of the Empire.
-  loopBars:
-    - 0.16666666666666666
-    - 16.16666666666666666
-  scale:
-    root: Eb
-    mode: Major
-  texture: tavern
-  startUnlocked: false
-moonsong.mid:
-  title: Ja-Kha'jay's Moonsong
-  description: A beloved Khajiiti folk tune, said to echo the laughter of Jone and Jode as they chase across the night sky. Commonly heard during celebrations such as the New Life Festival.
-  loopBars:
-    - 0
-    - 4
-  scale:
-    root: D
-    mode: Rajhinic
-  texture: elsweyr
-  startUnlocked: false
-ahemmusa.mid:
-  title: Ahemmusan Lament
-  description: A contemplative elegy of the Ahemmusa tribe of Azura's Coast, often played in remembrance of lost loved ones.
-  loopBars:
-    - 0
-    - 32
-  scale:
-    root: F
-    mode: Velothi
-  tempoMod: 0.5
-  texture: ashlander
-  startUnlocked: false
+midiData:
+  scales.mid:
+    title: Scales
+    description: A basic exercise for practicing ascending and descending scales. You could perform this... if you really wanted to?
+    scale:
+      root: C
+      mode: Major
+    texture: tavern
+    startUnlocked: true
+  vivecnights.mid:
+    title: Little Vivec Nights
+    description: A cheerful ascending waltz typically taught to Dunmer children as a lullaby, but also serviceable as a tavern jig when played uptempo.
+    loopBars:
+      - 0
+      - 16
+    scale:
+      root: D
+      mode: Major
+    tempoMod: 0.5
+    texture: vivec
+    startUnlocked: true
+  greensleeves.mid:
+    title: Greensleeves
+    description: A traditional folk melody of uncertain origin, a staple in taverns throughout the provinces of the Empire.
+    loopBars:
+      - 0.16666666666666666
+      - 16.16666666666666666
+    scale:
+      root: Eb
+      mode: Major
+    texture: tavern
+    startUnlocked: false
+  moonsong.mid:
+    title: Ja-Kha'jay's Moonsong
+    description: A beloved Khajiiti folk tune, said to echo the laughter of Jone and Jode as they chase across the night sky. Commonly heard during celebrations such as the New Life Festival.
+    loopBars:
+      - 0
+      - 4
+    scale:
+      root: D
+      mode: Rajhinic
+    texture: elsweyr
+    startUnlocked: false
+  ahemmusa.mid:
+    title: Ahemmusan Lament
+    description: A contemplative elegy of the Ahemmusa tribe of Azura's Coast, often played in remembrance of lost loved ones.
+    loopBars:
+      - 0
+      - 32
+    scale:
+      root: F
+      mode: Velothi
+    tempoMod: 0.5
+    texture: ashlander
+    startUnlocked: false
+
+sheetMusicMappings:
+  generic:
+    - greensleeves.mid

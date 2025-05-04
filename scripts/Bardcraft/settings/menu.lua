@@ -6,7 +6,7 @@ local ui = require('openmw.ui')
 local util = require('openmw.util')
 
 local l10n = core.l10n('Bardcraft')
-local versionString = "1.0.0"
+local versionString = "0.1-alpha"
 
 local luaxp = require('scripts.Bardcraft.util.luaxp')
 

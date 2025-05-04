@@ -50,7 +50,7 @@ function P:onLoad(data)
 end
 
 function P:getPerformanceXPRequired()
-    return (self.performanceSkill.level + 1) * 0.25
+    return (self.performanceSkill.level + 1) * 5
 end
 
 function P:getPerformanceProgress()
@@ -60,7 +60,6 @@ end
 function P:addPerformanceXP(xp)
     if self.performanceSkill.level >= 100 then return end
     self.performanceSkill.xp = self.performanceSkill.xp + xp
-    --print("New performance XP: " .. performance.xp)
     local leveledUp = false
     local milestone = nil
     while self:getPerformanceProgress() >= 1 do
@@ -90,6 +89,20 @@ function P:addKnownSong(song, confidences)
         self.knownSongs[song.id].partConfidences[part.index] = (confidences and confidences[part.index]) or 0
     end
     self:sendPerformerInfo()
+end
+
+function P:teachSong(song)
+    if not self.knownSongs[song.id] then
+        self.knownSongs[song.id] = {
+            partConfidences = {},
+        }
+        for _, part in ipairs(song.parts) do
+            self.knownSongs[song.id].partConfidences[part.index] = 0
+        end
+        self:sendPerformerInfo()
+        return true
+    end
+    return false
 end
 
 function P:modSongConfidence(songId, part, mod)
@@ -123,8 +136,7 @@ P.noteIntervals = {}
 P.currentDensity = 0
 P.currentConfidence = 0
 P.maxConfidence = 0
-P.maxHistory = 16
-P.ignoreChordTimer = 5
+P.maxHistory = 24
 
 P.maxConfidenceGrowth = 0
 P.overallNoteEvents = {}
@@ -240,8 +252,6 @@ function P.handlePerformEvent(data)
     P.maxConfidence = P.knownSongs[song.id].partConfidences[data.part.index] or 0
     P.maxConfidenceGrowth = (1 - math.pow(P.maxConfidence, 1/3)) * 0.8 -- Fast growth at low confidence, slow growth at high confidence
 
-    print("Current confidence: " .. P.maxConfidence .. "; Max Growth this performance: " .. P.maxConfidenceGrowth)
-
     if not P.playing then
         P.currentConfidence = P.maxConfidence
         P.currentDensity = 0
@@ -255,7 +265,7 @@ function P.handlePerformEvent(data)
     P.overallNoteEvents = {}
 end
 
-function P.handleStopEvent()
+function P.handleStopEvent(data)
     anim.removeVfx(omwself, 'BO_Instrument')
     anim.cancel(omwself, instrumentData[P.instrument].anim)
     if animData[P.instrument] then
@@ -273,11 +283,14 @@ function P.handleStopEvent()
             successCount = successCount + 1
         end
     end
-    local successRate = successCount / #P.overallNoteEvents
-    if successRate > 0 then
-        P:modSongConfidence(P.currentSong.id, P.currentPart.index, successRate * P.maxConfidenceGrowth)
+    local successRate = math.pow(successCount / #P.overallNoteEvents, 2)
+    local diff = successRate - P.maxConfidence
+    local maxGrowth = util.clamp(P.maxConfidenceGrowth * data.completion, 0, P.maxConfidenceGrowth)
+    if diff ~= 0 then
+        local oldConfidence = P.maxConfidence
+        P:modSongConfidence(P.currentSong.id, P.currentPart.index, util.clamp(diff, -maxGrowth, maxGrowth))
         if omwself.type == types.Player then
-            omwself:sendEvent('BC_GainConfidence', { songTitle = P.currentSong.title, partTitle = P.currentPart.title, newConfidence = P.knownSongs[P.currentSong.id].partConfidences[P.currentPart.index] })
+            omwself:sendEvent('BC_GainConfidence', { songTitle = P.currentSong.title, partTitle = P.currentPart.title, oldConfidence = oldConfidence, newConfidence = P.knownSongs[P.currentSong.id].partConfidences[P.currentPart.index] })
         end
     end
     
@@ -289,7 +302,7 @@ function P.getNoteAccuracy()
     local density = P.currentDensity
 
     local difficultyFactor = util.clamp((density - easyDensity) / (hardDensity - easyDensity), 0, 1)
-    local accuracy = math.pow(P.performanceSkill.level / 100, 1/2) - (difficultyFactor * 0.4) + (P.currentConfidence * 0.5)
+    local accuracy = math.pow(P.performanceSkill.level / 100, 1/2) - (difficultyFactor * 0.6) + (math.pow(P.currentConfidence, 1/2) * 0.4)
 
     return util.clamp(accuracy, 0, 1)
 end
@@ -297,8 +310,10 @@ end
 function P.playNote(note, velocity)
     local success = true
     local pitch = 1.0
+    local volume = velocity
     if math.random() > P.getNoteAccuracy() then
         pitch = 1.0 + (math.random() * 0.2 - 0.1) -- Random pitch shift between -10% and +10%
+        volume = volume * 0.5 + math.random() * (volume)
         success = false
     end
     local noteName = Song.noteNumberToName(note)
@@ -314,34 +329,40 @@ function P.stopNote(note)
 end
 
 function P.handleNoteEvent(data)
+    if omwself.type.isDead(omwself) then return false end
     if P.lastNoteTime then
         local interval = data.time - P.lastNoteTime
-        interval = math.max(interval, 1 / hardDensity)
-        table.insert(P.noteIntervals, interval)
+        local weight = 1
+        if interval < 0.05 then
+            weight = 0.1
+        end
+        table.insert(P.noteIntervals, { interval = interval, weight = weight })
         if #P.noteIntervals > P.maxHistory then
             table.remove(P.noteIntervals, 1)
         end
 
         -- Calculate moving average density (notes per second)
         local totalInterval = 0
+        local totalWeight = 0
         for _, v in ipairs(P.noteIntervals) do
-            totalInterval = totalInterval + v
+            totalInterval = totalInterval + v.interval * v.weight
+            totalWeight = totalWeight + v.weight
         end
-        local avgInterval = totalInterval / #P.noteIntervals
+        local avgInterval = totalInterval / totalWeight
         P.currentDensity = 1 / avgInterval
     end
-    P.lastNoteTime = data.time
+    P.lastNoteTime = data.timecurren
     local success = P.playNote(data.note, data.velocity)
     if success then
         local gain = (P.maxConfidence - P.currentConfidence) / P.maxConfidence * 0.04
         P.currentConfidence = math.min(P.currentConfidence + gain, P.maxConfidence)
-        P:addPerformanceXP(0.05)
+        P:addPerformanceXP(1)
     else
         local loss = P.currentConfidence / P.maxConfidence * 0.04
         P.currentConfidence = math.max(P.currentConfidence - loss, 0)
-        P:addPerformanceXP(0.0025)
     end
     table.insert(P.overallNoteEvents, success)
+    core.sendGlobalEvent('BC_PerformerNoteHandled', { success = success, part = P.currentPart })
     return success
 end
 
@@ -350,7 +371,7 @@ function P.handleConductorEvent(data)
     if data.type == 'PerformStart' then
         P.handlePerformEvent(data)
     elseif data.type == 'PerformStop' and P.playing then
-        P.handleStopEvent()
+        P.handleStopEvent(data)
     else
         if data.type == 'NoteEvent' then
             success = P.handleNoteEvent(data)

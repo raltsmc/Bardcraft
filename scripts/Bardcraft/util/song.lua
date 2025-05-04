@@ -175,6 +175,12 @@ for i, scale in ipairs(Song.Mode) do
     Song.ModeIndex[scale] = i
 end
 
+Song.PerformanceType = {
+    Perform = 1,
+    Practice = 2,
+    NPCTeaching = 3,
+}
+
 Song.playbackTickPrev = 0
 Song.playbackTickCurr = 0
 Song.playbackNoteIndex = 1
@@ -366,11 +372,14 @@ function Song:setTimeSignature(timeSig)
     self.timeSig = timeSig
 end
 
+local restart = false
+
 function Song:resetPlayback()
     self.playbackTickPrev = 0
     self.playbackTickCurr = 0
     self.playbackNoteIndex = 1
     self.loopCount = 1
+    restart = false
 end
 
 function Song.getInstrumentProfile(instrument)
@@ -465,6 +474,11 @@ function Song:beatToTick(beat)
     return tick
 end
 
+function Song:lengthInSeconds()
+    local lengthInTicks = self.lengthBars * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
+    return self:ticksToSeconds(lengthInTicks)
+end
+
 function Song.noteNumberToName(noteNumber)
     local octave = math.floor(noteNumber / 12) - 1
     local noteName = Song.Note[(noteNumber % 12) + 1]
@@ -474,6 +488,29 @@ end
 function Song:tickPlayback(dt, noteOnHandler, noteOffHandler)
     self.playbackTickPrev = self.playbackTickCurr
     self.playbackTickCurr = self.playbackTickCurr + self:secondsToTicks(dt)
+
+    local bars = self.lengthBars
+    local lengthInTicks = bars * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
+    local loopEnd = self.loopBars[2] * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
+
+    if restart then
+        restart = false
+        if self.loopCount > 0 then
+            self.loopCount = self.loopCount - 1
+            local loopStart = self.loopBars[1] * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
+            self.playbackNoteIndex = 1
+            self.playbackTickCurr = loopStart
+            self.playbackTickPrev = self.playbackTickCurr
+            return true
+        else
+            return false
+        end
+    end
+
+    if (self.playbackTickCurr > loopEnd and self.loopCount > 0) or self.playbackTickCurr > lengthInTicks then
+        restart = true
+    end
+
     local noteEvents = self.notes
     while self.playbackNoteIndex <= #noteEvents do
         local event = noteEvents[self.playbackNoteIndex]
@@ -486,28 +523,13 @@ function Song:tickPlayback(dt, noteOnHandler, noteOffHandler)
             local instrument = self:getPart(event.part).instrument
             local profile = self.getInstrumentProfile(instrument)
             local filePath = 'sound\\Bardcraft\\samples\\' .. profile.name .. '\\' .. profile.name .. '_' .. noteName .. '.wav'
-            if event.type == 'noteOn' and event.velocity > 0 then
+            if event.type == 'noteOn' and event.velocity > 0 and not restart then
                 noteOnHandler(filePath, event.velocity, instrument, event.note, event.part, event.id)
             elseif event.type == 'noteOff' or (event.type == 'noteOn' and event.velocity == 0) then
                 noteOffHandler(filePath, instrument, event.note, event.part, event.id)
             end
         end
         self.playbackNoteIndex = self.playbackNoteIndex + 1
-    end
-    local bars = self.lengthBars
-    local lengthInTicks = bars * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
-    local loopEnd = self.loopBars[2] * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
-    if (self.playbackTickCurr > loopEnd and self.loopCount > 0) or self.playbackTickCurr > lengthInTicks then
-        if self.loopCount > 0 then
-            self.loopCount = self.loopCount - 1
-            local loopStart = self.loopBars[1] * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
-            self.playbackNoteIndex = 1
-            self.playbackTickCurr = loopStart
-            self.playbackTickPrev = self.playbackTickCurr
-            return true
-        else
-            return false
-        end
     end
 
     return true

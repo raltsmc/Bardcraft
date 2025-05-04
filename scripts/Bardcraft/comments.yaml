@@ -1,0 +1,353 @@
+publican:
+  - criteria: # First Performance Block
+      perfCountMax: 0 # This is the player's first time performing HERE
+    subcriteria:
+      # --- Catastrophic Failure ---
+      - criteria:
+          perfQualityMax: 15 # Score 0-15
+        subcriteria:
+          - criteria:
+              race: dark elf
+            choices:
+              - Comments_Publican_FirstPerf_Terrible_Dunmer_1
+          - choices:
+              - Comments_Publican_FirstPerf_Terrible_1
+              - Comments_Publican_FirstPerf_Terrible_2
+              - Comments_Publican_FirstPerf_Terrible_3
+        effects:
+          disposition: -25
+          reputation: -1
+          kickPlayer: true
+      # --- Really Bad Performance ---
+      - criteria:
+          perfQualityMin: 16
+          perfQualityMax: 29 # Score 16-29
+        choices:
+          - Comments_Publican_FirstPerf_Bad_1
+          - Comments_Publican_FirstPerf_Bad_2
+          - Comments_Publican_FirstPerf_Bad_3
+          - Comments_Publican_FirstPerf_Bad_4
+        effects:
+          disposition: -15
+          reputation: -0.5
+      # --- Mediocre / Forgettable Performance ---
+      - criteria:
+          perfQualityMin: 30
+          perfQualityMax: 49 # Score 30-49
+        choices:
+          - Comments_Publican_FirstPerf_Mediocre_1
+          - Comments_Publican_FirstPerf_Mediocre_2
+          - Comments_Publican_FirstPerf_Mediocre_3
+          - Comments_Publican_FirstPerf_Mediocre_4
+        effects:
+          disposition: -5 # Still slightly negative, it wasn't impressive
+          # Maybe a tiny gold reward if disposition was already high? e.g., gold: 5
+      # --- Decent / Okay Performance ---
+      - criteria:
+          perfQualityMin: 50
+          perfQualityMax: 69 # Score 50-69
+        choices:
+          - Comments_Publican_FirstPerf_Okay_1
+          - Comments_Publican_FirstPerf_Okay_2
+          - Comments_Publican_FirstPerf_Okay_3
+          - Comments_Publican_FirstPerf_Okay_4
+        effects:
+          disposition: +5
+          reputation: +0.2
+          gold: 15 # Small payment
+      # --- Good Performance ---
+      - criteria:
+          perfQualityMin: 70
+          perfQualityMax: 85 # Score 70-85
+        choices:
+          - Comments_Publican_FirstPerf_Good_1
+          - Comments_Publican_FirstPerf_Good_2
+          - Comments_Publican_FirstPerf_Good_3
+          - Comments_Publican_FirstPerf_Good_4
+        effects:
+          disposition: +15
+          reputation: +0.5
+          gold: 40 # Decent payment
+      # --- Excellent Performance ---
+      - criteria:
+          perfQualityMin: 86 # Score 86+
+        choices:
+          - Comments_Publican_FirstPerf_Excellent_1
+          - Comments_Publican_FirstPerf_Excellent_2
+          - Comments_Publican_FirstPerf_Excellent_3
+          - Comments_Publican_FirstPerf_Excellent_4
+        effects:
+          disposition: +30
+          reputation: +1
+          gold: 75 # Good payment
+
+  # --- Subsequent Performances Blocks ---
+  # Block for 2nd to 5th performance - showing recognition
+  - criteria:
+      perfCountMin: 1
+      perfCountMax: 4 # Played here 1-4 times before
+    subcriteria:
+      # --- Still Bad After Returning ---
+      - criteria:
+          perfQualityMax: 29
+          reputationMax: 5 # Prevents this if reputation is already high despite bad performance
+        choices:
+          - "Still haven't improved, eh? Look, I appreciate the effort, but this isn't working out."
+          - "I thought we talked about this... Practice *before* you perform. Please leave."
+          - "You're testing my patience. That was no better than last time. Maybe worse."
+        effects:
+          disposition: -20
+          reputation: -0.7 # Slightly harsher rep hit for repeat offense
+          kickPlayer: true # Maybe only if quality is < 15?
+      # --- Showing Improvement (Mediocre to Okay) ---
+      - criteria:
+          perfQualityMin: 40
+          perfQualityMax: 69
+          # Could add check for previous performance quality being lower? Requires tracking history.
+        choices:
+          - "Getting better, I see. Keep at it, you might make something of yourself yet."
+          - "Hmm, definitely an improvement from last time. Still room to grow, but better."
+          - "Alright, that's more like it. Still not amazing, but heading the right direction."
+        effects:
+          disposition: +5 # Small boost for improvement
+          gold: 10
+      # --- Consistently Good ---
+      - criteria:
+          perfQualityMin: 70
+          perfQualityMax: 85
+          dispositionMin: 30 # They already liked the player somewhat
+        choices:
+          - "Good to have you back! Another solid performance."
+          - "Just like last time, nice and enjoyable. Keep it coming!"
+          - "You're becoming a familiar face, and a welcome one. Well played."
+        effects:
+          disposition: +10
+          reputation: +0.3
+          gold: 50
+      # --- Consistently Excellent ---
+      - criteria:
+          perfQualityMin: 86
+          reputationMin: 2 # Already made a good impression
+        choices:
+          - "Always a pleasure! You really know how to work the crowd."
+          - "Brilliant, as always! The regulars are starting to ask for you by name."
+          - "Another masterful performance! You make this tavern feel like a palace... well, almost."
+        effects:
+          disposition: +20
+          reputation: +0.7
+          gold: 100
+
+  # Block for established performers (5+ times) - Higher stakes/expectations
+  - criteria:
+      perfCountMin: 5
+    subcriteria:
+      # --- Sudden Drop in Quality from an Established Performer ---
+      - criteria:
+          perfQualityMax: 40
+          reputationMin: 10 # They had a good reputation
+        choices:
+          - "Whoa there! Rough night? That wasn't like you at all. Everything alright?" # Concerned if high disposition
+          - "Bit sloppy tonight, eh? Let's hope that was just a fluke. I expect better from you." # Neutral/Lower disposition
+          - "What was that? Sounded like you were playing with your feet! Don't let it happen again."
+        effects:
+          disposition: -15 # Significant drop due to unmet expectations
+          reputation: -1 # Reputation takes a hit
+      # --- Maintaining Excellence ---
+      - criteria:
+          perfQualityMin: 80
+          reputationMin: 15 # Well established positive reputation
+        choices:
+          - "Perfection, as usual! You're part of the furniture now... the very talented, musical furniture."
+          - "Wouldn't be the same without your tunes. Cheers!"
+          - "Another night, another brilliant performance. You spoil us, you know that?"
+        effects:
+          disposition: +10 # Maintenance boost
+          reputation: +0.5 # Continued positive rep
+          gold: 120 # Top tier regular payment
+
+# --- Special Cases ---
+# Example: High quality performance but low reputation/disposition (grudging respect)
+  - criteria:
+      perfCountMax: 0 # First time
+      perfQualityMin: 80 # Very good performance
+      dispositionMax: 20 # But the NPC dislikes the player
+      reputationMax: 5 # And player isn't famous yet
+    choices:
+      - "Hmph. Can't deny you've got skill, fetcher. Doesn't mean I like you, but... that wasn't bad. Take this and go."
+      - "Surprising. I expected garbage, but that was... tolerable. Even good. Fine, here's some coin."
+    effects:
+      disposition: +10 # Improves disposition slightly despite initial dislike
+      reputation: +0.5
+      gold: 50 # Decent payment, maybe slightly less than if they liked player
+
+# Example: Mediocre performance but high reputation/disposition (benefit of the doubt)
+  - criteria:
+      perfCountMin: 2 # Not the first time
+      perfQualityMin: 40
+      perfQualityMax: 60 # Mediocre
+      dispositionMin: 60 # But NPC likes player
+      reputationMin: 10 # And player is known
+    choices:
+      - "A bit of an off night, maybe? Don't worry, happens to the best of us. Still good to hear you play."
+      - "Not your strongest performance, but still better than silence. Here you go, friend."
+    effects:
+      disposition: +0 # No change, benefit of the doubt
+      reputation: -0.1 # Slight dip as it wasn't great
+      gold: 20 # Smaller payment, but still paid due to relationship
+
+patron:
+  # --- Catastrophic Failure ---
+  - criteria:
+      perfQualityMax: 15 # Score 0-15
+    subcriteria:
+      - criteria:
+          race: nord
+          randomChance: 0.25
+        choices:
+          - "By Shor's beard, what was that racket?"
+          - "Sounds worse than cliff racers mating!"
+      - criteria:
+          race: dark elf
+          randomChance: 0.25
+        choices:
+          - "By Vehk, that was dreadful."
+          - "*mumbles* Filthy outlander bards..."
+      - criteria:
+          race: high elf
+          randomChance: 0.25
+        choices:
+          - "Auriel have mercy! That was atrocious."
+      - criteria:
+          race: khajiit
+          randomChance: 0.25
+        choices:
+          - "This one is not sure if that was music or a death rattle."
+      - criteria:
+          race: imperial
+          randomChance: 0.25
+        choices:
+          - "By the Divines, that's dreadful."
+      - choices:
+          - "Is he hitting that lute with a rock?"
+          - "My ears! Make it stop!"
+          - "Is this some kind of punishment?"
+          - "Even the rats are plugging their ears."
+          - "Ugh, time for another drink."
+          - "Please... just... silence."
+          - "Think I'm going somewhere quieter."
+  # --- Really Bad Performance ---
+  - criteria:
+      perfQualityMin: 16
+      perfQualityMax: 29 # Score 16-29
+    choices:
+      - "Oof. Did you hear that note?"
+      - "Well... points for trying?"
+      - "Maybe try a different instrument? Or... silence?"
+      - "I've heard mudcrabs sing better."
+      - "My headache's getting worse."
+      - "Don't encourage him..."
+      - "Is the barkeep really letting this happen?"
+  # --- Mediocre / Forgettable Performance ---
+  - criteria:
+      perfQualityMin: 30
+      perfQualityMax: 49 # Score 30-49
+    subcriteria:
+      - criteria:
+          race: high elf
+          randomChance: 0.25
+        choices:
+          - "How... interesting."
+      - choices:
+          - "Hmm? Oh, someone's playing."
+          - "It's... noise, I suppose."
+          - "Is that supposed to be 'Jiub's Jaunt'? Needs work."
+          - "Fills the silence, at least."
+          - "He seems passionate, anyway."
+          - "Meh."
+          - "Is it over yet?"
+          - "Not the worst I've heard. Not the best either."
+          - "Passable."
+          - "Wonder what's for dinner..."
+  # --- Decent / Okay Performance ---
+  - criteria:
+      perfQualityMin: 50
+      perfQualityMax: 69 # Score 50-69
+    subcriteria:
+      - criteria:
+          race: redguard
+          randomChance: 0.25
+        choices:
+          - "Got a decent swing to it."
+      - criteria:
+          race: argonian
+          randomChance: 0.25
+        choices:
+          - "The notes flow... adequately."
+      - choices:
+          - "Not bad, not bad."
+          - "Catchy little rhythm."
+          - "Makes the sujamma go down smoother."
+          - "Ah, that part sounds familiar."
+          - "Better than most minstrels wandering through."
+          - "My foot's tapping. That's a good sign."
+          - "Quite pleasant, actually."
+          - "Easy listening."
+
+  # --- Good Performance ---
+  - criteria:
+      perfQualityMin: 70
+      perfQualityMax: 85 # Score 70-85
+    subcriteria:
+      - criteria:
+          race: imperial
+          randomChance: 0.25
+        choices:
+          - "Ah, brings a touch of culture to this establishment."
+      - choices:
+          - "Hey, that's actually pretty good!"
+          - "Well played, bard!"
+          - "More! Play us another!"
+          - "I could listen to this all night."
+          - "Really sets a nice mood."
+          - "He's got talent, this one."
+          - "Bravo!"
+          - "Now *that's* music!"
+  # --- Excellent Performance ---
+  - criteria:
+      perfQualityMin: 86 # Score 86+
+    subcriteria:
+      - criteria:
+          race: dark elf
+          randomChance: 0.25
+        choices:
+          - "By Vivec's grace! That was masterfully played!"
+      - criteria:
+          race: high elf
+          randomChance: 0.25
+        choices:
+          - "Such artistry! The phrasing, the dynamics... superb."
+      - criteria:
+          race: imperial
+          randomChance: 0.25
+        choices:
+          - "As good as any bard in the Imperial City!"
+      - choices:
+          - "Incredible! Encore! Encore!"
+          - "Makes you forget your troubles for a while."
+          - "Truly moving..."
+          - "I haven't heard playing like that in years!"
+          - "Give him some coin, somebody!"
+          - "Absolutely brilliant!"
+  - criteria:
+      perfQualityMin: 60
+      densityMatch: DensityTooFast
+    choices:
+      - "A bit... energetic for this establishment, wouldn't you say?"
+      - "Well played, but perhaps something calmer?"
+      - "Woke me up, I'll give him that."
+  - criteria:
+      perfQualityMin: 60
+      densityMatch: DensityTooSlow
+    choices:
+      - "Nice tune, but... pick up the pace, bard!"
+      - "Put some fire into it!"

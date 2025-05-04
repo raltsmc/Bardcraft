@@ -19,28 +19,24 @@ local Song = require('scripts.Bardcraft.util.song').Song
 
 local function populateKnownSongs()
     -- Check the stored preset songs; if any are set to startUnlocked but are missing from knownSongs, add them
-    local bardData = storage.playerSection('Bardcraft')
+    local bardData = storage.globalSection('Bardcraft')
     local storedSongs = bardData:getCopy('songs/preset') or {}
     for _, song in pairs(storedSongs) do
         if song.startUnlocked and not Performer.knownSongs[song.id] then
             Performer:addKnownSong(song)
         end
     end
-
-    print("Known songs:")
-    for songName, _ in pairs(Performer.knownSongs) do
-        print(songName)
-    end
 end
 
 local performersInfo = {}
 
-local performancePart = 1
+local performancePart = nil
 local queuedMilestone = nil
 local practiceSong = nil
 
 local practiceOverlayNoteMap = {}
 local practiceOverlayNoteIdToIndex = {}
+local practiceOverlayNoteIndexToContentId = {}
 local practiceOverlay = nil
 local practiceOverlayNotesWrapper = nil
 local practiceOverlayNoteFlashTimes = {}
@@ -53,9 +49,12 @@ local practiceOverlayFadeInTimer = 0
 local practiceOverlayFadeInDuration = 0.3
 local practiceOverlayScaleX = 8 -- Every 8 ticks is 1 pixel
 local practiceOverlayScaleY = 0
-local practiceOverlayWidthTicks = 0
 local practiceOverlayTick = 0
 local practiceOverlayNoteBounds = {129, 0}
+local practiceOverlayRepopulateTimeWindow = 2 -- seconds; only render notes within this time window to avoid crazy lag
+local practiceOverlayRepopulateTime = practiceOverlayRepopulateTimeWindow 
+local practiceOverlayNoteLayouts = {}
+local practiceOverlayLastShakeFactor = 0
 
 local hurtOverlay = ui.create {
     layer = 'Notification',
@@ -86,7 +85,7 @@ local function getPracticeNoteMap()
         end
     end
     table.sort(noteMap, function(a, b) return a.time < b.time end)
-    practiceOverlayScaleY = 128 / ((practiceOverlayNoteBounds[2] - practiceOverlayNoteBounds[1]) + 1)
+    practiceOverlayScaleY = 128 / ((practiceOverlayNoteBounds[2] - practiceOverlayNoteBounds[1]) + 2)
     return noteMap
 end
 
@@ -102,32 +101,57 @@ local function lerpColor(t, a, b)
     )
 end
 
-local function populatePracticeOverlayNotes()
+local function initPracticeOverlayNotes()
     if not practiceOverlayNotesWrapper then return end
 
-    local content = practiceOverlayNotesWrapper.layout.content
+    local screenWidth = ui.screenSize().x
 
+    practiceOverlayNoteLayouts = {}
     local i = 1
     for _, data in pairs(practiceOverlayNoteMap) do
         practiceOverlayNoteIdToIndex[data.index] = i
-        i = i + 1
         local note = {
             type = ui.TYPE.Image,
             props = {
+                index = data.index,
                 resource = ui.texture { path = 'textures/bardcraft/ui/pianoroll-note.dds' },
                 size = util.vector2(data.duration * practiceOverlayScaleX - practiceOverlayScaleX, practiceOverlayScaleY * 4),
                 tileH = true,
                 tileV = false,
-                position = util.vector2(data.time * practiceOverlayScaleX + (practiceOverlayWidthTicks * 0.5 * practiceOverlayScaleX), math.floor((practiceOverlayNoteBounds[2] - data.note) * practiceOverlayScaleY) * 2),
+                baseY = math.floor((practiceOverlayNoteBounds[2] - data.note) * practiceOverlayScaleY) * 2,
+                position = util.vector2(data.time * practiceOverlayScaleX + screenWidth / 2, math.floor((practiceOverlayNoteBounds[2] - data.note) * practiceOverlayScaleY) * 2),
                 alpha = 0.2,
             },
         }
-        content:add(note)
+        table.insert(practiceOverlayNoteLayouts, note)
+        i = i + 1
     end
     practiceOverlayNotesWrapper:update()
-    practiceOverlayNoteFlashTimes = {}
-    practiceOverlayNoteFadeTimes = {}
-    practiceOverlayNoteFadeAlphaStart = {}
+end
+
+local function populatePracticeOverlayNotes()
+    local windowXOffset = practiceOverlayTick * practiceOverlayScaleX - practiceOverlayScaleX
+    local windowXSize = ui.screenSize().x + practiceSong:secondsToTicks(practiceOverlayRepopulateTimeWindow) * practiceOverlayScaleX
+    local content = ui.content {}
+    practiceOverlayNoteIndexToContentId = {}
+
+    local count = 0
+    for i, note in pairs(practiceOverlayNoteLayouts) do
+        local notePos = note.props.position.x
+        local noteSize = note.props.size.x
+
+        if notePos >= windowXOffset + windowXSize then
+            break
+        end
+        if notePos + noteSize >= windowXOffset then
+            content:add(note)
+            count = count + 1
+            practiceOverlayNoteIndexToContentId[i] = count
+        end
+    end
+
+    practiceOverlayNotesWrapper.layout.content = content
+    practiceOverlayNotesWrapper:update()
 end
 
 local function createPracticeOverlay()
@@ -179,9 +203,15 @@ local function createPracticeOverlay()
     end
 
     practiceOverlayScaleX = 6 * (practiceSong.tempo * practiceSong.tempoMod / 120)
-    practiceOverlayWidthTicks = ui.screenSize().x / practiceOverlayScaleX
     practiceOverlayTick = 1
+    initPracticeOverlayNotes()
     populatePracticeOverlayNotes()
+    practiceOverlayNoteFlashTimes = {}
+    practiceOverlayNoteFadeTimes = {}
+    practiceOverlayNoteFadeAlphaStart = {}
+    practiceOverlayNoteSuccess = {}
+    practiceOverlayRepopulateTime = practiceOverlayRepopulateTimeWindow 
+    practiceOverlayLastShakeFactor = -1
 end
 
 local function destroyPracticeOverlay()
@@ -194,26 +224,56 @@ end
 local function updatePracticeOverlay()
     if not practiceOverlay or not practiceOverlayNotesWrapper then return end
     practiceOverlayNotesWrapper.layout.props.position = util.vector2(-practiceOverlayTick * practiceOverlayScaleX, 0)
+    if practiceOverlayRepopulateTime > 0 then
+        practiceOverlayRepopulateTime = math.max(practiceOverlayRepopulateTime - core.getRealFrameDuration(), 0)
+    else
+        practiceOverlayRepopulateTime = practiceOverlayRepopulateTimeWindow
+        populatePracticeOverlayNotes()
+    end
     practiceOverlayNotesWrapper:update()
     practiceOverlay:update()
 end
 
 local function doHurt(amount)
     hurtAlpha = 0.25
-    self.type.stats.dynamic.health(self).current = math.max(self.type.stats.dynamic.health(self).current - amount, 1)
+    self.type.stats.dynamic.health(self).current = self.type.stats.dynamic.health(self).current - amount
     ambient.playSoundFile('sound\\fx\\body hit.wav')
 end
 
-local function doBread()
-    doHurt(1)
-    ui.showMessage('A patron threw their bread at you.\n1 Bread acquired.')
-    core.sendGlobalEvent('BC_ThrowItem', { actor = self, item = 'ingred_bread_01', count = 1 })
+local function playSwoosh()
+    ambient.playSoundFile('sound\\fx\\swoosh ' .. math.random(1, 3) .. '.wav')
 end
 
-local function doDrink()
-    doHurt(5)
-    ui.showMessage('A patron threw their drink at you. You managed to catch it!\n1 Mazte acquired.')
-    core.sendGlobalEvent('BC_ThrowItem', { actor = self, item = 'Potion_Local_Brew_01', count = 1 })
+local function handleThrownItem(item, caught)
+    if item == 'ingred_bread_01' then
+        if caught then
+            ui.showMessage('A patron threw their bread at you. You managed to catch it!\n1 Bread acquired.')
+            playSwoosh()
+        else
+            ui.showMessage('A patron threw their bread at you.')
+            doHurt(1)
+        end
+    elseif item == 'Potion_Local_Brew_01' then
+        if caught then
+            ui.showMessage('A patron threw their drink at you. You managed to catch it!\n1 Mazte acquired.')
+            playSwoosh()
+        else
+            ui.showMessage('A patron threw their drink at you. It nailed you in the skull!')
+            doHurt(5)
+        end
+    end
+end
+
+local function getSongBySourceFile(sourceFile)
+    -- Search songs/preset
+    local bardData = storage.globalSection('Bardcraft')
+    local storedSongs = bardData:get('songs/preset') or {}
+    for _, song in pairs(storedSongs) do
+        if song.sourceFile == sourceFile then
+            return song
+        end
+    end
+    return nil
 end
 
 return {
@@ -264,16 +324,6 @@ return {
             elseif e.symbol == 'n' then
                 Performer:addPerformanceXP(10) -- debug
             elseif e.symbol == 'o' then
-                anim.addVfx(self, "meshes/Bardcraft/tuba.nif", {
-                    boneName = 'Bip01 BOInstrument',
-                    vfxId = 'BO_Instrument',
-                    loop = true,
-                    useAmbientLight = false
-                })
-                Performer.startAnim('bctuba')
-            elseif e.symbol == 'b' then
-                doBread()
-            elseif e.symbol == 'v' then
                 doDrink()
             elseif Editor.active and e.code == input.KEY.Space then
                 Editor:togglePlayback(input.isCtrlPressed())
@@ -298,7 +348,7 @@ return {
                 for id, time in pairs(practiceOverlayNoteFlashTimes) do
                     if time > 0 then
                         practiceOverlayNoteFlashTimes[id] = math.max(time - dt, 0)
-                        local note = practiceOverlayNotesWrapper.layout.content[practiceOverlayNoteIdToIndex[id]]
+                        local note = practiceOverlayNotesWrapper.layout.content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[id]]]
                         if note then
                             note.props.alpha = lerp((1.5 - practiceOverlayNoteFlashTimes[id]) / 1.5, 1, 0.4)
                             note.props.color = practiceOverlayNoteSuccess[id] and Editor.uiColors.DEFAULT or Editor.uiColors.DARK_RED
@@ -312,7 +362,7 @@ return {
                 for id, time in pairs(practiceOverlayNoteFadeTimes) do
                     if time > 0 then
                         practiceOverlayNoteFadeTimes[id] = math.max(time - dt, 0)
-                        local note = practiceOverlayNotesWrapper.layout.content[practiceOverlayNoteIdToIndex[id]]
+                        local note = practiceOverlayNotesWrapper.layout.content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[id]]]
                         if note then
                             note.props.alpha = lerp((0.5 - practiceOverlayNoteFadeTimes[id]) / 0.5, practiceOverlayNoteFadeAlphaStart[id], 0)
                             local startColor = practiceOverlayNoteSuccess[id] and Editor.uiColors.DEFAULT or Editor.uiColors.DARK_RED
@@ -326,16 +376,43 @@ return {
                         end
                     end
                 end
+
+                -- for id, success in pairs(practiceOverlayNoteSuccess) do
+                --     local note = practiceOverlayNotesWrapper.layout.content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[id]]]
+                --     if note then
+                --         if not success then
+                --             note.props.position = util.vector2(note.props.position.x, note.props.baseY + 3 * math.sin((core.getRealTime()) * 25 + id))
+                --         end
+                --     end
+                -- end
+
+                local currentShakeFactor = Performer.currentConfidence < 0.75 and (0.75 - Performer.currentConfidence) / 0.75 or 0
+                -- Smooth shake factor
+                if practiceOverlayLastShakeFactor == -1 then
+                    practiceOverlayLastShakeFactor = currentShakeFactor
+                end
+                local shakeFactor = practiceOverlayLastShakeFactor * 0.99 + currentShakeFactor * 0.01
+                practiceOverlayLastShakeFactor = shakeFactor
+
+                for _, note in pairs(practiceOverlayNotesWrapper.layout.content) do
+                    if note and note.props then
+                        if not practiceOverlayNoteSuccess[note.props.index] then
+                            note.props.position = util.vector2(note.props.position.x, note.props.baseY + shakeFactor * 5 * math.sin((core.getRealTime()) * 25 + note.props.index))
+                        else
+                            note.props.position = util.vector2(note.props.position.x, note.props.baseY)
+                        end
+                    end
+                end
+
                 local opacity = lerp((practiceOverlayFadeInDuration - practiceOverlayFadeInTimer) / practiceOverlayFadeInDuration, 0, practiceOverlayTargetOpacity)
                 practiceOverlay.layout.props.alpha = opacity
                 updatePracticeOverlay()
             end
             if hurtAlpha > 0 then
                 hurtAlpha = math.max(hurtAlpha - dt, 0)
+                hurtOverlay.layout.props.alpha = hurtAlpha
+                hurtOverlay:update()
             end
-            hurtOverlay.layout.props.alpha = hurtAlpha
-            hurtOverlay:update()
-
             if queuedMilestone and not Performer.playing then
                 local message
                 if queuedMilestone < 100 then
@@ -361,14 +438,15 @@ return {
             local success = Performer.handleConductorEvent(data)
             if data.type == 'PerformStart' then
                 practiceSong = data.song
+                performancePart = data.part.index
                 setmetatable(practiceSong, Song)
                 createPracticeOverlay()
             elseif data.type == 'PerformStop' then
                 destroyPracticeOverlay()
             elseif data.type == 'NoteEvent' then
-                if practiceOverlay and practiceOverlayNoteIdToIndex[data.id] then
+                if practiceOverlay and practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]] then
                     local content = practiceOverlayNotesWrapper.layout.content
-                    local note = content[practiceOverlayNoteIdToIndex[data.id]]
+                    local note = content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]]]
                     if note then
                         practiceOverlayNoteFlashTimes[data.id] = 1.5
                         practiceOverlayNoteSuccess[data.id] = success
@@ -376,9 +454,9 @@ return {
                     end
                 end
             elseif data.type == 'NoteEndEvent' then
-                if practiceOverlay and practiceOverlayNoteIdToIndex[data.id] then
+                if practiceOverlay and practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]] then
                     local content = practiceOverlayNotesWrapper.layout.content
-                    local note = content[practiceOverlayNoteIdToIndex[data.id]]
+                    local note = content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]]]
                     if note then
                         practiceOverlayNoteFadeTimes[data.id] = 0.5
                         practiceOverlayNoteFadeAlphaStart[data.id] = note.props.alpha
@@ -399,7 +477,15 @@ return {
             end
         end,
         BC_GainConfidence = function(data)
-            ui.showMessage(l10n('UI_Msg_GainConfidence'):gsub('%%{songTitle}', data.songTitle):gsub('%%{partTitle}', data.partTitle):gsub('%%{confidence}', string.format('%.2f', data.newConfidence * 100)))
+            local message
+            if data.newConfidence > data.oldConfidence then
+                message = l10n('UI_Msg_Confidence_Up')
+            elseif data.newConfidence < data.oldConfidence then
+                message = l10n('UI_Msg_Confidence_Down')
+            else
+                return 
+            end
+            ui.showMessage(message:gsub('%%{songTitle}', data.songTitle):gsub('%%{partTitle}', data.partTitle):gsub('%%{confidence}', string.format('%.2f', data.newConfidence * 100)))
         end,
         BC_PerformerInfo = function(data)
             performersInfo[data.actor.id] = {
@@ -408,9 +494,74 @@ return {
             }
             Editor.performersInfo = performersInfo
         end,
+        BC_RandomEvent = function(data)
+            if data.type == 'ThrownItem' then
+                handleThrownItem(data.item, data.caught)
+            end
+        end,
         UiModeChanged = function(data)
             if data.newMode == nil then
                 Editor:onUINil()
+            elseif data.newMode == 'Scroll' then
+                local book = data.arg
+                local id = book.recordId
+                local suffix = id:match("_(%w+)$")
+                local prefix = id:sub(1, -#suffix - 2)
+                if prefix ~= '_rlts_bc_sheetmusic' then return end
+
+                local bardData = storage.globalSection('Bardcraft')
+                local mappings = bardData:get('sheetmusic') or {}
+                local choices = mappings[suffix]
+                if not choices or #choices == 0 then return end
+                --[[local choice = math.random(1, #choices)
+                local song = getSongBySourceFile(choices[choice])
+                if song == nil then
+                    print('ERROR: Song not found for source file: ' .. choices[choice])
+                    return
+                end]]
+                -- Instead, let's keep trying until we find a song that the player doesn't know, or we run out of choices
+                local song = nil
+                local success = false
+                local availableChoices = {}
+
+                -- Create a copy of the choices array to safely modify it
+                for _, sourceFile in ipairs(choices) do
+                    table.insert(availableChoices, sourceFile)
+                end
+
+                -- Try to find a song the player doesn't know yet
+                while #availableChoices > 0 and not song do
+                    local index = math.random(1, #availableChoices)
+                    local sourceFile = availableChoices[index]
+                    local candidateSong = getSongBySourceFile(sourceFile)
+                    
+                    if candidateSong and not Performer.knownSongs[candidateSong.id] then
+                        -- Found a song the player doesn't know
+                        song = candidateSong
+                    end
+                    
+                    -- Remove this choice regardless of whether we found a usable song
+                    table.remove(availableChoices, index)
+                end
+
+                -- If no unknown songs were found, just pick the first valid song
+                if not song and #choices > 0 then
+                    for _, sourceFile in ipairs(choices) do
+                        song = getSongBySourceFile(sourceFile)
+                        if song then break end
+                    end
+                end
+
+                success = song and Performer:teachSong(song) or false
+
+                if success then
+                    ui.showMessage(l10n('UI_Msg_LearnSong_Success'):gsub('%%{songTitle}', song.title))
+                    ambient.playSoundFile('Sound\\fx\\inter\\levelUP.wav')
+                elseif song then
+                    ui.showMessage(l10n('UI_Msg_LearnSong_Fail'):gsub('%%{songTitle}', song.title))
+                end
+
+                core.sendGlobalEvent('BC_ConsumeItem', { item = book })
             end
         end,
     }

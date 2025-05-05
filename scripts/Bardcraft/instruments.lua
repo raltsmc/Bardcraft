@@ -90,7 +90,6 @@ local animOverrideAll = {
     Drum = {
         bodrum_roll = true,
     },
-    Ocarina = {}
 }
 
 local animMappings = {

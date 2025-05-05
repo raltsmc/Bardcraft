@@ -77,6 +77,7 @@ function P:addPerformanceXP(xp)
     if leveledUp then
         self:sendPerformerInfo()
     end
+    return leveledUp
 end
 
 function P:addKnownSong(song, confidences)
@@ -137,6 +138,9 @@ P.currentDensity = 0
 P.currentConfidence = 0
 P.maxConfidence = 0
 P.maxHistory = 24
+
+P.xpGain = 0
+P.levelGain = 0
 
 P.maxConfidenceGrowth = 0
 P.overallNoteEvents = {}
@@ -237,6 +241,12 @@ function P.handlePerformEvent(data)
     local song = data.song
     P.musicTime = data.time + (core.getRealTime() - data.realTime)
     P.bpm = song.tempo * song.tempoMod
+
+    -- Check if time sig is compound and if so, adjust BPM so animation matches
+    if song.timeSig[1] % 3 == 0 and song.timeSig[1] > 3 then
+        P.bpm = P.bpm * 4 / 3
+    end
+
     local iData = instrumentData[data.instrument]
     if not iData then return end
     P.instrument = data.instrument
@@ -256,13 +266,15 @@ function P.handlePerformEvent(data)
         P.currentConfidence = P.maxConfidence
         P.currentDensity = 0
         P.noteIntervals = {}
+        P.overallNoteEvents = {}
         P.lastNoteTime = nil
+        P.xpGain = 0
+        P.levelGain = 0
     end
 
     P.playing = true
     P.currentSong = song
     P.currentPart = data.part
-    P.overallNoteEvents = {}
 end
 
 function P.handleStopEvent(data)
@@ -292,6 +304,9 @@ function P.handleStopEvent(data)
         if omwself.type == types.Player then
             omwself:sendEvent('BC_GainConfidence', { songTitle = P.currentSong.title, partTitle = P.currentPart.title, oldConfidence = oldConfidence, newConfidence = P.knownSongs[P.currentSong.id].partConfidences[P.currentPart.index] })
         end
+    end
+    if omwself.type == types.Player then
+        core.sendGlobalEvent('BC_PlayerPerfSkillLog', { xpGain = P.xpGain, levelGain = P.levelGain, level = P.performanceSkill.level, xpCurr = P.performanceSkill.xp, xpReq = P:getPerformanceXPRequired() })
     end
     
     P.currentSong = nil
@@ -356,7 +371,8 @@ function P.handleNoteEvent(data)
     if success then
         local gain = (P.maxConfidence - P.currentConfidence) / P.maxConfidence * 0.04
         P.currentConfidence = math.min(P.currentConfidence + gain, P.maxConfidence)
-        P:addPerformanceXP(1)
+        if P:addPerformanceXP(1) then P.levelGain = P.levelGain + 1 end
+        P.xpGain = P.xpGain + 1
     else
         local loss = P.currentConfidence / P.maxConfidence * 0.04
         P.currentConfidence = math.max(P.currentConfidence - loss, 0)

@@ -1,10 +1,14 @@
 local core = require('openmw.core')
 local world = require('openmw.world')
 local types = require('openmw.types')
+local storage = require('openmw.storage')
 
 local configGlobal = require('scripts.Bardcraft.config.global')
 local Song = require('scripts.Bardcraft.util.song').Song
 local Cell = require('scripts.Bardcraft.cell')
+local Feedback = require('scripts.Bardcraft.feedback')
+
+local l10n = core.l10n('Bardcraft')
 
 local playing = false
 local song = nil
@@ -36,7 +40,7 @@ local function resyncAllActors()
     end
 end
 
-local function start()
+local function start(data)
     if not song then return end
     print("Starting performance (" .. song.title .. ")")
     playing = true
@@ -53,8 +57,16 @@ local function start()
     performance.density = 0
     performance.complexity = 0
     performance.time = 0
+    performance.type = data.type
+    performance.streetName = data.streetName
+    performance.streetType = data.streetType
+    performance.cell = world.players[1].cell
+    performance.startGameTime = core.getGameTime()
+    performanceEvalTimer = 0
     performanceRandomEventTimer = performanceRandomEventInterval[1]
 end
+
+local logAwait = nil
 
 local function stop()
     if song then
@@ -63,6 +75,51 @@ local function stop()
     playing = false
     for _, performerData in ipairs(performers) do
         performerData.actor:sendEvent('BO_ConductorEvent', { type = 'PerformStop', completion = song and (performance.time / song:lengthInSeconds()) or 0 })
+    end
+
+    local performanceLog = {
+        type = performance.type,
+        quality = performance.quality,
+        density = performance.density,
+        complexity = performance.complexity,
+        time = performance.time,
+        cell = performance.streetName or performance.cell.name,
+        gameTime = performance.startGameTime,
+    }
+
+    local cellBlurb = l10n('UI_Blurb_' .. performanceLog.cell)
+    if cellBlurb ~= ('UI_Blurb_' .. performanceLog.cell) then
+        performanceLog.cellBlurb = cellBlurb
+    end
+
+    if performanceLog.type == Song.PerformanceType.Street then
+        performanceLog.cell = l10n('UI_PerfLog_StreetsOf'):gsub('%%{city}', performanceLog.cell)
+    end
+
+    local player = world.players[1]
+    if player then
+        if performance.type == Song.PerformanceType.Tavern then
+            local publican = Cell.getPublican(performance.cell)
+            local context = {
+                perfQuality = performance.quality,
+                perfDensity = performance.density,
+                race = publican and types.NPC.record(publican).race or '',
+            }
+            local feedbackTree = storage.globalSection('Bardcraft'):getCopy('feedback')
+            if not feedbackTree then
+                print('No feedback tree found')
+                return
+            end
+            local feedback = Feedback.findMatchingNode(feedbackTree.publican, context)
+            if feedback then
+                local choice = l10n(feedback.choices[math.random(1, #feedback.choices)])
+                local effects = feedback.effects
+
+                performanceLog.publicanComment = choice
+                performanceLog.effects = effects
+            end
+        end
+        logAwait = performanceLog
     end
 end
 
@@ -237,7 +294,22 @@ return {
         BO_StartPerformance = function(data)
             if not playing then
                 if not data.performers or #data.performers == 0 then return end
-                local hasPublican = Cell.cellHasPublican(world.players[1].cell)
+                
+                local type, streetName, streetType = Cell.canPerformHere(world.players[1].cell, data.type)
+                if not type then
+                    print('Cannot perform here')
+                    return
+                elseif type == Song.PerformanceType.Tavern then
+                    print('Performing in tavern')
+                elseif type == Song.PerformanceType.Street then
+                    print('Performing on the street in ' .. streetName .. ' (' .. streetType .. ')')
+                elseif type == Song.PerformanceType.Practice then
+                    print('Practicing')
+                end
+                data.type = type
+                data.streetName = streetName
+                data.streetType = streetType
+
                 song = data.song
                 setmetatable(song, Song)
 
@@ -254,7 +326,7 @@ return {
                 end
                 performers = perfList
                 song:resetPlayback()
-                start()
+                start(data)
             else
                 stop()
             end
@@ -264,6 +336,17 @@ return {
                 performance.noteEvents[data.part.index] = {}
             end
             table.insert(performance.noteEvents[data.part.index], data.success)
+        end,
+        BC_PlayerPerfSkillLog = function(data)
+            if logAwait then
+                logAwait.xpGain = data.xpGain
+                logAwait.level = data.level
+                logAwait.levelGain = data.levelGain
+                logAwait.xpCurr = data.xpCurr
+                logAwait.xpReq = data.xpReq
+                world.players[1]:sendEvent('BC_PerformanceLog', logAwait)
+                logAwait = nil
+            end
         end,
     }
 }

@@ -9,6 +9,7 @@ local util = require('openmw.util')
 local input = require('openmw.input')
 local nearby = require('openmw.nearby')
 local types = require('openmw.types')
+local calendar = require('openmw_aux.calendar')
 
 local l10n = core.l10n('Bardcraft')
 
@@ -90,6 +91,9 @@ Editor.uiColors = {
     DARK_RED = util.color.rgb(0.5, 0, 0),
     RED_DESAT = util.color.rgb(0.7, 0.3, 0.3),
     DARK_RED_DESAT = util.color.rgb(0.3, 0.05, 0.05),
+    BOOK_HEADER = util.color.rgb(0.3, 0.03, 0.03),
+    BOOK_TEXT = util.color.rgb(0.1, 0.1, 0.1),
+    BOOK_TEXT_LIGHT = util.color.rgb(101 / 255, 82 / 255, 48 / 255),
 }
 
 Editor.noteColor = Editor.uiColors.DEFAULT
@@ -2786,6 +2790,482 @@ getStatsTab = function()
     return stats
 end
 
+local logShowing = false
+
+function Editor:showPerformanceLog(log)
+    screenSize = ui.screenSize()
+    local sizeX = math.min(1600, screenSize.x * 5/6)
+    local sizeY = sizeX * 9/16
+    
+    self:destroyUI()
+    I.UI.setMode(I.UI.MODE.Interface, {windows = {}})
+    core.sendGlobalEvent('Pause', 'BO_Editor')
+    logShowing = true
+
+    local dateString = calendar.formatGameTime('%d %B, %Y', log.gameTime)
+    local baseTextSize = math.max(16 * sizeX / 1600, 8)
+    local headerSize = baseTextSize * 2
+    local textSize = baseTextSize * 1.5
+
+    local function textWithLabel(label, text, color, size)
+        color = color or Editor.uiColors.BOOK_HEADER
+        size = size or textSize
+        return {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = label .. ': ',
+                        textSize = size,
+                        textColor = color,
+                    },
+                },
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = text,
+                        textSize = size,
+                        textColor = Editor.uiColors.BOOK_TEXT,
+                    },
+                    external = {
+                        grow = 1,
+                        stretch = 1,
+                    },
+                },
+            }
+        }
+    end
+    local qualityString
+    if log.quality == 100 then
+        qualityString = 'Perfect'
+    elseif log.quality >= 86 then
+        qualityString = 'Excellent'
+    elseif log.quality >= 70 then
+        qualityString = 'Great'
+    elseif log.quality >= 50 then
+        qualityString = 'Good'
+    elseif log.quality >= 30 then
+        qualityString = 'Mediocre'
+    elseif log.quality >= 16 then
+        qualityString = 'Bad'
+    else
+        qualityString = 'Terrible'
+    end
+    
+    local starsTexture = ui.texture {
+        path = 'textures/Bardcraft/ui/stars-' .. qualityString .. '.dds',
+        size = util.vector2(500, 96),
+    }
+
+    qualityString = l10n('UI_Quality_' .. qualityString)
+
+    local tavernNotes = {}
+    if log.type == Song.PerformanceType.Tavern then
+        local patronComments = {}
+        if log.patronComments and #log.patronComments > 0 then
+            for _, comment in ipairs(log.patronComments) do
+                table.insert(patronComments, {
+                    template = I.MWUI.templates.textParagraph,
+                    props = {
+                        text = ' - "' .. comment .. '"',
+                        textSize = textSize,
+                        textColor = Editor.uiColors.BOOK_TEXT,
+                        relativeSize = util.vector2(1, 0),
+                        size = util.vector2(-32, 0),
+                    },
+                })
+            end
+        end
+        tavernNotes = {
+            {
+                template = createPaddingTemplate(4),
+            },
+            {
+                template = I.MWUI.templates.textNormal,
+                props = {
+                    text = 'Notes from the Evening',
+                    textSize = headerSize,
+                    textColor = Editor.uiColors.BOOK_HEADER
+                },
+            },
+            {
+                template = I.MWUI.templates.horizontalLine,
+            },
+            {
+                template = createPaddingTemplate(8),
+            },
+            textWithLabel('From the Publican', ''),
+            {
+                template = createPaddingTemplate(4),
+            },
+            {
+                template = I.MWUI.templates.textParagraph,
+                props = {
+                    text = log.publicanComment and ('"' .. log.publicanComment .. '"') or 'No comment.',
+                    textSize = textSize,
+                    textColor = Editor.uiColors.BOOK_TEXT,
+                    relativeSize = util.vector2(1, 0),
+                    size = util.vector2(-32, 0),
+                },
+            },
+            {
+                template = createPaddingTemplate(8),
+            },
+            textWithLabel('From the Patrons', ''),
+            {
+                template = createPaddingTemplate(4),
+            },
+            table.unpack(patronComments),
+        }
+    end
+
+    local xpProg = log.xpCurr / log.xpReq
+
+    wrapperElement = ui.create {
+        layer = 'Windows',
+        type = ui.TYPE.Widget,
+        props = {
+            size = util.vector2(sizeX, sizeY),
+            anchor = util.vector2(0.5, 0.5),
+            relativePosition = util.vector2(0.5, 0.5),
+        },
+        content = ui.content {
+            {
+                type = ui.TYPE.Image,
+                props = {
+                    resource = ui.texture {
+                        path = 'textures/Bardcraft/ui/tx_performancebook.dds',
+                    },
+                    relativeSize = util.vector2(1, 1),
+                    anchor = util.vector2(0.5, 0.5),
+                    relativePosition = util.vector2(0.5, 0.5),
+                }
+            },
+            {
+                type = ui.TYPE.Flex,
+                props = {
+                    autoSize = false,
+                    relativeSize = util.vector2(0.7, 0.92),
+                    anchor = util.vector2(0.5, 0.5),
+                    relativePosition = util.vector2(0.5, 0.5),
+                    horizontal = true,
+                },
+                content = ui.content {
+                    {
+                        type = ui.TYPE.Flex,
+                        props = {
+                            autoSize = false,
+                            relativeSize = util.vector2(0.475, 1), -- left page of the book
+                        },
+                        content = ui.content {
+                            {
+                                template = I.MWUI.templates.textNormal,
+                                props = {
+                                    text = 'Performance Log',
+                                    textSize = headerSize,
+                                    textColor = Editor.uiColors.BOOK_HEADER
+                                },
+                            },
+                            {
+                                template = I.MWUI.templates.horizontalLine,
+                            },
+                            {
+                                template = I.MWUI.templates.textNormal,
+                                props = {
+                                    text = dateString,
+                                    textSize = textSize,
+                                    textColor = Editor.uiColors.BOOK_TEXT,
+                                },
+                            },
+                            {
+                                template = createPaddingTemplate(4),
+                            },
+                            textWithLabel('Venue', log.cell),
+                            {
+                                template = createPaddingTemplate(4),
+                            },
+                            {
+                                template = I.MWUI.templates.textParagraph,
+                                props = {
+                                    text = log.cellBlurb or '',
+                                    textSize = textSize,
+                                    textColor = Editor.uiColors.BOOK_TEXT_LIGHT,
+                                    relativeSize = util.vector2(1, 0),
+                                    size = util.vector2(-32, 0),
+                                },
+                            },
+                            {
+                                template = createPaddingTemplate(4),
+                            },
+                            textWithLabel('Performance Quality', qualityString),
+                            {
+                                type = ui.TYPE.Image,
+                                props = {
+                                    resource = starsTexture,
+                                    size = util.vector2(500 / 2 * (sizeX / 1600), 96 / 2 * (sizeX / 1600)),
+                                }
+                            },
+                            table.unpack(tavernNotes),
+                        }
+                    },
+                    {
+                        type = ui.TYPE.Flex,
+                        props = {
+                            autoSize = false,
+                            relativeSize = util.vector2(0.05, 1), -- space between pages
+                        }
+                    },
+                    {
+                        type = ui.TYPE.Flex,
+                        props = {
+                            autoSize = false,
+                            relativeSize = util.vector2(0.475, 1), -- right page of the book
+                        },
+                        content = ui.content {
+                            {
+                                template = I.MWUI.templates.textNormal,
+                                props = {
+                                    text = 'Rewards & Advancement',
+                                    textSize = headerSize,
+                                    textColor = Editor.uiColors.BOOK_HEADER
+                                },
+                            },
+                            {
+                                template = I.MWUI.templates.horizontalLine,
+                            },
+                            {
+                                template = createPaddingTemplate(4),
+                            },
+                            textWithLabel('Experience Gained', ''),
+                            {
+                                template = createPaddingTemplate(8),
+                            },
+                            {
+                                type = ui.TYPE.Flex,
+                                props = {
+                                    autoSize = false,
+                                    relativeSize = util.vector2(1, 0),
+                                    size = util.vector2(0, 96 * (sizeX / 1600)),
+                                    arrange = ui.ALIGNMENT.Center,
+                                },
+                                content = ui.content {
+                                    {
+                                        type = ui.TYPE.Flex,
+                                        props = {
+                                            autoSize = false,
+                                            relativeSize = util.vector2(1, 0),
+                                            size = util.vector2(0, 32 * (sizeX / 1600)),
+                                            horizontal = true,
+                                            arrange = ui.ALIGNMENT.Center,
+                                            align = ui.ALIGNMENT.Center,
+                                        },
+                                        content = ui.content {
+                                            {
+                                                template = I.MWUI.templates.textNormal,
+                                                props = {
+                                                    text = tostring(log.level),
+                                                    textSize = textSize,
+                                                    textColor = Editor.uiColors.BOOK_TEXT,
+                                                }
+                                            },
+                                            createPaddingTemplate(8),
+                                            {
+                                                template = I.MWUI.templates.borders,
+                                                props = {
+                                                    autoSize = false,
+                                                    relativeSize = util.vector2(0.8, 0),
+                                                    size = util.vector2(0, 32 * (sizeX / 1600)),
+                                                },
+                                                content = ui.content {
+                                                    {
+                                                        type = ui.TYPE.Image,
+                                                        props = {
+                                                            resource = ui.texture {
+                                                                path = 'white',
+                                                            },
+                                                            color = Editor.uiColors.DARK_RED_DESAT,
+                                                            relativeSize = util.vector2(xpProg, 1),
+                                                        }
+                                                    },
+                                                    {
+                                                        template = I.MWUI.templates.textNormal,
+                                                        props = {
+                                                            text = '+' .. log.xpGain .. ' XP',
+                                                            textSize = textSize,
+                                                            textColor = xpProg < 0.5 and Editor.uiColors.BOOK_TEXT or Editor.uiColors.DEFAULT_LIGHT,
+                                                            anchor = xpProg < 0.5 and util.vector2(0, 0) or util.vector2(1, 0),
+                                                            relativePosition = util.vector2(xpProg, 0),
+                                                            position = util.vector2(xpProg < 0.5 and 4 or -4, 0),
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            createPaddingTemplate(8),
+                                            {
+                                                template = I.MWUI.templates.textNormal,
+                                                props = {
+                                                    text = tostring(log.level + 1),
+                                                    textSize = textSize,
+                                                    textColor = Editor.uiColors.BOOK_TEXT,
+                                                }
+                                            },
+                                        }
+                                    },
+                                    createPaddingTemplate(4),
+                                    {
+                                        template = I.MWUI.templates.textNormal,
+                                        props = {
+                                            text = log.levelGain > 0 and ('Leveled up! (x' .. log.levelGain .. ')') or '',
+                                            textSize = textSize,
+                                            textColor = Editor.uiColors.BOOK_HEADER,
+                                        }
+                                    },
+                                    {
+                                        template = I.MWUI.templates.textNormal,
+                                        props = {
+                                            text = log.xpCurr .. '/' .. log.xpReq .. ' (' .. util.round(xpProg * 100) .. '%) to next level',
+                                            textSize = textSize,
+                                            textColor = Editor.uiColors.BOOK_TEXT,
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                template = createPaddingTemplate(4),
+                            },
+                            textWithLabel('Outcome', ''),
+                            {
+                                template = createPaddingTemplate(4),
+                            },
+                            {
+                                type = ui.TYPE.Widget,
+                                props = {
+                                    relativeSize = util.vector2(1, 0),
+                                    size = util.vector2(0, 96 * (sizeX / 1600)),
+                                },
+                                content = ui.content {
+                                    {
+                                        type = ui.TYPE.Image,
+                                        props = {
+                                            resource = ui.texture {
+                                                path = 'textures/Bardcraft/ui/bookicon-gold.dds',
+                                            },
+                                            size = util.vector2(96 * (sizeX / 1600), 96 * (sizeX / 1600)),
+                                        }
+                                    },
+                                    {
+                                        type = ui.TYPE.Flex,
+                                        props = {
+                                            autoSize = false,
+                                            relativeSize = util.vector2(1, 1),
+                                            size = util.vector2(-96 * (sizeX / 1600) - 8, 0),
+                                            anchor = util.vector2(1, 0),
+                                            relativePosition = util.vector2(1, 0),
+                                            align = ui.ALIGNMENT.Center,
+                                        },
+                                        content = ui.content {
+                                            textWithLabel('Gold Gained', tostring(0)),
+                                            {
+                                                template = createPaddingTemplate(4),
+                                            },
+                                            textWithLabel('From publican', tostring(0), Editor.uiColors.BOOK_TEXT, baseTextSize),
+                                            textWithLabel('From tips', tostring(0), Editor.uiColors.BOOK_TEXT, baseTextSize),
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                type = ui.TYPE.Widget,
+                                props = {
+                                    relativeSize = util.vector2(1, 0),
+                                    size = util.vector2(0, 96 * (sizeX / 1600)),
+                                },
+                                content = ui.content {
+                                    {
+                                        type = ui.TYPE.Image,
+                                        props = {
+                                            resource = ui.texture {
+                                                path = 'textures/Bardcraft/ui/bookicon-rep.dds',
+                                            },
+                                            size = util.vector2(96 * (sizeX / 1600), 96 * (sizeX / 1600)),
+                                        }
+                                    },
+                                    {
+                                        type = ui.TYPE.Flex,
+                                        props = {
+                                            autoSize = false,
+                                            relativeSize = util.vector2(1, 1),
+                                            size = util.vector2(-96 * (sizeX / 1600) - 8, 0),
+                                            anchor = util.vector2(1, 0),
+                                            relativePosition = util.vector2(1, 0),
+                                            align = ui.ALIGNMENT.Center,
+                                        },
+                                        content = ui.content {
+                                            textWithLabel('Reputation Change', tostring(-2)),
+                                            {
+                                                template = createPaddingTemplate(4),
+                                            },
+                                        }
+                                    }
+                                }
+                            },
+                            createPaddingTemplate(16),
+                            {
+                                template = I.MWUI.templates.textParagraph,
+                                props = {
+                                    text = l10n('UI_Msg_PerfTavern_KickedOut'),
+                                    textColor = Editor.uiColors.BOOK_HEADER,
+                                    textSize = textSize,
+                                    textAlignH = ui.ALIGNMENT.Center,
+                                },
+                                external = {
+                                    grow = 1,
+                                    stretch = 1,
+                                },
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                type = ui.TYPE.Container,
+                props = {
+                    anchor = util.vector2(0.5, 1),
+                    relativePosition = util.vector2(0.5, 1),
+                },
+                content = ui.content {
+                    {
+                        type = ui.TYPE.Image,
+                        props = {
+                            resource = ui.texture { path = 'white' },
+                            color = Editor.uiColors.BLACK,
+                            size = util.vector2(256, 32),
+                        }
+                    },
+                    uiTemplates.button(l10n('UI_Button_Close'), util.vector2(256, 32), function()
+                        self:destroyUI()
+                        if self.active then
+                            self:createUI()
+                            I.UI.setMode(I.UI.MODE.Interface, {windows = {}})
+                            core.sendGlobalEvent('Pause', 'BO_Editor')
+                        else
+                            I.UI.removeMode(I.UI.MODE.Interface)
+                            core.sendGlobalEvent('Unpause', 'BO_Editor')
+                        end
+                        ambient.playSoundFile('sound\\Fx\\BOOKCLS2.wav', { volume = 0.5 })
+                    end),
+                }
+            }
+        },
+    }
+    wrapperElement:update()
+    ambient.playSoundFile('sound\\Fx\\BOOKOPN1.wav', { volume = 0.5 })
+end
+
 local function updatePlaybackMarker()
     if pianoRollEditorMarkersWrapper and pianoRollEditorMarkersWrapper.layout.content.pianoRollMarkers.content[1] then
         local playbackMarker = pianoRollEditorMarkersWrapper.layout.content.pianoRollMarkers.content[1]
@@ -2848,6 +3328,7 @@ function Editor:setContent()
 end
 
 function Editor:createUI()
+    self:destroyUI()
     local wrapper = uiTemplates.wrapper
     screenSize = ui.screenSize()
     self.windowXOff = self.state == self.STATE.SONG and 20 or (screenSize.x * 1 / 3)
@@ -2861,6 +3342,7 @@ function Editor:destroyUI()
         auxUi.deepDestroy(wrapperElement)
         wrapperElement = nil
     end
+    logShowing = false
 end
 
 function Editor:onToggle()
@@ -2887,7 +3369,7 @@ function Editor:togglePlayback(fromStart)
 end
 
 function Editor:onUINil()
-    if self.active then
+    if self.active or logShowing then
         --self:createUI()
         I.UI.setMode(I.UI.MODE.Interface, {windows = {}})
     else

@@ -1,7 +1,7 @@
 # CURRENTLY UNUSED AND UNFINISHED - For now, relying on checking if the cell has a Publican NPC instead.
 # To add custom performance cells, either modify this file or create a new one in the same directory with the same structure. All yaml files will be read.
 
-tavernCells:
+taverns:
   # Base Game
   - Ald-ruhn, Ald Skar Inn
   - Ald-ruhn, Council Club
@@ -46,3 +46,57 @@ tavernCells:
   - Almas Thirr, Thirsty Saint Cornerclub
   - Andothren, Cat-Catchers' Cornerclub
   - Andothren, Council Club
+
+street:
+  metropolises:
+    # Base Game
+    - Vivec
+    # Tamriel Rebuilt
+    - Old Ebonheart
+    - Narsis
+    # Cyrodiil
+    - Anvil
+    # Skyrim
+    - Karthwasten
+  cities:
+    # Base Game
+    - Ald-ruhn
+    - Balmora
+    - Sadrith Mora
+    # Tamriel Rebuilt
+    - Almas Thirr
+    - Andothren
+    - Bal Foyen
+    - Firewatch
+    - Necrom
+    - Akamora
+    - Hlan Oek
+    - Port Telvannis
+    # Skyrim
+    - Dragonstar
+  towns:
+    # Base Game
+    - Caldera
+    - Ebonheart
+    - Gnisis
+    - Maar Gan
+    - Molag Mar
+    - Pelagiad
+    - Suran
+    - Tel Aruhn
+    - Tel Branora
+    - Tel Mora
+    # Tamriel Rebuilt
+    - Darvonis
+    - Dondril
+    - Helnim
+    - Llothanis
+    - Ranyon-ruhn
+    - Roa Dyr
+    - Sailen
+    - Vhul
+    # Cyrodiil
+    - Brina Cross
+    - Charach
+    # Skyrim
+    - Karthgad

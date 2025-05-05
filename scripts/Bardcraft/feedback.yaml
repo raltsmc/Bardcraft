@@ -1,0 +1,385 @@
+publican:
+  # --- Unimpressive Song ---
+  - criteria:
+      perfDensityMax: 2.5
+    subcriteria:
+      # --- Terrible Performance ---
+      - criteria:
+          perfQualityMax: 15
+        subcriteria:
+          - criteria:
+              race: dark elf
+            choices:
+              - Comments_Publican_Unimpressive_Terrible_Dunmer_1
+          - choices:
+              - Comments_Publican_Unimpressive_Terrible_1
+              - Comments_Publican_Unimpressive_Terrible_2
+              - Comments_Publican_Unimpressive_Terrible_3
+        effects:
+          disposition: -40
+          reputation: -2
+          kickPlayer: true
+      # --- Bad Performance ---
+      - criteria:
+          perfQualityMin: 16
+          perfQualityMax: 29
+        choices:
+          - Comments_Publican_Unimpressive_Bad_1
+          - Comments_Publican_Unimpressive_Bad_2
+          - Comments_Publican_Unimpressive_Bad_3
+          - Comments_Publican_Unimpressive_Bad_4
+        effects:
+          disposition: -25
+          reputation: -1
+      # --- Mediocre Performance ---
+      - criteria:
+          perfQualityMin: 30
+          perfQualityMax: 49
+        choices:
+          - Comments_Publican_Unimpressive_Mediocre_1
+          - Comments_Publican_Unimpressive_Mediocre_2
+          - Comments_Publican_Unimpressive_Mediocre_3
+          - Comments_Publican_Unimpressive_Mediocre_4
+        effects:
+          disposition: -10
+      # --- Good Performance ---
+      - criteria:
+          perfQualityMin: 50
+          perfQualityMax: 69
+        choices:
+          - Comments_Publican_Unimpressive_Good_1
+          - Comments_Publican_Unimpressive_Good_2
+          - Comments_Publican_Unimpressive_Good_3
+          - Comments_Publican_Unimpressive_Good_4
+        effects:
+          disposition: +3
+          reputation: +0.1
+          gold: 10
+      # --- Great Performance ---
+      - criteria:
+          perfQualityMin: 70
+          perfQualityMax: 85
+        choices:
+          - Comments_Publican_Unimpressive_Great_1
+          - Comments_Publican_Unimpressive_Great_2
+          - Comments_Publican_Unimpressive_Great_3
+          - Comments_Publican_Unimpressive_Great_4
+        effects:
+          disposition: +10
+          reputation: +0.25
+          gold: 20
+      # --- Excellent Performance ---
+      - criteria:
+          perfQualityMin: 86
+        choices:
+          - Comments_Publican_Unimpressive_Excellent_1
+          - Comments_Publican_Unimpressive_Excellent_2
+          - Comments_Publican_Unimpressive_Excellent_3
+          - Comments_Publican_Unimpressive_Excellent_4
+        effects:
+          disposition: +15
+          reputation: +0.5
+          gold: 40
+
+  # --- Impressive Song ---
+  - criteria:
+      perfDensityMin: 6
+    subcriteria:
+      # --- Terrible Performance ---
+      - criteria:
+          perfQualityMax: 15
+        subcriteria:
+          - criteria:
+              race: dark elf
+            choices:
+              - Comments_Publican_Impressive_Terrible_Dunmer_1
+          - choices:
+              - Comments_Publican_Impressive_Terrible_1
+              - Comments_Publican_Impressive_Terrible_2
+              - Comments_Publican_Impressive_Terrible_3
+        effects:
+          disposition: -20
+          reputation: -0.5
+          kickPlayer: true
+      # --- Bad Performance ---
+      - criteria:
+          perfQualityMin: 16
+          perfQualityMax: 29
+        choices:
+          - Comments_Publican_Impressive_Bad_1
+          - Comments_Publican_Impressive_Bad_2
+          - Comments_Publican_Impressive_Bad_3
+        effects:
+          disposition: -10
+          reputation: -0.25
+      # --- Mediocre Performance ---
+      - criteria:
+          perfQualityMin: 30
+          perfQualityMax: 49
+        choices:
+          - Comments_Publican_Impressive_Mediocre_1
+          - Comments_Publican_Impressive_Mediocre_2
+          - Comments_Publican_Impressive_Mediocre_3
+          - Comments_Publican_Impressive_Mediocre_4
+      # --- Good Performance ---
+      - criteria:
+          perfQualityMin: 50
+          perfQualityMax: 69
+        choices:
+          - Comments_Publican_Impressive_Good_1
+          - Comments_Publican_Impressive_Good_2
+          - Comments_Publican_Impressive_Good_3
+          - Comments_Publican_Impressive_Good_4
+        effects:
+          disposition: +15
+          reputation: +0.5
+          gold: 30
+      # --- Great Performance ---
+      - criteria:
+          perfQualityMin: 70
+          perfQualityMax: 85
+        choices:
+          - Comments_Publican_Impressive_Great_1
+          - Comments_Publican_Impressive_Great_2
+          - Comments_Publican_Impressive_Great_3
+          - Comments_Publican_Impressive_Great_4
+        effects:
+          disposition: +30
+          reputation: +1
+          gold: 75
+      # --- Excellent Performance ---
+      - criteria:
+          perfQualityMin: 86
+        choices:
+          - Comments_Publican_Impressive_Excellent_1
+          - Comments_Publican_Impressive_Excellent_2
+          - Comments_Publican_Impressive_Excellent_3
+          - Comments_Publican_Impressive_Excellent_4
+        effects:
+          disposition: +50
+          reputation: +2
+          gold: 125
+
+  # --- Average Song ---
+  - subcriteria:
+      # --- Terrible Performance ---
+      - criteria:
+          perfQualityMax: 15
+        subcriteria:
+          - criteria:
+              race: dark elf
+            choices:
+              - Comments_Publican_Terrible_Dunmer_1
+          - choices:
+              - Comments_Publican_Terrible_1
+              - Comments_Publican_Terrible_2
+              - Comments_Publican_Terrible_3
+        effects:
+          disposition: -30
+          reputation: -1
+          kickPlayer: true
+      # --- Bad Performance ---
+      - criteria:
+          perfQualityMin: 16
+          perfQualityMax: 29
+        choices:
+          - Comments_Publican_Bad_1
+          - Comments_Publican_Bad_2
+          - Comments_Publican_Bad_3
+          - Comments_Publican_Bad_4
+        effects:
+          disposition: -20
+          reputation: -0.5
+      # --- Mediocre Performance ---
+      - criteria:
+          perfQualityMin: 30
+          perfQualityMax: 49
+        choices:
+          - Comments_Publican_Mediocre_1
+          - Comments_Publican_Mediocre_2
+          - Comments_Publican_Mediocre_3
+          - Comments_Publican_Mediocre_4
+        effects:
+          disposition: -5
+      # --- Good Performance ---
+      - criteria:
+          perfQualityMin: 50
+          perfQualityMax: 69
+        choices:
+          - Comments_Publican_Good_1
+          - Comments_Publican_Good_2
+          - Comments_Publican_Good_3
+          - Comments_Publican_Good_4
+        effects:
+          disposition: +10
+          reputation: +0.25
+          gold: 20
+      # --- Great Performance ---
+      - criteria:
+          perfQualityMin: 70
+          perfQualityMax: 85
+        choices:
+          - Comments_Publican_Great_1
+          - Comments_Publican_Great_2
+          - Comments_Publican_Great_3
+          - Comments_Publican_Great_4
+        effects:
+          disposition: +30
+          reputation: +1
+          gold: 40
+      # --- Excellent Performance ---
+      - criteria:
+          perfQualityMin: 86
+        choices:
+          - Comments_Publican_Excellent_1
+          - Comments_Publican_Excellent_2
+          - Comments_Publican_Excellent_3
+          - Comments_Publican_Excellent_4
+        effects:
+          disposition: +50
+          reputation: +2
+          gold: 80
+
+patron:
+  # --- Catastrophic Failure ---
+  - criteria:
+      perfQualityMax: 15 # Score 0-15
+    subcriteria:
+      - criteria:
+          race: nord
+          randomChance: 0.25
+        choices:
+          - "By Shor's beard, what was that racket?"
+          - "Sounds worse than cliff racers mating!"
+      - criteria:
+          race: dark elf
+          randomChance: 0.25
+        choices:
+          - "By Vehk, that was dreadful."
+          - "Filthy outlander bards..."
+      - criteria:
+          race: high elf
+          randomChance: 0.25
+        choices:
+          - "Auriel have mercy! That was atrocious."
+      - criteria:
+          race: khajiit
+          randomChance: 0.25
+        choices:
+          - "This one is not sure if that was music or a death rattle."
+      - criteria:
+          race: imperial
+          randomChance: 0.25
+        choices:
+          - "By the Divines, that's dreadful."
+      - choices:
+          - "Is he hitting that lute with a rock?"
+          - "My ears! Make it stop!"
+          - "Is this some kind of punishment?"
+          - "Even the rats are plugging their ears."
+          - "This is why I drink."
+          - "Please... just... silence."
+          - "Think I'm going somewhere quieter."
+  # --- Really Bad Performance ---
+  - criteria:
+      perfQualityMin: 16
+      perfQualityMax: 29 # Score 16-29
+    choices:
+      - "Oof. Did you hear that note?"
+      - "Well... points for trying?"
+      - "Maybe try a different instrument? Or... silence?"
+      - "I've heard mudcrabs sing better."
+      - "My headache's getting worse."
+      - "Don't encourage him..."
+      - "Is the barkeep really letting this happen?"
+  # --- Mediocre Performance ---
+  - criteria:
+      perfQualityMin: 30
+      perfQualityMax: 49 # Score 30-49
+    subcriteria:
+      - criteria:
+          race: high elf
+          randomChance: 0.25
+        choices:
+          - "How... interesting."
+      - choices:
+          - "Hmm? Oh, someone's playing."
+          - "It's... noise, I suppose."
+          - "Is that supposed to be 'Jiub's Jaunt'? Needs work."
+          - "Fills the silence, at least."
+          - "He seems passionate, anyway."
+          - "Meh."
+          - "Is it over yet?"
+          - "Not the worst I've heard. Not the best either."
+          - "Passable."
+          - "Wonder what's for dinner..."
+  # --- Good Performance ---
+  - criteria:
+      perfQualityMin: 50
+      perfQualityMax: 69 # Score 50-69
+    subcriteria:
+      - criteria:
+          race: redguard
+          randomChance: 0.25
+        choices:
+          - "Got a decent swing to it."
+      - criteria:
+          race: argonian
+          randomChance: 0.25
+        choices:
+          - "The notes flow... adequately."
+      - choices:
+          - "Not bad, not bad."
+          - "Catchy little rhythm."
+          - "Makes the sujamma go down smoother."
+          - "Ah, that part sounds familiar."
+          - "Better than most minstrels wandering through."
+          - "My foot's tapping. That's a good sign."
+          - "Quite pleasant, actually."
+          - "Easy listening."
+
+  # --- Great Performance ---
+  - criteria:
+      perfQualityMin: 70
+      perfQualityMax: 85 # Score 70-85
+    subcriteria:
+      - criteria:
+          race: imperial
+          randomChance: 0.25
+        choices:
+          - "Ah, brings a touch of culture to this establishment."
+      - choices:
+          - "Hey, that's actually pretty good!"
+          - "Well played, bard!"
+          - "More! Play us another!"
+          - "I could listen to this all night."
+          - "Really sets a nice mood."
+          - "He's got talent, this one."
+          - "Bravo!"
+          - "Now *that's* music!"
+  # --- Excellent Performance ---
+  - criteria:
+      perfQualityMin: 86 # Score 86+
+    subcriteria:
+      - criteria:
+          race: dark elf
+          randomChance: 0.25
+        choices:
+          - "By Vivec's grace! That was masterfully played!"
+      - criteria:
+          race: high elf
+          randomChance: 0.25
+        choices:
+          - "Such artistry! The phrasing, the dynamics... superb."
+      - criteria:
+          race: imperial
+          randomChance: 0.25
+        choices:
+          - "As good as any bard in the Imperial City!"
+      - choices:
+          - "Incredible! Encore! Encore!"
+          - "Makes you forget your troubles for a while."
+          - "Truly moving..."
+          - "I haven't heard playing like that in years!"
+          - "Give him some coin, somebody!"
+          - "Absolutely brilliant!"

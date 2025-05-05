@@ -16,6 +16,7 @@ local l10n = core.l10n('Bardcraft')
 local Performer = require('scripts.Bardcraft.performer')
 local Editor = require('scripts.Bardcraft.editor')
 local Song = require('scripts.Bardcraft.util.song').Song
+local Feedback = require('scripts.Bardcraft.feedback')
 
 local function populateKnownSongs()
     -- Check the stored preset songs; if any are set to startUnlocked but are missing from knownSongs, add them
@@ -324,7 +325,31 @@ return {
             elseif e.symbol == 'n' then
                 Performer:addPerformanceXP(10) -- debug
             elseif e.symbol == 'o' then
-                doDrink()
+                local data = {
+                    type = Song.PerformanceType.Tavern,
+                    quality = 0,
+                    density = 0,
+                    complexity = 0,
+                    time = 60,
+                    cell = 'Balmora, Eight Plates',
+                    publicanComment = 'N\'wah! Silence that infernal racket! Out! Out!',
+                    patronComments = {
+                        'By Vehk, that was dreadful.',
+                        'Is this some kind of punishment?',
+                        'This is why I drink.',
+                    },
+                    gameTime = core.getGameTime(),
+                    xpCurr = 5,
+                    xpReq = 25,
+                    levelGain = 1,
+                    level = 4,
+                    xpGain = 22
+                }
+                local cellBlurb = l10n('UI_Blurb_' .. data.cell)
+                if cellBlurb ~= ('UI_Blurb_' .. data.cell) then
+                    data.cellBlurb = cellBlurb
+                end
+                Editor:showPerformanceLog(data)
             elseif Editor.active and e.code == input.KEY.Space then
                 Editor:togglePlayback(input.isCtrlPressed())
             end
@@ -409,7 +434,7 @@ return {
                 updatePracticeOverlay()
             end
             if hurtAlpha > 0 then
-                hurtAlpha = math.max(hurtAlpha - dt, 0)
+                hurtAlpha = math.max(hurtAlpha - core.getRealFrameTime(), 0)
                 hurtOverlay.layout.props.alpha = hurtAlpha
                 hurtOverlay:update()
             end
@@ -498,6 +523,9 @@ return {
             if data.type == 'ThrownItem' then
                 handleThrownItem(data.item, data.caught)
             end
+        end,
+        BC_PerformanceLog = function(data)
+            Editor:showPerformanceLog(data)
         end,
         UiModeChanged = function(data)
             if data.newMode == nil then

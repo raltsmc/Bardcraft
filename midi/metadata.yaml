@@ -2,6 +2,9 @@ midiData:
   scales.mid:
     title: Scales
     description: A basic exercise for practicing ascending and descending scales. You could perform this... if you really wanted to?
+    loopBars:
+      - 0
+      - 16
     scale:
       root: C
       mode: Major

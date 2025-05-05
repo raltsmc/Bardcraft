@@ -50,6 +50,24 @@ local function parseAll()
     if metadata and metadata.sheetMusicMappings then
         bardData:set('sheetmusic', metadata.sheetMusicMappings)
     end
+
+    local feedbackPath = 'scripts/Bardcraft/feedback.yaml'
+    exists = vfs.fileExists(feedbackPath)
+    local feedback = exists and markup.loadYaml(feedbackPath) or {}
+    if not exists then
+        print("WARNING: feedback.yaml missing")
+    elseif feedback then
+        bardData:set('feedback', feedback)
+    end
+
+    local venuesPath = 'scripts/Bardcraft/venues.yaml'
+    exists = vfs.fileExists(venuesPath)
+    local venues = exists and markup.loadYaml(venuesPath) or {}
+    if not exists then
+        print("WARNING: venues.yaml missing")
+    elseif venues then
+        bardData:set('venues', venues)
+    end
 end
 
 return {

@@ -176,9 +176,11 @@ for i, scale in ipairs(Song.Mode) do
 end
 
 Song.PerformanceType = {
-    Perform = 1,
-    Practice = 2,
-    NPCTeaching = 3,
+    Perform = 0,
+    Tavern = 1,
+    Street = 2,
+    Practice = 3,
+    NPCTeaching = 4,
 }
 
 Song.playbackTickPrev = 0

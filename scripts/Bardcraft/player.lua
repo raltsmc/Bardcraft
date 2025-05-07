@@ -10,6 +10,9 @@ local ambient = require('openmw.ambient')
 local nearby = require('openmw.nearby')
 local util = require('openmw.util')
 local storage = require('openmw.storage')
+local async = require('openmw.async')
+local time = require('openmw_aux.time')
+local calendar = require('openmw_aux.calendar')
 
 local l10n = core.l10n('Bardcraft')
 
@@ -29,6 +32,34 @@ local function populateKnownSongs()
     end
 end
 
+local currentCell = nil
+local bannedVenues = {}
+local bannedVenueTrespassTimer = nil
+local bannedVenueTrespassDuration = 30 -- seconds
+
+local function unbanFromVenue(cellName)
+    if bannedVenues[cellName] then
+        bannedVenues[cellName] = nil
+    end
+end
+
+local function banFromVenue(cellName, startTime, days)
+    if bannedVenues[cellName] then
+        print('Already banned from ' .. cellName)
+        return bannedVenues[cellName]
+    end
+    local startDay = math.ceil(startTime / time.day)
+    local endDay = startDay + days
+    local endTime = endDay * time.day
+    local currentTime = core.getGameTime()
+    if currentTime >= startTime and currentTime < endTime then
+        bannedVenues[cellName] = endTime
+        currentCell = nil
+        return endTime
+    end
+    return nil
+end
+
 local performersInfo = {}
 
 local performancePart = nil
@@ -45,7 +76,7 @@ local practiceOverlayNoteSuccess = {}
 local practiceOverlayNoteFadeTimes = {}
 local practiceOverlayNoteFadeAlphaStart = {}
 
-local practiceOverlayTargetOpacity = 0.8
+local practiceOverlayTargetOpacity = 0.4
 local practiceOverlayFadeInTimer = 0
 local practiceOverlayFadeInDuration = 0.3
 local practiceOverlayScaleX = 8 -- Every 8 ticks is 1 pixel
@@ -127,7 +158,6 @@ local function initPracticeOverlayNotes()
         table.insert(practiceOverlayNoteLayouts, note)
         i = i + 1
     end
-    practiceOverlayNotesWrapper:update()
 end
 
 local function populatePracticeOverlayNotes()
@@ -151,7 +181,7 @@ local function populatePracticeOverlayNotes()
         end
     end
 
-    practiceOverlayNotesWrapper.layout.content = content
+    practiceOverlayNotesWrapper.layout.content[1].content = content
     practiceOverlayNotesWrapper:update()
 end
 
@@ -170,7 +200,24 @@ local function createPracticeOverlay()
         props = {
             relativeSize = util.vector2(1, 1),
         },
-        content = ui.content{},
+        content = ui.content{
+            {
+                type = ui.TYPE.Container,
+                props = {
+                    relativeSize = util.vector2(1, 1),
+                },
+                content = ui.content {},
+            },
+            {
+                type = ui.TYPE.Image,
+                props = {
+                    resource = ui.texture { path = 'textures/bardcraft/ui/practice-overlay-line.dds' },
+                    position = util.vector2(practiceSong:barToTick(practiceSong.loopBars[2]) * practiceOverlayScaleX + ui.screenSize().x / 2, 0),
+                    size = util.vector2(8, 256),
+                    color = Editor.uiColors.CYAN,
+                },
+            }
+        },
     }
 
     practiceOverlay = ui.create {
@@ -196,7 +243,7 @@ local function createPracticeOverlay()
                     size = util.vector2(8, 256),
                     color = Editor.uiColors.DEFAULT_LIGHT,
                 },
-            }
+            },
         },
     }
     if not alreadyShowing then
@@ -245,26 +292,6 @@ local function playSwoosh()
     ambient.playSoundFile('sound\\fx\\swoosh ' .. math.random(1, 3) .. '.wav')
 end
 
-local function handleThrownItem(item, caught)
-    if item == 'ingred_bread_01' then
-        if caught then
-            ui.showMessage('A patron threw their bread at you. You managed to catch it!\n1 Bread acquired.')
-            playSwoosh()
-        else
-            ui.showMessage('A patron threw their bread at you.')
-            doHurt(1)
-        end
-    elseif item == 'Potion_Local_Brew_01' then
-        if caught then
-            ui.showMessage('A patron threw their drink at you. You managed to catch it!\n1 Mazte acquired.')
-            playSwoosh()
-        else
-            ui.showMessage('A patron threw their drink at you. It nailed you in the skull!')
-            doHurt(5)
-        end
-    end
-end
-
 local function getSongBySourceFile(sourceFile)
     -- Search songs/preset
     local bardData = storage.globalSection('Bardcraft')
@@ -275,6 +302,11 @@ local function getSongBySourceFile(sourceFile)
         end
     end
     return nil
+end
+
+local function startTrespassTimer()
+    bannedVenueTrespassTimer = 0
+    ui.showMessage(l10n('UI_Msg_Warn_Trespass'))
 end
 
 return {
@@ -291,10 +323,14 @@ return {
             if data.BC_PerformersInfo then
                 performersInfo = data.BC_PerformersInfo
             end
+            if data.BC_BannedVenues then
+                bannedVenues = data.BC_BannedVenues
+            end
         end,
         onSave = function()
             local data = Performer:onSave()
             data.BC_PerformersInfo = performersInfo
+            data.BC_BannedVenues = bannedVenues
             return data
         end,
         onUpdate = function(dt)
@@ -318,12 +354,33 @@ return {
             if Performer.playing then
                 Performer.musicTime = Performer.musicTime + dt
             end
+            if self.cell then
+                if not currentCell or currentCell ~= self.cell then
+                    currentCell = self.cell
+
+                    local banEndTime = bannedVenues[currentCell.name]
+                    if banEndTime and core.getGameTime() < banEndTime then
+                        -- Player is in a banned venue
+                        startTrespassTimer()
+                    else
+                        -- Player is not in a banned venue
+                        unbanFromVenue(currentCell.name)
+                    end
+                end
+            end
+            if bannedVenueTrespassTimer then
+                bannedVenueTrespassTimer = math.min(bannedVenueTrespassTimer + dt, bannedVenueTrespassDuration)
+                if bannedVenueTrespassTimer >= bannedVenueTrespassDuration then
+                    core.sendGlobalEvent('BC_Trespass', { player = self, })
+                    bannedVenueTrespassTimer = 0
+                end
+            end
         end,
         onKeyPress = function(e)
             if e.symbol == 'k' then
                 Editor:onToggle()
             elseif e.symbol == 'n' then
-                Performer:addPerformanceXP(10) -- debug
+                Performer:addPerformanceXP(1000) -- debug
             elseif e.symbol == 'o' then
                 local data = {
                     type = Song.PerformanceType.Tavern,
@@ -350,6 +407,8 @@ return {
                     data.cellBlurb = cellBlurb
                 end
                 Editor:showPerformanceLog(data)
+            elseif e.symbol == 'b' then
+                banFromVenue(self.cell.name, core.getGameTime(), 1)
             elseif Editor.active and e.code == input.KEY.Space then
                 Editor:togglePlayback(input.isCtrlPressed())
             end
@@ -373,7 +432,7 @@ return {
                 for id, time in pairs(practiceOverlayNoteFlashTimes) do
                     if time > 0 then
                         practiceOverlayNoteFlashTimes[id] = math.max(time - dt, 0)
-                        local note = practiceOverlayNotesWrapper.layout.content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[id]]]
+                        local note = practiceOverlayNotesWrapper.layout.content[1].content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[id]]]
                         if note then
                             note.props.alpha = lerp((1.5 - practiceOverlayNoteFlashTimes[id]) / 1.5, 1, 0.4)
                             note.props.color = practiceOverlayNoteSuccess[id] and Editor.uiColors.DEFAULT or Editor.uiColors.DARK_RED
@@ -387,7 +446,7 @@ return {
                 for id, time in pairs(practiceOverlayNoteFadeTimes) do
                     if time > 0 then
                         practiceOverlayNoteFadeTimes[id] = math.max(time - dt, 0)
-                        local note = practiceOverlayNotesWrapper.layout.content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[id]]]
+                        local note = practiceOverlayNotesWrapper.layout.content[1].content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[id]]]
                         if note then
                             note.props.alpha = lerp((0.5 - practiceOverlayNoteFadeTimes[id]) / 0.5, practiceOverlayNoteFadeAlphaStart[id], 0)
                             local startColor = practiceOverlayNoteSuccess[id] and Editor.uiColors.DEFAULT or Editor.uiColors.DARK_RED
@@ -419,22 +478,22 @@ return {
                 local shakeFactor = practiceOverlayLastShakeFactor * 0.99 + currentShakeFactor * 0.01
                 practiceOverlayLastShakeFactor = shakeFactor
 
-                for _, note in pairs(practiceOverlayNotesWrapper.layout.content) do
-                    if note and note.props then
-                        if not practiceOverlayNoteSuccess[note.props.index] then
-                            note.props.position = util.vector2(note.props.position.x, note.props.baseY + shakeFactor * 5 * math.sin((core.getRealTime()) * 25 + note.props.index))
-                        else
-                            note.props.position = util.vector2(note.props.position.x, note.props.baseY)
-                        end
-                    end
-                end
+                -- for _, note in pairs(practiceOverlayNotesWrapper.layout.content[1].content) do
+                --     if note and note.props then
+                --         if not practiceOverlayNoteSuccess[note.props.index] then
+                --             note.props.position = util.vector2(note.props.position.x, note.props.baseY + shakeFactor * 5 * math.sin((core.getRealTime()) * 25 + note.props.index))
+                --         else
+                --             note.props.position = util.vector2(note.props.position.x, note.props.baseY)
+                --         end
+                --     end
+                -- end
 
                 local opacity = lerp((practiceOverlayFadeInDuration - practiceOverlayFadeInTimer) / practiceOverlayFadeInDuration, 0, practiceOverlayTargetOpacity)
                 practiceOverlay.layout.props.alpha = opacity
                 updatePracticeOverlay()
             end
             if hurtAlpha > 0 then
-                hurtAlpha = math.max(hurtAlpha - core.getRealFrameTime(), 0)
+                hurtAlpha = math.max(hurtAlpha - core.getRealFrameDuration(), 0)
                 hurtOverlay.layout.props.alpha = hurtAlpha
                 hurtOverlay:update()
             end
@@ -457,9 +516,15 @@ return {
                 queuedMilestone = nil
             end
         end,
+        onActive = function()
+            print('became active')
+        end,
     },
     eventHandlers = {
         BO_ConductorEvent = function(data)
+            if data.type == 'PerformStart' then
+                camera.setMode(camera.MODE.ThirdPerson, true)
+            end
             local success = Performer.handleConductorEvent(data)
             if data.type == 'PerformStart' then
                 practiceSong = data.song
@@ -470,7 +535,7 @@ return {
                 destroyPracticeOverlay()
             elseif data.type == 'NoteEvent' then
                 if practiceOverlay and practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]] then
-                    local content = practiceOverlayNotesWrapper.layout.content
+                    local content = practiceOverlayNotesWrapper.layout.content[1].content
                     local note = content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]]]
                     if note then
                         practiceOverlayNoteFlashTimes[data.id] = 1.5
@@ -480,7 +545,7 @@ return {
                 end
             elseif data.type == 'NoteEndEvent' then
                 if practiceOverlay and practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]] then
-                    local content = practiceOverlayNotesWrapper.layout.content
+                    local content = practiceOverlayNotesWrapper.layout.content[1].content
                     local note = content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]]]
                     if note then
                         practiceOverlayNoteFadeTimes[data.id] = 0.5
@@ -508,7 +573,7 @@ return {
             elseif data.newConfidence < data.oldConfidence then
                 message = l10n('UI_Msg_Confidence_Down')
             else
-                return 
+                message = l10n('UI_Msg_Confidence_NoChange')
             end
             ui.showMessage(message:gsub('%%{songTitle}', data.songTitle):gsub('%%{partTitle}', data.partTitle):gsub('%%{confidence}', string.format('%.2f', data.newConfidence * 100)))
         end,
@@ -516,15 +581,31 @@ return {
             performersInfo[data.actor.id] = {
                 knownSongs = data.knownSongs,
                 performanceSkill = data.performanceSkill,
+                reputation = data.reputation
             }
             Editor.performersInfo = performersInfo
         end,
-        BC_RandomEvent = function(data)
+        BC_PerformanceEvent = function(data)
             if data.type == 'ThrownItem' then
-                handleThrownItem(data.item, data.caught)
+                ui.showMessage(data.message)
+                if data.damage > 0 then
+                    doHurt(data.damage)
+                else
+                    playSwoosh()
+                end
+            elseif data.type == 'Gold' then
+                local message = data.message:gsub('%%{amount}', data.amount)
+                ui.showMessage(message)
+                ambient.playSoundFile('sound\\Fx\\item\\money.wav')
             end
         end,
         BC_PerformanceLog = function(data)
+            data.oldRep = Performer.reputation
+            Performer:modReputation(data.rep)
+            data.newRep = Performer.reputation
+            if data.kickedOut then
+                data.banEndTime = calendar.formatGameTime('%d %B, %Y', banFromVenue(data.cell, data.gameTime, 1))
+            end
             Editor:showPerformanceLog(data)
         end,
         UiModeChanged = function(data)

@@ -5,6 +5,7 @@ midiData:
     loopBars:
       - 0
       - 16
+    loopCount: 0
     scale:
       root: C
       mode: Major
@@ -16,23 +17,49 @@ midiData:
     loopBars:
       - 0
       - 16
+    loopCount: 1
     scale:
       root: D
       mode: Major
     tempoMod: 0.5
     texture: vivec
     startUnlocked: true
+  bwv997.mid:
+    title: The Guar and the Scrib
+    description: A relaxed lute accompaniment supports a lively ocarina melody; perfect for confidence-building for aspiring lutists looking to move on from basic scales.
+    scale:
+      root: A
+      mode: Minor
+    loopBars:
+      - 0 
+      - 20
+    loopCount: 0
+    texture: tavern
+    startUnlocked: true
+  bwv997-adv.mid:
+    title: The Guar - Adv.
+    description: "\"The Guar and the Scrib\"'s lute steals the show in this advanced solo arrangement, carrying both melody and chords at a quicker pace. A nostalgic romp for skilled lutists looking to return to their roots."
+    scale:
+      root: A
+      mode: Minor
+    loopBars:
+      - 0
+      - 16
+    loopCount: 1
+    texture: tavern
+    startUnlocked: true # false
   greensleeves.mid:
     title: Greensleeves
     description: A traditional folk melody of uncertain origin, a staple in taverns throughout the provinces of the Empire.
     loopBars:
       - 0.16666666666666666
       - 16.16666666666666666
+    loopCount: 1
     scale:
       root: Eb
       mode: Major
     texture: tavern
-    startUnlocked: false
+    startUnlocked: true # false
   moonsong.mid:
     title: Ja-Kha'jay's Moonsong
     description: A beloved Khajiiti folk tune, said to echo the laughter of Jone and Jode as they chase across the night sky. Commonly heard during celebrations such as the New Life Festival.
@@ -43,20 +70,30 @@ midiData:
       root: D
       mode: Rajhinic
     texture: elsweyr
-    startUnlocked: false
+    startUnlocked: true # false
   ahemmusa.mid:
     title: Ahemmusan Lament
     description: A contemplative elegy of the Ahemmusa tribe of Azura's Coast, often played in remembrance of lost loved ones.
     loopBars:
       - 0
       - 32
+    loopCount: 0
     scale:
       root: F
       mode: Velothi
     tempoMod: 0.5
     texture: ashlander
-    startUnlocked: false
+    startUnlocked: true # false
+  estampie1.mid:
+    title: Estampie
+    scale:
+      root: G
+      mode: Major
+    loopCount: 0
+    texture: tavern
+    startUnlocked: true # false
 
 sheetMusicMappings:
   generic:
     - greensleeves.mid
+    - bwv997-adv.mid

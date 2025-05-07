@@ -3,6 +3,7 @@ local types = require('openmw.types')
 local storage = require('openmw.storage')
 local vfs = require('openmw.vfs')
 local markup = require('openmw.markup')
+local I = require('openmw.interfaces')
 
 local MIDI = require('scripts.Bardcraft.util.midi')
 local Song = require('scripts.Bardcraft.util.song').Song
@@ -18,7 +19,7 @@ local function parseAll()
     end
 
     local bardData = storage.globalSection('Bardcraft')
-    --bardData:set('songs/preset', nil) -- Clear the old data
+    bardData:set('songs/preset', nil) -- Clear the old data
     local storedSongs = bardData:getCopy('songs/preset') or {}
 
     local midiSongs = {}
@@ -84,6 +85,11 @@ return {
         end,
         BC_ParseMidis = function()
             parseAll()
+        end,
+        BC_Trespass = function(data)
+            I.Crimes.commitCrime(data.player, {
+                type = types.Player.OFFENSE_TYPE.Trespassing,
+            })
         end,
     }
 }

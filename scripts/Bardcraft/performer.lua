@@ -22,11 +22,13 @@ P.performanceSkill = {
     level = 1,
     xp = 0,
 }
+P.reputation = 0
 
 function P:onSave()
     local saveData = {
         BC_PerformanceStat = self.performanceSkill,
         BC_KnownSongs = self.knownSongs,
+        BC_Reputation = self.reputation,
     }
     return saveData
 end
@@ -46,11 +48,14 @@ function P:onLoad(data)
     if data.BC_KnownSongs then
         self.knownSongs = data.BC_KnownSongs
     end
+    if data.BC_Reputation then
+        self.reputation = data.BC_Reputation
+    end
     self:sendPerformerInfo()
 end
 
 function P:getPerformanceXPRequired()
-    return (self.performanceSkill.level + 1) * 5
+    return (self.performanceSkill.level + 1) * 10
 end
 
 function P:getPerformanceProgress()
@@ -58,12 +63,14 @@ function P:getPerformanceProgress()
 end
 
 function P:addPerformanceXP(xp)
-    if self.performanceSkill.level >= 100 then return end
+    if self.performanceSkill.level >= 100 then return 0 end
     self.performanceSkill.xp = self.performanceSkill.xp + xp
     local leveledUp = false
     local milestone = nil
+    local levelGain = 0
     while self:getPerformanceProgress() >= 1 do
         leveledUp = true
+        levelGain = levelGain + 1
         self.performanceSkill.xp = self.performanceSkill.xp - self:getPerformanceXPRequired()
         self.performanceSkill.level = self.performanceSkill.level + 1
         if self.performanceSkill.level % 10 == 0 then
@@ -77,7 +84,12 @@ function P:addPerformanceXP(xp)
     if leveledUp then
         self:sendPerformerInfo()
     end
-    return leveledUp
+    return levelGain
+end
+
+function P:modReputation(mod)
+    self.reputation = self.reputation + mod
+    self:sendPerformerInfo()
 end
 
 function P:addKnownSong(song, confidences)
@@ -113,6 +125,8 @@ function P:modSongConfidence(songId, part, mod)
         }
     end
     local confidence = self.knownSongs[songId].partConfidences[part] or 0
+    if confidence ~= confidence then confidence = 0 end
+    if mod ~= mod then mod = 0 end
     confidence = util.clamp(confidence + mod, 0, 1)
     self.knownSongs[songId].partConfidences[part] = confidence
     self:sendPerformerInfo()
@@ -127,6 +141,7 @@ P.musicTime = -1
 P.currentSong = nil
 P.currentPart = nil
 P.playing = false
+P.performanceType = nil
 
 P.wasMoving = false
 P.idleTimer = nil
@@ -144,6 +159,12 @@ P.levelGain = 0
 
 P.maxConfidenceGrowth = 0
 P.overallNoteEvents = {}
+
+local xpMult = {
+    [Song.PerformanceType.Tavern] = 1.5,
+    [Song.PerformanceType.Street] = 0.2,
+    [Song.PerformanceType.Practice] = 0.8,
+}
 
 local easyDensity = 1.0
 local hardDensity = 6.0
@@ -241,6 +262,7 @@ function P.handlePerformEvent(data)
     local song = data.song
     P.musicTime = data.time + (core.getRealTime() - data.realTime)
     P.bpm = song.tempo * song.tempoMod
+    P.performanceType = data.perfType
 
     -- Check if time sig is compound and if so, adjust BPM so animation matches
     if song.timeSig[1] % 3 == 0 and song.timeSig[1] > 3 then
@@ -260,6 +282,9 @@ function P.handlePerformEvent(data)
     end
 
     P.maxConfidence = P.knownSongs[song.id].partConfidences[data.part.index] or 0
+    if P.maxConfidence ~= P.maxConfidence then
+        P.maxConfidence = 0 -- NaN check
+    end
     P.maxConfidenceGrowth = (1 - math.pow(P.maxConfidence, 1/3)) * 0.8 -- Fast growth at low confidence, slow growth at high confidence
 
     if not P.playing then
@@ -298,12 +323,11 @@ function P.handleStopEvent(data)
     local successRate = math.pow(successCount / #P.overallNoteEvents, 2)
     local diff = successRate - P.maxConfidence
     local maxGrowth = util.clamp(P.maxConfidenceGrowth * data.completion, 0, P.maxConfidenceGrowth)
-    if diff ~= 0 then
-        local oldConfidence = P.maxConfidence
-        P:modSongConfidence(P.currentSong.id, P.currentPart.index, util.clamp(diff, -maxGrowth, maxGrowth))
-        if omwself.type == types.Player then
-            omwself:sendEvent('BC_GainConfidence', { songTitle = P.currentSong.title, partTitle = P.currentPart.title, oldConfidence = oldConfidence, newConfidence = P.knownSongs[P.currentSong.id].partConfidences[P.currentPart.index] })
-        end
+    local oldConfidence = P.maxConfidence
+    local mod = util.clamp(diff, -maxGrowth, maxGrowth)
+    P:modSongConfidence(P.currentSong.id, P.currentPart.index, mod)
+    if omwself.type == types.Player then
+        omwself:sendEvent('BC_GainConfidence', { songTitle = P.currentSong.title, partTitle = P.currentPart.title, oldConfidence = oldConfidence, newConfidence = P.knownSongs[P.currentSong.id].partConfidences[P.currentPart.index] })
     end
     if omwself.type == types.Player then
         core.sendGlobalEvent('BC_PlayerPerfSkillLog', { xpGain = P.xpGain, levelGain = P.levelGain, level = P.performanceSkill.level, xpCurr = P.performanceSkill.xp, xpReq = P:getPerformanceXPRequired() })
@@ -317,7 +341,7 @@ function P.getNoteAccuracy()
     local density = P.currentDensity
 
     local difficultyFactor = util.clamp((density - easyDensity) / (hardDensity - easyDensity), 0, 1)
-    local accuracy = math.pow(P.performanceSkill.level / 100, 1/2) - (difficultyFactor * 0.6) + (math.pow(P.currentConfidence, 1/2) * 0.4)
+    local accuracy = math.pow(P.performanceSkill.level / 100, 1/2) * 1.1 - (difficultyFactor * 0.5) + (math.pow(P.currentConfidence, 1/2) * 0.5)
 
     return util.clamp(accuracy, 0, 1)
 end
@@ -333,7 +357,7 @@ function P.playNote(note, velocity)
     end
     local noteName = Song.noteNumberToName(note)
     local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
-    core.sound.playSoundFile3d(filePath, omwself, { volume = velocity, pitch = pitch })
+    core.sound.playSoundFile3d(filePath, omwself, { volume = volume, pitch = pitch })
     return success
 end
 
@@ -366,13 +390,14 @@ function P.handleNoteEvent(data)
         local avgInterval = totalInterval / totalWeight
         P.currentDensity = 1 / avgInterval
     end
-    P.lastNoteTime = data.timecurren
+    P.lastNoteTime = data.time
     local success = P.playNote(data.note, data.velocity)
     if success then
         local gain = (P.maxConfidence - P.currentConfidence) / P.maxConfidence * 0.04
         P.currentConfidence = math.min(P.currentConfidence + gain, P.maxConfidence)
-        if P:addPerformanceXP(1) then P.levelGain = P.levelGain + 1 end
-        P.xpGain = P.xpGain + 1
+        local xp = 1 * xpMult[P.performanceType]
+        P.levelGain = P.levelGain + P:addPerformanceXP(xp)
+        P.xpGain = P.xpGain + xp
     else
         local loss = P.currentConfidence / P.maxConfidence * 0.04
         P.currentConfidence = math.max(P.currentConfidence - loss, 0)

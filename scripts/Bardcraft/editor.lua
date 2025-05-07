@@ -92,7 +92,7 @@ Editor.uiColors = {
     RED_DESAT = util.color.rgb(0.7, 0.3, 0.3),
     DARK_RED_DESAT = util.color.rgb(0.3, 0.05, 0.05),
     BOOK_HEADER = util.color.rgb(0.3, 0.03, 0.03),
-    BOOK_TEXT = util.color.rgb(0.1, 0.1, 0.1),
+    BOOK_TEXT = util.color.rgb(0.05, 0.05, 0.05),
     BOOK_TEXT_LIGHT = util.color.rgb(101 / 255, 82 / 255, 48 / 255),
 }
 
@@ -2807,8 +2807,9 @@ function Editor:showPerformanceLog(log)
     local headerSize = baseTextSize * 2
     local textSize = baseTextSize * 1.5
 
-    local function textWithLabel(label, text, color, size)
-        color = color or Editor.uiColors.BOOK_HEADER
+    local function textWithLabel(label, text, size, headerColor, textColor)
+        headerColor = headerColor or Editor.uiColors.BOOK_HEADER
+        textColor = textColor or Editor.uiColors.BOOK_TEXT
         size = size or textSize
         return {
             type = ui.TYPE.Flex,
@@ -2821,7 +2822,7 @@ function Editor:showPerformanceLog(log)
                     props = {
                         text = label .. ': ',
                         textSize = size,
-                        textColor = color,
+                        textColor = headerColor,
                     },
                 },
                 {
@@ -2829,7 +2830,7 @@ function Editor:showPerformanceLog(log)
                     props = {
                         text = text,
                         textSize = size,
-                        textColor = Editor.uiColors.BOOK_TEXT,
+                        textColor = textColor,
                     },
                     external = {
                         grow = 1,
@@ -2842,15 +2843,15 @@ function Editor:showPerformanceLog(log)
     local qualityString
     if log.quality == 100 then
         qualityString = 'Perfect'
-    elseif log.quality >= 86 then
+    elseif log.quality >= 95 then
         qualityString = 'Excellent'
-    elseif log.quality >= 70 then
+    elseif log.quality >= 85 then
         qualityString = 'Great'
-    elseif log.quality >= 50 then
+    elseif log.quality >= 70 then
         qualityString = 'Good'
-    elseif log.quality >= 30 then
+    elseif log.quality >= 40 then
         qualityString = 'Mediocre'
-    elseif log.quality >= 16 then
+    elseif log.quality >= 15 then
         qualityString = 'Bad'
     else
         qualityString = 'Terrible'
@@ -2869,15 +2870,24 @@ function Editor:showPerformanceLog(log)
         if log.patronComments and #log.patronComments > 0 then
             for _, comment in ipairs(log.patronComments) do
                 table.insert(patronComments, {
-                    template = I.MWUI.templates.textParagraph,
+                    template = I.MWUI.templates.textNormal,
                     props = {
-                        text = ' - "' .. comment .. '"',
+                        text = comment.name .. ':',
                         textSize = textSize,
                         textColor = Editor.uiColors.BOOK_TEXT,
+                    }
+                })
+                table.insert(patronComments, {
+                    template = I.MWUI.templates.textParagraph,
+                    props = {
+                        text = '"' .. l10n(comment.comment) .. '"',
+                        textSize = textSize,
+                        textColor = Editor.uiColors.BOOK_TEXT_LIGHT,
                         relativeSize = util.vector2(1, 0),
                         size = util.vector2(-32, 0),
                     },
                 })
+                table.insert(patronComments, createPaddingTemplate(4))
             end
         end
         tavernNotes = {
@@ -2905,7 +2915,7 @@ function Editor:showPerformanceLog(log)
             {
                 template = I.MWUI.templates.textParagraph,
                 props = {
-                    text = log.publicanComment and ('"' .. log.publicanComment .. '"') or 'No comment.',
+                    text = log.publicanComment and ('"' .. l10n(log.publicanComment) .. '"') or 'No comment.',
                     textSize = textSize,
                     textColor = Editor.uiColors.BOOK_TEXT,
                     relativeSize = util.vector2(1, 0),
@@ -2923,7 +2933,8 @@ function Editor:showPerformanceLog(log)
         }
     end
 
-    local xpProg = log.xpCurr / log.xpReq
+    local notMaxLevel = log.level < 100
+    local xpProg = notMaxLevel and (log.xpCurr / log.xpReq) or 1
 
     wrapperElement = ui.create {
         layer = 'Windows',
@@ -2991,13 +3002,17 @@ function Editor:showPerformanceLog(log)
                             {
                                 template = I.MWUI.templates.textParagraph,
                                 props = {
-                                    text = log.cellBlurb or '',
+                                    text = log.cellBlurb and l10n(log.cellBlurb) or '',
                                     textSize = textSize,
                                     textColor = Editor.uiColors.BOOK_TEXT_LIGHT,
                                     relativeSize = util.vector2(1, 0),
                                     size = util.vector2(-32, 0),
                                 },
                             },
+                            {
+                                template = createPaddingTemplate(4),
+                            },
+                            textWithLabel('Song', log.songName),
                             {
                                 template = createPaddingTemplate(4),
                             },
@@ -3085,21 +3100,24 @@ function Editor:showPerformanceLog(log)
                                                         type = ui.TYPE.Image,
                                                         props = {
                                                             resource = ui.texture {
-                                                                path = 'white',
+                                                                path = 'textures/Bardcraft/ui/xpbar.dds',
                                                             },
-                                                            color = Editor.uiColors.DARK_RED_DESAT,
+                                                            tileH = true,
+                                                            tileV = false,
                                                             relativeSize = util.vector2(xpProg, 1),
                                                         }
                                                     },
                                                     {
                                                         template = I.MWUI.templates.textNormal,
                                                         props = {
-                                                            text = '+' .. log.xpGain .. ' XP',
+                                                            text = notMaxLevel and ('+' .. log.xpGain .. ' XP') or 'Max Level!',
                                                             textSize = textSize,
                                                             textColor = xpProg < 0.5 and Editor.uiColors.BOOK_TEXT or Editor.uiColors.DEFAULT_LIGHT,
-                                                            anchor = xpProg < 0.5 and util.vector2(0, 0) or util.vector2(1, 0),
-                                                            relativePosition = util.vector2(xpProg, 0),
-                                                            position = util.vector2(xpProg < 0.5 and 4 or -4, 0),
+                                                            anchor = util.vector2(xpProg < 0.5 and 0 or (notMaxLevel and 1 or 0.5), 0),
+                                                            relativePosition = util.vector2(notMaxLevel and xpProg or 0.5, 0),
+                                                            position = util.vector2(notMaxLevel and (xpProg < 0.5 and 4 or -4) or 0, 0),
+                                                            relativeSize = util.vector2(0, 1),
+                                                            textAlignV = ui.ALIGNMENT.Center,
                                                         }
                                                     }
                                                 }
@@ -3108,7 +3126,7 @@ function Editor:showPerformanceLog(log)
                                             {
                                                 template = I.MWUI.templates.textNormal,
                                                 props = {
-                                                    text = tostring(log.level + 1),
+                                                    text = notMaxLevel and (tostring(log.level + 1)) or '--',
                                                     textSize = textSize,
                                                     textColor = Editor.uiColors.BOOK_TEXT,
                                                 }
@@ -3127,7 +3145,7 @@ function Editor:showPerformanceLog(log)
                                     {
                                         template = I.MWUI.templates.textNormal,
                                         props = {
-                                            text = log.xpCurr .. '/' .. log.xpReq .. ' (' .. util.round(xpProg * 100) .. '%) to next level',
+                                            text = notMaxLevel and (log.xpCurr .. '/' .. log.xpReq .. ' (' .. util.round(xpProg * 100) .. '%) to next level') or '',
                                             textSize = textSize,
                                             textColor = Editor.uiColors.BOOK_TEXT,
                                         }
@@ -3168,12 +3186,12 @@ function Editor:showPerformanceLog(log)
                                             align = ui.ALIGNMENT.Center,
                                         },
                                         content = ui.content {
-                                            textWithLabel('Gold Gained', tostring(0)),
+                                            textWithLabel('Gold Gained', tostring((log.payment or 0) + (log.tips or 0))),
                                             {
                                                 template = createPaddingTemplate(4),
                                             },
-                                            textWithLabel('From publican', tostring(0), Editor.uiColors.BOOK_TEXT, baseTextSize),
-                                            textWithLabel('From tips', tostring(0), Editor.uiColors.BOOK_TEXT, baseTextSize),
+                                            textWithLabel('From publican', tostring(log.payment or 0), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT),
+                                            textWithLabel('From tips', tostring(log.tips or 0), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT),
                                         }
                                     }
                                 }
@@ -3205,10 +3223,51 @@ function Editor:showPerformanceLog(log)
                                             align = ui.ALIGNMENT.Center,
                                         },
                                         content = ui.content {
-                                            textWithLabel('Reputation Change', tostring(-2)),
+                                            textWithLabel('Reputation', ((log.rep and log.rep > 0) and '+' or '') .. tostring(log.rep or 0)),
                                             {
                                                 template = createPaddingTemplate(4),
                                             },
+                                            textWithLabel('From', tostring(log.oldRep) .. ' -> ' .. tostring(log.newRep), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT),
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                type = ui.TYPE.Widget,
+                                props = {
+                                    relativeSize = util.vector2(1, 0),
+                                    size = util.vector2(0, 96 * (sizeX / 1600)),
+                                },
+                                content = ui.content {
+                                    {
+                                        type = ui.TYPE.Image,
+                                        props = {
+                                            resource = ui.texture {
+                                                path = 'textures/Bardcraft/ui/bookicon-pub' .. (
+                                                    ((log.kickedOut or log.disp < -15) and 'mad') or
+                                                    ((log.disp < 0) and 'meh') or
+                                                    ((log.disp < 30) and 'happy') or
+                                                    'grin') .. '.dds',
+                                            },
+                                            size = util.vector2(96 * (sizeX / 1600), 96 * (sizeX / 1600)),
+                                        }
+                                    },
+                                    {
+                                        type = ui.TYPE.Flex,
+                                        props = {
+                                            autoSize = false,
+                                            relativeSize = util.vector2(1, 1),
+                                            size = util.vector2(-96 * (sizeX / 1600) - 8, 0),
+                                            anchor = util.vector2(1, 0),
+                                            relativePosition = util.vector2(1, 0),
+                                            align = ui.ALIGNMENT.Center,
+                                        },
+                                        content = ui.content {
+                                            textWithLabel('Publican Disposition', ((log.disp and log.disp > 0) and '+' or '') .. tostring(log.disp or 0)),
+                                            {
+                                                template = createPaddingTemplate(4),
+                                            },
+                                            textWithLabel('From', tostring(log.oldDisp) .. ' -> ' .. tostring(log.newDisp), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT),
                                         }
                                     }
                                 }
@@ -3217,7 +3276,7 @@ function Editor:showPerformanceLog(log)
                             {
                                 template = I.MWUI.templates.textParagraph,
                                 props = {
-                                    text = l10n('UI_Msg_PerfTavern_KickedOut'),
+                                    text = log.kickedOut and l10n('UI_Msg_PerfTavern_KickedOut'):gsub('%%{date}', log.banEndTime) or '',
                                     textColor = Editor.uiColors.BOOK_HEADER,
                                     textSize = textSize,
                                     textAlignH = ui.ALIGNMENT.Center,
@@ -3290,9 +3349,9 @@ local function tickPlayback(dt)
         if not Editor.song:tickPlayback(dt, 
         function(filePath, velocity, instrument, note, part)
             local profile = Song.getInstrumentProfile(instrument)
-            if not profile.polyphonic then
-                stopSounds(instrument)
-            end
+            -- if not profile.polyphonic then
+            --     stopSounds(instrument)
+            -- end
             if velocity > 0 and Editor.partsPlaying[part] then
                 ambient.playSoundFile(filePath, { volume = velocity / 127 })
             end

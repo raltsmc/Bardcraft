@@ -9,7 +9,7 @@
                      { perfDensity = 5.0, perfQuality = 75, race = "dark elf" }
 
   Returns:
-    table: A table containing { choices = {list of strings}, effects = {key-value pairs} }
+    table: A table containing { prefix = {localization prefix string}, effects = {key-value pairs} }
            if a match is found, otherwise nil.
 ]]
 local function findMatchingNode(dataTree, context)
@@ -17,12 +17,14 @@ local function findMatchingNode(dataTree, context)
     local function checkCriteria(criteria, context)
         if not criteria then return true end -- No criteria means it's a potential match or default
         for key, value in pairs(criteria) do
-            --print('Checking key:', key, 'with value:', value)
             local contextValue = nil
             local checkType = "exact" -- Default check type
 
             -- Determine check type (Min/Max/Exact)
-            if key:match("Min$") then
+            if key == "randomChance" then
+                checkType = "max"
+                contextValue = math.random()
+            elseif key:match("Min$") then
                 checkType = "min"
                 local baseKey = key:sub(1, -4) -- Remove "Min" suffix
                 contextValue = context[baseKey]
@@ -36,12 +38,14 @@ local function findMatchingNode(dataTree, context)
             end
 
             -- Perform the check
-            if contextValue == nil then return false end -- Context value missing, cannot satisfy criteria
+            if contextValue == nil then 
+                return false 
+            end -- Context value missing, cannot satisfy criteria
 
             if checkType == "min" then
                 if not (contextValue >= value) then return false end
             elseif checkType == "max" then
-                if not (contextValue <= value) then return false end
+                if not (contextValue < value) then return false end
             elseif checkType == "exact" then
                 if contextValue ~= value then return false end
             end
@@ -62,10 +66,10 @@ local function findMatchingNode(dataTree, context)
                     result = traverse(node.subcriteria, context)
                 end
 
-                -- If there's no result from subcriteria or if this node has its own choices/effects
-                if result == nil and (node.choices or node.effects) then
+                -- If there's no result from subcriteria or if this node has its own prefix/effects
+                if result == nil and (node.prefix or node.effects) then
                     result = {
-                        choices = node.choices,
+                        prefix = node.prefix,
                         effects = node.effects or {}
                     }
                 end

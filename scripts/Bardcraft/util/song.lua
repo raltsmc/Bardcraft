@@ -206,6 +206,7 @@ function Song.new(title, desc, tempo, timeSig)
     self.id = self.title .. '_' .. os.time() + math.random(10000)
     self.noteIdCounter = 1
     self.tempoMod = 1
+    self.loopTimes = 1
     self.texture = "tavern"
     self.startUnlocked = false
     return self
@@ -310,12 +311,17 @@ function Song.fromMidiParser(parser, metadata)
     end
     --self.timeSig[1], self.timeSig[2] = parser:getInitialTimeSignature()
     self.sourceFile = string.match(parser.filename, "([^\\]+)$")
+    self.id = self.sourceFile
     local id = 1
 
     local partIndex = {}
     for _, note in ipairs(parser:getNotes()) do
         if note.channel == 9 then
             note.note = mapDrumNote(note.note)
+        end
+
+        if not parser.instruments[note.channel] then
+            parser.instruments[note.channel] = 24
         end
         local instrument = (note.channel == 9 and 116) or getInstrumentMapping(parser.instruments[note.channel])
         if not metadata then
@@ -347,11 +353,12 @@ function Song.fromMidiParser(parser, metadata)
             table.insert(self.notes, noteData)
         end
     end
-    local lastNoteTime = self.notes[#self.notes].time / 96
+    local lastNoteTime = (#self.notes > 0) and self.notes[#self.notes].time / 96 or 0
     local quarterNotesPerBar = self.timeSig[1] * (4 / self.timeSig[2])
     local barCount = math.ceil(lastNoteTime / quarterNotesPerBar)
     self.lengthBars = barCount
     self.loopBars = (metadata and metadata.loopBars) or {0, barCount}
+    self.loopTimes = (metadata and metadata.loopCount) or 0
     self.tempoMod = (metadata and metadata.tempoMod) or 1
     if not metadata or metadata.startUnlocked == true then
         self.startUnlocked = true
@@ -380,7 +387,7 @@ function Song:resetPlayback()
     self.playbackTickPrev = 0
     self.playbackTickCurr = 0
     self.playbackNoteIndex = 1
-    self.loopCount = 1
+    self.loopCount = self.loopTimes
     restart = false
 end
 
@@ -476,6 +483,10 @@ function Song:beatToTick(beat)
     return tick
 end
 
+function Song:barToTick(bar)
+    return bar * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
+end
+
 function Song:lengthInSeconds()
     local lengthInTicks = self.lengthBars * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
     return self:ticksToSeconds(lengthInTicks)
@@ -492,8 +503,8 @@ function Song:tickPlayback(dt, noteOnHandler, noteOffHandler)
     self.playbackTickCurr = self.playbackTickCurr + self:secondsToTicks(dt)
 
     local bars = self.lengthBars
-    local lengthInTicks = bars * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
-    local loopEnd = self.loopBars[2] * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
+    local lengthInTicks = self:barToTick(bars)
+    local loopEnd = self:barToTick(self.loopBars[2])
 
     if restart then
         restart = false

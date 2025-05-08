@@ -23,6 +23,15 @@ UI_Drum: "Drum"
 UI_Ocarina: "Ocarina"
 UI_BassFlute: "Flute"
 
+UI_Msg_Lute_Indef: "a lute"
+UI_Msg_Lute_Def: "the lute"
+UI_Msg_Drum_Indef: "a drum"
+UI_Msg_Drum_Def: "the drum"
+UI_Msg_Ocarina_Indef: "an ocarina"
+UI_Msg_Ocarina_Def: "the ocarina"
+UI_Msg_BassFlute_Indef: "a flute"
+UI_Msg_BassFlute_Def: "the flute"
+
 UI_Title: "Bardcraft"
 UI_Tab_Performance: "Performance"
 UI_Tab_Songwriting: "Songwriting"
@@ -138,6 +147,14 @@ UI_Msg_Confidence_NoChange: "You gained no confidence from this performance."
 UI_Msg_LearnSong_Success: "You learned a new song:\n%{songTitle}"
 UI_Msg_LearnSong_Fail: "You already know this song:\n%{songTitle}"
 
+UI_Msg_PerfStartFail_NoPerformers: "You need at least one performer to start a performance."
+UI_Msg_PerfStartFail_NoInstrument: "Performer %{performer} is missing %{instrument_indef}!"
+UI_Msg_PerfStartFail_InvalidLocation: "You need to be in a tavern, or outside in a city to perform."
+UI_Msg_PerfStartFail_InvalidPracticeLocation: "The publican says: \n\"Take that somewhere else. This is a tavern, not a practice room.\""
+UI_Msg_PerfStartFail_BannedVenue: "You are banned from this venue until %{date}!"
+UI_Msg_PerfStartFail_AlreadyPerformed: "The publican says: \n\"I appreciate your enthusiasm, but I have other performers waiting. Come back tomorrow.\""
+UI_Msg_PerfStartFail_TooEarly: "The publican says: \n\"Come back in the evening, friend. Nobody's looking for music at this hour.\""
+
 UI_Msg_PerfTavern_KickedOut: "The publican has kicked you out!\nLeave quickly, or be fined for trespassing.\n\nYou may return on:\n%{date}"
 UI_Msg_PerfTavern_Payment: "The publican paid you:\n%{amount} gold"
 UI_Msg_PerfTavern_Tip_1: "A patron tipped you:\n%{amount} gold"
@@ -159,6 +176,8 @@ UI_Msg_Perf_Throw_Catch: "You managed to catch it!\n%{count} %{itemName} acquire
 UI_Msg_Warn_Trespass: "You have been temporarily banned from this venue!\nLeave now or be fined for trespassing."
 
 # --- Tavern Blurbs ---
+
+# Vanilla
 UI_Blurb_Ald-ruhn, Ald Skar Inn: "The largest tavern in Ald'ruhn, nestled snugly under the shadow of Skar's corpse. Perfect for a warm meal, a cold drink, and very loud arguments about Redoran politics."
 UI_Blurb_Balmora, Council Club: "A dim establishment known for its surly patrons and clandestine dealings, the Council Club serves as a stronghold for the Camonna Tong's influence in Balmora."
 UI_Blurb_Balmora, Eight Plates: "A favorite among House Hlaalu retainers, offering a modest yet lively atmosphere. A common starting point for aspiring entertainers of all kinds."
@@ -166,6 +185,13 @@ UI_Blurb_Balmora, Lucky Lockup: "A quaint tavern that is often the first stop fo
 UI_Blurb_Balmora, South Wall Cornerclub: "A discreet establishment where the Thieves Guild conducts \"business\" behind a facade of legitimate trade."
 UI_Blurb_Suran, Desele's House of Earthly Delights: "A cultured establishment where patrons come for the music, stay for the company, and inevitably forget what they were doing in the first place."
 UI_Blurb_Vivec, Black Shalk Cornerclub: "A cramped watering hole nestled in the Foreign Quarter where outlanders trade tales of their homelands over cheap mazte."
+
+# Tamriel Rebuilt
+
+# Project Cyrodiil
+UI_Blurb_Anvil, The Abecette: "Anvil's most upscale hotel, renowned the world over for its gambling halls, elegant rooms, and fighting pits. Home to wealthy patrons with distinguished tastes and deep pockets."
+
+# Skyrim
 
 # --- City Blurbs ---
 # Metropolises
@@ -453,7 +479,7 @@ Comments_Patron_Bad_Khajiit_1: "Khajiit has heard better from a rusty hinge. But
 Comments_Patron_Mediocre_1: "Hmm? Oh, someone's playing."
 Comments_Patron_Mediocre_2: "It's... noise, I suppose."
 Comments_Patron_Mediocre_3: "Fills the silence, at least."
-Comments_Patron_Mediocre_4: "They seems passionate, anyway."
+Comments_Patron_Mediocre_4: "They seem passionate, anyway."
 Comments_Patron_Mediocre_5: "Meh."
 Comments_Patron_Mediocre_6: "Is it over yet?"
 Comments_Patron_Mediocre_7: "Not the worst I've heard. Not the best either."
@@ -499,7 +525,6 @@ Comments_Patron_Good_20: "Set a nice mood in here."
 Comments_Patron_Good_21: "Well done, bard!"
 Comments_Patron_Good_Dunmer_1: "A surprisingly capable performance. You honor our traditions, in your way."
 Comments_Patron_Good_Dunmer_2: "Not bad for an outlander. You have a spark of the true ash-born spirit."
-Comments_Patron_Good_Dunmer_3: "Almost as moving as the sacred hymns of the Temple."
 Comments_Patron_Good_Altmer_1: "Quite listenable. A glimmer of true artistry, perhaps."
 Comments_Patron_Good_Altmer_2: "A commendable display. Far better than the usual provincial caterwauling."
 Comments_Patron_Good_Altmer_3: "Perhaps there is merit to the native instruments after all."
@@ -546,6 +571,7 @@ Comments_Patron_Great_Dunmer_1: "By Almsivi's grace, that was a performance wort
 Comments_Patron_Great_Dunmer_2: "You play with the fire of Red Mountain and the wisdom of the ancestors!"
 Comments_Patron_Great_Dunmer_3: "A worthy offering to both ear and spirit, sera."
 Comments_Patron_Great_Dunmer_4: "The Tribunal smiles upon such cultural preservation."
+Comments_Patron_Great_Dunmer_5: "Almost as moving as the sacred hymns of the Temple."
 Comments_Patron_Great_Altmer_1: "Astonishing! Such refined skill is rare, especially in these... lesser provinces."
 Comments_Patron_Great_Altmer_2: "That performance transcended mere entertainment. It approached true art."
 Comments_Patron_Great_Altmer_3: "Such artistry! The phrasing, the dynamics... superb."

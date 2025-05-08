@@ -3,11 +3,14 @@ local world = require('openmw.world')
 local types = require('openmw.types')
 local storage = require('openmw.storage')
 local util = require('openmw.util')
+local calendar = require('openmw_aux.calendar')
+local time = require('openmw_aux.time')
 
 local configGlobal = require('scripts.Bardcraft.config.global')
 local Song = require('scripts.Bardcraft.util.song').Song
 local Cell = require('scripts.Bardcraft.cell')
 local Feedback = require('scripts.Bardcraft.feedback')
+local instrumentItems = require('scripts.Bardcraft.data').InstrumentItems
 
 local l10n = core.l10n('Bardcraft')
 
@@ -32,7 +35,7 @@ local performanceRandomEventTimer = performanceRandomEventInterval[1]
 local function resyncActor(performer)
     local part = performer.part
     local instrumentName = Song.getInstrumentProfile(part.instrument).name
-    performer.actor:sendEvent('BO_ConductorEvent', { type = 'PerformStart', time = song:ticksToSeconds(song.playbackTickCurr), realTime = core.getRealTime(), instrument = instrumentName, song = song, part = part, perfType = performance.type })
+    performer.actor:sendEvent('BO_ConductorEvent', { type = 'PerformStart', time = song:ticksToSeconds(song.playbackTickCurr), realTime = core.getRealTime(), instrument = instrumentName, song = song, part = part, perfType = performance.type, item = performer.item })
 end
 
 local function resyncAllActors()
@@ -117,7 +120,7 @@ local function stop()
     end
     playing = false
     for _, performerData in ipairs(performers) do
-        performerData.actor:sendEvent('BO_ConductorEvent', { type = 'PerformStop', completion = song and (performance.time / song:lengthInSeconds()) or 0 })
+        performerData.actor:sendEvent('BO_ConductorEvent', { type = 'PerformStop', completion = song and (performance.time / song:lengthInSeconds()) or 0, cell = performance.streetName or performance.cell.name })
     end
 
     if performance.type == Song.PerformanceType.Practice then
@@ -136,18 +139,42 @@ local function stop()
         songName = performance.songName,
     }
 
-    local cellBlurb = 'UI_Blurb_' .. performanceLog.cell
-    local cellLoc = l10n(cellBlurb)
-    if cellBlurb ~= cellLoc then
-        performanceLog.cellBlurb = cellBlurb
-    end
-
-    if performanceLog.type == Song.PerformanceType.Street then
-        performanceLog.cell = l10n('UI_PerfLog_StreetsOf'):gsub('%%{city}', performanceLog.cell)
-    end
-
     local player = world.players[1]
     if player then
+        local timeScale = math.min(performance.time / 60, 2)
+        local speechcraftFactor = (types.NPC.stats.skills.speechcraft(player).modified - 50) / 50 * 0.125
+        local personalityFactor = (types.Actor.stats.attributes.personality(player).modified - 50) / 50 * 0.25
+        local statSumFactor = speechcraftFactor + personalityFactor
+        local impressiveness = math.min(1, performance.density / 8)
+
+        -- Calculate rep gain/loss
+        local rep = 0
+        local gainRepMin = 50
+        local loseRepMax = 29
+        if performance.quality >= gainRepMin then
+            -- Gain rep: Interpolation between 0 rep at gainRepMin and (.1 + impressiveness * 1.9) rep at 100 quality
+            local qualityRange = 100 - gainRepMin
+            if qualityRange > 0 then
+                local normalizedQuality = (performance.quality - gainRepMin) / qualityRange
+                local maxRepGain = 0.1 + impressiveness * 1.9
+                rep = normalizedQuality * maxRepGain
+            elseif performance.quality == 100 then -- Handle edge case where gainRepMin is 100
+                rep = 0.1 + impressiveness * 1.9
+            end
+            rep = math.max(0, rep + statSumFactor)
+        elseif performance.quality <= loseRepMax then
+            -- Lose rep: Interpolation between (-3 + impressiveness * 2) rep at 0 quality and 0 rep at loseRepMax
+            if loseRepMax > 0 then
+                local normalizedQuality = performance.quality / loseRepMax
+                local minRepLoss = -3 + impressiveness * 2
+                local repRange = 0 - minRepLoss -- = 3 - impressiveness * 2
+                rep = minRepLoss + normalizedQuality * repRange
+            elseif performance.quality == 0 then -- Handle edge case where loseRepMax is 0 or less
+                rep = -3 + impressiveness * 2
+            end
+            rep = math.min(0, rep + statSumFactor * 0.5)
+        end
+
         if performance.type == Song.PerformanceType.Tavern then
             local publican = Cell.getPublican(performance.cell)
             local context = {
@@ -222,15 +249,9 @@ local function stop()
                 end
             end
 
-            local speechcraftFactor = (types.NPC.stats.skills.speechcraft(player).modified - 50) / 50 * 0.125
-            local personalityFactor = (types.Actor.stats.attributes.personality(player).modified - 50) / 50 * 0.25
-            local statSumFactor = speechcraftFactor + personalityFactor
             local minQualityModifier = 30 * (1 - statSumFactor)
-            local impressiveness = math.min(1, performance.density / 8)
 
             local kickOut = (performanceLog.effects and performanceLog.effects.kickPlayer) or performance.quality < 15 and performance.time >= 10
-
-            local timeScale = math.min(performance.time / 60, 2)
 
             -- Calculate how much the publican pays
             local payment = 0
@@ -239,38 +260,11 @@ local function stop()
                 local payScale = math.max(0, 1 + statSumFactor)
                 -- Base: A maximum impressiveness song (density > 8) with a 100% quality should reward 250 gold
                 local impressivenessFactor = math.min(1, performance.density / 8)
-                local qualityFactor = util.clamp((performance.quality - minPerfQualityToPay) / (100 - minPerfQualityToPay), 0, 1)
+                local scaledQuality = math.pow(performance.quality / 100, 2) * 100
+                local qualityFactor = util.clamp((scaledQuality - minPerfQualityToPay) / (100 - minPerfQualityToPay), 0, 1)
                 local basePayment = 250 * impressivenessFactor * qualityFactor
                 payment = math.max(0, math.floor(basePayment * payScale * timeScale))
                 payment = math.floor(payment * (1 + math.random() * 0.1))
-            end
-
-            -- Calculate rep gain/loss
-            local rep = 0
-            local gainRepMin = 50
-            local loseRepMax = 29
-            if performance.quality >= gainRepMin then
-                -- Gain rep: Interpolation between 0 rep at gainRepMin and (.1 + impressiveness * 1.9) rep at 100 quality
-                local qualityRange = 100 - gainRepMin
-                if qualityRange > 0 then
-                    local normalizedQuality = (performance.quality - gainRepMin) / qualityRange
-                    local maxRepGain = 0.1 + impressiveness * 1.9
-                    rep = normalizedQuality * maxRepGain
-                elseif performance.quality == 100 then -- Handle edge case where gainRepMin is 100
-                    rep = 0.1 + impressiveness * 1.9
-                end
-                rep = math.max(0, rep + statSumFactor)
-            elseif performance.quality <= loseRepMax then
-                -- Lose rep: Interpolation between (-3 + impressiveness * 2) rep at 0 quality and 0 rep at loseRepMax
-                if loseRepMax > 0 then
-                    local normalizedQuality = performance.quality / loseRepMax
-                    local minRepLoss = -3 + impressiveness * 2
-                    local repRange = 0 - minRepLoss -- = 3 - impressiveness * 2
-                    rep = minRepLoss + normalizedQuality * repRange
-                elseif performance.quality == 0 then -- Handle edge case where loseRepMax is 0 or less
-                    rep = -3 + impressiveness * 2
-                end
-                rep = math.min(0, rep + statSumFactor * 0.5)
             end
 
             -- Calculate publican disposition change
@@ -320,7 +314,7 @@ local function stop()
                 dispositionChange = dispositionChange * (1 - statSumFactor * 0.5) -- if statSumFactor is negative, (1 - (-val)) increases loss
             end
 
-            dispositionChange = util.clamp(math.floor(dispositionChange), -75, 75)
+            dispositionChange = util.round(util.clamp(math.floor(dispositionChange * 1/3), -25, 25) * timeScale)
             local currDisp = publican.type.getBaseDisposition(publican, player)
             local newDisp = util.clamp(currDisp + dispositionChange, 0, 100)
             publican.type.setBaseDisposition(publican, player, newDisp)
@@ -328,11 +322,13 @@ local function stop()
             performanceLog.disp = dispositionChange
             performanceLog.oldDisp = currDisp
             performanceLog.newDisp = newDisp
-            performanceLog.rep = util.round((rep) * timeScale * 100) / 100
             performanceLog.payment = payment
             performanceLog.kickedOut = kickOut
             payPlayer(player, payment, l10n('UI_Msg_PerfTavern_Payment'))
+        elseif performance.type == Song.PerformanceType.Street then
+            rep = rep * 0.1
         end
+        performanceLog.rep = util.round((rep) * timeScale * 10) / 10
         logAwait = performanceLog
     end
 end
@@ -386,10 +382,12 @@ local function tickJudge(dt)
             local noteCount = #partNoteEvents
             if noteCount > 0 then
                 local successCount = 0
+                local totalMod = 0
                 for _, event in ipairs(partNoteEvents) do
-                    if event then successCount = successCount + 1 end
+                    if event.success then successCount = successCount + 1 end
+                    totalMod = totalMod + event.mod
                 end
-                partDensities[#partDensities + 1] = noteCount / performance.time
+                partDensities[#partDensities + 1] = totalMod / performance.time
                 totalSuccessCount = totalSuccessCount + successCount
                 totalNoteCount = totalNoteCount + noteCount
             end
@@ -404,6 +402,7 @@ local function tickJudge(dt)
                 totalDensity = totalDensity + density
             end
             performance.density = maxDensity
+            print('Conductor density: ' .. performance.density)
             performance.complexity = totalDensity
         end
     else
@@ -436,7 +435,7 @@ local function createThrownItemData(threshold, probability, damage, type, items,
 end
 
 local ThrownItemData = {
-    [ThrownItemType.Drink] = createThrownItemData(20, 0.2, 3, types.Potion, {
+    [ThrownItemType.Drink] = createThrownItemData(20, 0.1, 3, types.Potion, {
         potion_local_brew_01 = 1/10, -- Mazte
         potion_comberry_wine_01 = 1/10, -- Shein
         potion_comberry_brandy_01 = 1/30, -- Greef
@@ -444,13 +443,13 @@ local ThrownItemData = {
         potion_cyro_brandy_01 = 1/100, -- Cyrodiilic Brandy
         potion_cyro_whiskey_01 = 1/100, -- Flin
     },
-    { hit = 0.5, criticalHit = 0.3, catch = 1,},--0.3, }, 
+    { hit = 0.5, criticalHit = 0.3, catch = 0.3, }, 
     'UI_Msg_PerfTavern_Throw_Drink'),
 
     [ThrownItemType.Bread] = createThrownItemData(40, 0.3, 1, types.Ingredient, {
         ingred_bread_01 = 1,
     },
-    { hit = 0.5, criticalHit = 0.05, catch = 1,},--0.6, },
+    { hit = 0.5, criticalHit = 0.05, catch = 0.6, },
     'UI_Msg_PerfTavern_Throw_Bread'),
 }
 
@@ -602,7 +601,6 @@ local function tickRandomEvents(dt)
     end
 end
 
-
 local function update(dt)
     if playing then
         tickPerformance(dt)
@@ -618,18 +616,46 @@ return {
     eventHandlers = {
         BO_StartPerformance = function(data)
             if not playing then
-                if not data.performers or #data.performers == 0 then return end
+                local player = world.players[1]
+                if not data.performers or #data.performers == 0 then 
+                    player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_NoPerformers') })
+                    return 
+                end
                 
-                local type, streetName, streetType = Cell.canPerformHere(world.players[1].cell, data.type)
+                local type, streetName, streetType = Cell.canPerformHere(player.cell, data.type)
                 if not type then
-                    print('Cannot perform here')
+                    if data.type == Song.PerformanceType.Practice then
+                        player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_InvalidPracticeLocation') })
+                    else
+                        player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_InvalidLocation') })
+                    end
                     return
                 elseif type == Song.PerformanceType.Tavern then
-                    print('Performing in tavern')
-                elseif type == Song.PerformanceType.Street then
-                    print('Performing on the street in ' .. streetName .. ' (' .. streetType .. ')')
-                elseif type == Song.PerformanceType.Practice then
-                    print('Practicing')
+                    local bannedVenues = data.playerStats.bannedVenues
+                    for venue, banEndTime in pairs(bannedVenues) do
+                        print("Banned from: " .. venue)
+                        if venue == player.cell.name then
+                            player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_BannedVenue'):gsub('%%{date}', calendar.formatGameTime('%d %B', banEndTime)) })
+                            return
+                        end
+                    end
+
+                    local alreadyPerformed = data.playerStats.performedVenuesToday
+                    for venue, _ in pairs(alreadyPerformed) do
+                        if venue == player.cell.name then
+                            player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_AlreadyPerformed') })
+                            return
+                        end
+                    end
+
+                    -- Check if it's the evening (6PM - midnight)
+                    local gameTime = core.getGameTime()
+                    local timeOfDay = gameTime % time.day
+                    local isEvening = timeOfDay >= 18 * time.hour
+                    if not isEvening then
+                        player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_TooEarly') })
+                        return
+                    end
                 end
                 data.type = type
                 data.streetName = streetName
@@ -648,10 +674,30 @@ return {
                         end
                     end
                     perfList[i].part = song:getPart(performer.part)
+                    -- Make sure all the performers have their required instrument
+                    local instrument = Song.getInstrumentProfile(perfList[i].part.instrument).name
+                    local validItems = instrumentItems[instrument]
+                    local inventory = types.Actor.inventory(perfList[i].actor)
+                    for item, _ in pairs(validItems) do
+                        if inventory:find(item) then
+                            perfList[i].item = item
+                            print('Item found: ' .. item)
+                            break
+                        end
+                    end
+                    if not perfList[i].item then
+                        player:sendEvent('BC_StartPerformanceFail', { 
+                            reason = l10n('UI_Msg_PerfStartFail_NoInstrument')
+                                    :gsub('%%{performer}', perfList[i].actor.type.record(perfList[i].actor).name)
+                                    :gsub('%%{instrument_indef}', l10n('UI_Msg_' .. instrument .. '_Indef')) })
+                        return
+                    end
                 end
                 performers = perfList
                 song:resetPlayback()
                 start(data)
+
+                player:sendEvent('BC_StartPerformanceSuccess')
             else
                 stop()
             end
@@ -660,15 +706,15 @@ return {
             if not performance.noteEvents[data.part.index] then
                 performance.noteEvents[data.part.index] = {}
             end
-            table.insert(performance.noteEvents[data.part.index], data.success)
+            table.insert(performance.noteEvents[data.part.index], { success = data.success, mod = data.mod })
         end,
         BC_PlayerPerfSkillLog = function(data)
             if logAwait then
-                logAwait.xpGain = data.xpGain
+                logAwait.xpGain = util.round(data.xpGain * 10) / 10
                 logAwait.level = data.level
                 logAwait.levelGain = data.levelGain
-                logAwait.xpCurr = data.xpCurr
-                logAwait.xpReq = data.xpReq
+                logAwait.xpCurr = util.round(data.xpCurr * 10) / 10
+                logAwait.xpReq = util.round(data.xpReq * 10) / 10
                 world.players[1]:sendEvent('BC_PerformanceLog', logAwait)
                 logAwait = nil
             end

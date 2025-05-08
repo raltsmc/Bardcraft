@@ -17,6 +17,11 @@ publican:
           - prefix: Comments_Publican_Unimpressive_Terrible
         effects:
           kickPlayer: true
+      # --- Excellent Performance ---
+      - criteria:
+          perfQualityMin: 95
+          lengthMin: 15
+        prefix: Comments_Publican_Unimpressive_Excellent
       # --- Bad Performance ---
       - criteria:
           perfQualityMax: 40
@@ -34,16 +39,11 @@ publican:
       # --- Great Performance ---
       - criteria:
           perfQualityMin: 85
-          perfQualityMax: 95
         prefix: Comments_Publican_Unimpressive_Great
-      # --- Excellent Performance ---
-      - criteria:
-          perfQualityMin: 95
-        prefix: Comments_Publican_Unimpressive_Excellent
 
   # --- Impressive Song ---
   - criteria:
-      perfDensityMin: 6
+      perfDensityMin: 5.5
     subcriteria:
       # --- Terrible Performance ---
       - criteria:
@@ -57,6 +57,11 @@ publican:
           - prefix: Comments_Publican_Impressive_Terrible
         effects:
           kickPlayer: true
+      # --- Excellent Performance ---
+      - criteria:
+          perfQualityMin: 95
+          lengthMin: 15
+        prefix: Comments_Publican_Impressive_Excellent
       # --- Bad Performance ---
       - criteria:
           perfQualityMin: 15
@@ -75,12 +80,7 @@ publican:
       # --- Great Performance ---
       - criteria:
           perfQualityMin: 85
-          perfQualityMax: 95
         prefix: Comments_Publican_Impressive_Great
-      # --- Excellent Performance ---
-      - criteria:
-          perfQualityMin: 95
-        prefix: Comments_Publican_Impressive_Excellent
 
   # --- Average Song ---
   - subcriteria:
@@ -96,6 +96,11 @@ publican:
           - prefix: Comments_Publican_Terrible
         effects:
           kickPlayer: true
+      # --- Excellent Performance ---
+      - criteria:
+          perfQualityMin: 95
+          lengthMin: 15
+        prefix: Comments_Publican_Excellent
       # --- Bad Performance ---
       - criteria:
           perfQualityMin: 15
@@ -114,12 +119,7 @@ publican:
       # --- Great Performance ---
       - criteria:
           perfQualityMin: 85
-          perfQualityMax: 95
         prefix: Comments_Publican_Great
-      # --- Excellent Performance ---
-      - criteria:
-          perfQualityMin: 95
-        prefix: Comments_Publican_Excellent
 
 # === PATRON COMMENTS ===
 
@@ -127,7 +127,7 @@ patron:
   # --- Excellent and Impressive Performance ---
   - criteria:
       perfQualityMin: 95
-      perfDensityMin: 6
+      perfDensityMin: 5.5
     subcriteria:
       - criteria:
           race: dark elf

@@ -110,7 +110,6 @@ local playedThisBar = false
 
 local Instruments = {
     Lute = {
-        path = "meshes/m/misc_de_lute_01.nif",
         icon = "icons/m/tx_de_lute_01.dds",
         anim = "bolute",
         boneName = "Bip01 BOInstrument",
@@ -158,7 +157,6 @@ local Instruments = {
         end,
     },
     Drum = {
-        path = "meshes/m/misc_de_drum_01.nif",
         icon = "icons/m/tx_de_drum_01.dds",
         anim = "bodrum",
         boneName = "Bip01 BOInstrument",
@@ -183,7 +181,6 @@ local Instruments = {
         end,
     },
     Ocarina = {
-        path = "meshes/Bardcraft/ocarina.nif",
         icon = "icons/Bardcraft/tx_ocarina.dds",
         anim = "boocarina",
         boneName = "Bip01 BOInstrumentHand",
@@ -212,10 +209,12 @@ local Instruments = {
         end,
     },
     BassFlute = {
-        path = "meshes/Bardcraft/flute.nif",
         icon = "icons/Bardcraft/tx_flute.dds",
         anim = "boflute",
         boneName = "Bip01 BOInstrumentHand",
+        items = {
+            _rlts_bc_bassflute = true, -- Bardcraft
+        },
         eventHandler = function(data)
             if data.type ~= 'NoteEvent' then return end
             if data.note == lastNote then return end -- Only change fingering if the note changes
@@ -239,7 +238,24 @@ local Instruments = {
             local aData = animData.BassFlute[animName]
             I.AnimationController.playBlendedAnimation(animName, aData)
         end,
-    }
+    },
+    --[[
+    PanFlute = { -- Unfinished; for future Tamriel Data/OOAB integration
+        boneName = "Bip01 BOInstrumentHand",
+        eventHandler = function(data)
+        end,
+    },
+    Harp = { -- Unfinished; for future Tamriel Data/OOAB integration
+        boneName = "Bip01 BOInstrument",
+        eventHandler = function(data)
+        end,
+    },
+    Lyre = { -- Unfinished; for future Tamriel Data/OOAB integration
+        boneName = "Bip01 BOInstrument",
+        eventHandler = function(data)
+        end,
+    },
+    ]]
 }
 
 return {

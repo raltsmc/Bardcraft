@@ -21,46 +21,49 @@ local Editor = require('scripts.Bardcraft.editor')
 local Song = require('scripts.Bardcraft.util.song').Song
 local Feedback = require('scripts.Bardcraft.feedback')
 
+local performersInfo = {}
+
 local function populateKnownSongs()
     -- Check the stored preset songs; if any are set to startUnlocked but are missing from knownSongs, add them
     local bardData = storage.globalSection('Bardcraft')
     local storedSongs = bardData:getCopy('songs/preset') or {}
     for _, song in pairs(storedSongs) do
-        if song.startUnlocked and not Performer.knownSongs[song.id] then
+        if song.startUnlocked and not Performer.stats.knownSongs[song.id] then
             Performer:addKnownSong(song)
         end
     end
 end
 
 local currentCell = nil
-local bannedVenues = {}
 local bannedVenueTrespassTimer = nil
 local bannedVenueTrespassDuration = 30 -- seconds
 
 local function unbanFromVenue(cellName)
-    if bannedVenues[cellName] then
-        bannedVenues[cellName] = nil
+    if Performer.stats.bannedVenues[cellName] then
+        Performer.stats.bannedVenues[cellName] = nil
+        performersInfo[self.id] = Performer.stats
+        Editor.performersInfo = performersInfo
     end
 end
 
 local function banFromVenue(cellName, startTime, days)
-    if bannedVenues[cellName] then
+    if Performer.stats.bannedVenues[cellName] then
         print('Already banned from ' .. cellName)
-        return bannedVenues[cellName]
+        return Performer.stats.bannedVenues[cellName]
     end
     local startDay = math.ceil(startTime / time.day)
     local endDay = startDay + days
     local endTime = endDay * time.day
     local currentTime = core.getGameTime()
     if currentTime >= startTime and currentTime < endTime then
-        bannedVenues[cellName] = endTime
+        Performer.stats.bannedVenues[cellName] = endTime
         currentCell = nil
+        performersInfo[self.id] = Performer.stats
+        Editor.performersInfo = performersInfo
         return endTime
     end
     return nil
 end
-
-local performersInfo = {}
 
 local performancePart = nil
 local queuedMilestone = nil
@@ -323,14 +326,10 @@ return {
             if data.BC_PerformersInfo then
                 performersInfo = data.BC_PerformersInfo
             end
-            if data.BC_BannedVenues then
-                bannedVenues = data.BC_BannedVenues
-            end
         end,
         onSave = function()
             local data = Performer:onSave()
             data.BC_PerformersInfo = performersInfo
-            data.BC_BannedVenues = bannedVenues
             return data
         end,
         onUpdate = function(dt)
@@ -350,15 +349,12 @@ return {
                     Performer.resetAnim()
                 end
             end]]
-            Performer.handleMovement(dt)
-            if Performer.playing then
-                Performer.musicTime = Performer.musicTime + dt
-            end
+            Performer:onUpdate(dt)
             if self.cell then
                 if not currentCell or currentCell ~= self.cell then
                     currentCell = self.cell
 
-                    local banEndTime = bannedVenues[currentCell.name]
+                    local banEndTime = Performer.stats.bannedVenues[currentCell.name]
                     if banEndTime and core.getGameTime() < banEndTime then
                         -- Player is in a banned venue
                         startTrespassTimer()
@@ -377,38 +373,10 @@ return {
             end
         end,
         onKeyPress = function(e)
-            if e.symbol == 'k' then
+            if e.symbol == 'b' then
                 Editor:onToggle()
             elseif e.symbol == 'n' then
                 Performer:addPerformanceXP(1000) -- debug
-            elseif e.symbol == 'o' then
-                local data = {
-                    type = Song.PerformanceType.Tavern,
-                    quality = 0,
-                    density = 0,
-                    complexity = 0,
-                    time = 60,
-                    cell = 'Balmora, Eight Plates',
-                    publicanComment = 'N\'wah! Silence that infernal racket! Out! Out!',
-                    patronComments = {
-                        'By Vehk, that was dreadful.',
-                        'Is this some kind of punishment?',
-                        'This is why I drink.',
-                    },
-                    gameTime = core.getGameTime(),
-                    xpCurr = 5,
-                    xpReq = 25,
-                    levelGain = 1,
-                    level = 4,
-                    xpGain = 22
-                }
-                local cellBlurb = l10n('UI_Blurb_' .. data.cell)
-                if cellBlurb ~= ('UI_Blurb_' .. data.cell) then
-                    data.cellBlurb = cellBlurb
-                end
-                Editor:showPerformanceLog(data)
-            elseif e.symbol == 'b' then
-                banFromVenue(self.cell.name, core.getGameTime(), 1)
             elseif Editor.active and e.code == input.KEY.Space then
                 Editor:togglePlayback(input.isCtrlPressed())
             end
@@ -420,7 +388,6 @@ return {
             Editor:onFrame(self)
             Performer:onFrame()
             if practiceOverlay and practiceSong then
-                --practiceOverlayTick = practiceOverlayTick + practiceSong:secondsToTicks(dt)
                 practiceOverlayTick = practiceSong:secondsToTicks(Performer.musicTime)
                 if practiceOverlayFadeInTimer > 0 then
                     practiceOverlayFadeInTimer = practiceOverlayFadeInTimer - core.getRealFrameDuration()
@@ -461,15 +428,6 @@ return {
                     end
                 end
 
-                -- for id, success in pairs(practiceOverlayNoteSuccess) do
-                --     local note = practiceOverlayNotesWrapper.layout.content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[id]]]
-                --     if note then
-                --         if not success then
-                --             note.props.position = util.vector2(note.props.position.x, note.props.baseY + 3 * math.sin((core.getRealTime()) * 25 + id))
-                --         end
-                --     end
-                -- end
-
                 local currentShakeFactor = Performer.currentConfidence < 0.75 and (0.75 - Performer.currentConfidence) / 0.75 or 0
                 -- Smooth shake factor
                 if practiceOverlayLastShakeFactor == -1 then
@@ -478,15 +436,15 @@ return {
                 local shakeFactor = practiceOverlayLastShakeFactor * 0.99 + currentShakeFactor * 0.01
                 practiceOverlayLastShakeFactor = shakeFactor
 
-                -- for _, note in pairs(practiceOverlayNotesWrapper.layout.content[1].content) do
-                --     if note and note.props then
-                --         if not practiceOverlayNoteSuccess[note.props.index] then
-                --             note.props.position = util.vector2(note.props.position.x, note.props.baseY + shakeFactor * 5 * math.sin((core.getRealTime()) * 25 + note.props.index))
-                --         else
-                --             note.props.position = util.vector2(note.props.position.x, note.props.baseY)
-                --         end
-                --     end
-                -- end
+                for _, note in pairs(practiceOverlayNotesWrapper.layout.content[1].content) do
+                    if note and note.props then
+                        if not practiceOverlayNoteSuccess[note.props.index] then
+                            note.props.position = util.vector2(note.props.position.x, note.props.baseY + shakeFactor * 5 * math.sin((core.getRealTime()) * 25 + note.props.index))
+                        else
+                            note.props.position = util.vector2(note.props.position.x, note.props.baseY)
+                        end
+                    end
+                end
 
                 local opacity = lerp((practiceOverlayFadeInDuration - practiceOverlayFadeInTimer) / practiceOverlayFadeInDuration, 0, practiceOverlayTargetOpacity)
                 practiceOverlay.layout.props.alpha = opacity
@@ -515,9 +473,6 @@ return {
                 ambient.playSoundFile('sound\\Bardcraft\\lvl_up1.wav')
                 queuedMilestone = nil
             end
-        end,
-        onActive = function()
-            print('became active')
         end,
     },
     eventHandlers = {
@@ -559,7 +514,7 @@ return {
         end,
         BC_GainPerformanceXP = function(data)
             if data.leveledUp then
-                ui.showMessage(l10n('UI_LvlUp_Performance'):gsub('%%{level}', Performer.performanceSkill.level))
+                ui.showMessage(l10n('UI_LvlUp_Performance'):gsub('%%{level}', Performer.stats.performanceSkill.level))
                 ambient.playSoundFile('Sound\\Fx\\inter\\levelUP.wav')
             end
             if data.milestone then
@@ -578,11 +533,7 @@ return {
             ui.showMessage(message:gsub('%%{songTitle}', data.songTitle):gsub('%%{partTitle}', data.partTitle):gsub('%%{confidence}', string.format('%.2f', data.newConfidence * 100)))
         end,
         BC_PerformerInfo = function(data)
-            performersInfo[data.actor.id] = {
-                knownSongs = data.knownSongs,
-                performanceSkill = data.performanceSkill,
-                reputation = data.reputation
-            }
+            performersInfo[data.actor.id] = data.stats
             Editor.performersInfo = performersInfo
         end,
         BC_PerformanceEvent = function(data)
@@ -600,13 +551,19 @@ return {
             end
         end,
         BC_PerformanceLog = function(data)
-            data.oldRep = Performer.reputation
+            data.oldRep = Performer.stats.reputation
             Performer:modReputation(data.rep)
-            data.newRep = Performer.reputation
+            data.newRep = Performer.stats.reputation
             if data.kickedOut then
-                data.banEndTime = calendar.formatGameTime('%d %B, %Y', banFromVenue(data.cell, data.gameTime, 1))
+                data.banEndTime = banFromVenue(data.cell, data.gameTime, 1)
             end
             Editor:showPerformanceLog(data)
+        end,
+        BC_StartPerformanceSuccess = function()
+            Editor:onToggle()
+        end,
+        BC_StartPerformanceFail = function(data)
+            ui.showMessage(data.reason)
         end,
         UiModeChanged = function(data)
             if data.newMode == nil then
@@ -622,13 +579,8 @@ return {
                 local mappings = bardData:get('sheetmusic') or {}
                 local choices = mappings[suffix]
                 if not choices or #choices == 0 then return end
-                --[[local choice = math.random(1, #choices)
-                local song = getSongBySourceFile(choices[choice])
-                if song == nil then
-                    print('ERROR: Song not found for source file: ' .. choices[choice])
-                    return
-                end]]
-                -- Instead, let's keep trying until we find a song that the player doesn't know, or we run out of choices
+                
+                -- Keep trying until we find a song that the player doesn't know, or we run out of choices
                 local song = nil
                 local success = false
                 local availableChoices = {}
@@ -644,7 +596,7 @@ return {
                     local sourceFile = availableChoices[index]
                     local candidateSong = getSongBySourceFile(sourceFile)
                     
-                    if candidateSong and not Performer.knownSongs[candidateSong.id] then
+                    if candidateSong and not Performer.stats.knownSongs[candidateSong.id] then
                         -- Found a song the player doesn't know
                         song = candidateSong
                     end

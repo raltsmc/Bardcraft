@@ -2,6 +2,7 @@ local types = require('openmw.types')
 local storage = require('openmw.storage')
 
 local Song = require('scripts.Bardcraft.util.song').Song
+local publicanClasses = require('scripts.Bardcraft.data').PublicanClasses
 
 local C = {}
 
@@ -18,7 +19,7 @@ function C.getPublican(cell)
     for _, npc in ipairs(npcs) do
         if not types.Actor.isDead(npc) then
             local record = types.NPC.record(npc)
-            if record and record.class == 'publican' then
+            if record and publicanClasses[record.class] then
                 return npc
             end
         end
@@ -32,9 +33,6 @@ end
 
 function C.canPerformHere(cell, type)
     local venues = storage.globalSection('Bardcraft'):getCopy('venues') or {}
-    for k, v in pairs(venues) do
-        print(k, v)
-    end
     if type == Song.PerformanceType.Tavern then
         if C.cellHasPublican(cell) then
             return true

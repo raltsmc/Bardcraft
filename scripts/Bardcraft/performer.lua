@@ -7,6 +7,7 @@ local anim = require("openmw.animation")
 local I = require("openmw.interfaces")
 local nearby = require("openmw.nearby")
 local util = require("openmw.util")
+local time = require("openmw_aux.time")
 
 local configGlobal = require('scripts.Bardcraft.config.global')
 local instrumentData = require('scripts.Bardcraft.instruments').Instruments
@@ -17,18 +18,21 @@ local Song = require('scripts.Bardcraft.util.song').Song
 Performer Stats
 ============]]
 
-P.knownSongs = {}
-P.performanceSkill = {
-    level = 1,
-    xp = 0,
+P.stats = {
+    knownSongs = {},
+    performanceSkill = {
+        level = 1,
+        xp = 0,
+    },
+    reputation = 0,
+    bannedVenues = {},
+    performedVenuesToday = {},
+    practiceEfficiency = 1.0,
 }
-P.reputation = 0
 
 function P:onSave()
     local saveData = {
-        BC_PerformanceStat = self.performanceSkill,
-        BC_KnownSongs = self.knownSongs,
-        BC_Reputation = self.reputation,
+        BC_PerformerStats = self.stats,
     }
     return saveData
 end
@@ -36,50 +40,73 @@ end
 function P:sendPerformerInfo()
     local player = nearby.players[1]
     if player then
-        player:sendEvent('BC_PerformerInfo', { actor = omwself, knownSongs = self.knownSongs, performanceSkill = self.performanceSkill })
+        player:sendEvent('BC_PerformerInfo', { actor = omwself, stats = self.stats })
     end
 end
 
 function P:onLoad(data)
     if not data then return end
-    if data.BC_PerformanceStat then
-        self.performanceSkill = data.BC_PerformanceStat
-    end
-    if data.BC_KnownSongs then
-        self.knownSongs = data.BC_KnownSongs
-    end
-    if data.BC_Reputation then
-        self.reputation = data.BC_Reputation
+    if data.BC_PerformerStats then
+        self.stats = data.BC_PerformerStats
     end
     self:sendPerformerInfo()
 end
 
+local lastUpdate = nil
+
+function P:onUpdate(dt)
+    -- Check if new day
+    local currentTime = core.getGameTime()
+    local currentDay = math.floor(currentTime / time.day)
+    local lastDay = lastUpdate and math.floor(lastUpdate / time.day) or nil
+    local sendInfo = false
+    if lastDay and currentDay ~= lastDay then
+        self.stats.performedVenuesToday = {}
+        self.stats.practiceEfficiency = util.clamp(math.pow(self.stats.practiceEfficiency, 0.15), 0.25, 1)
+        sendInfo = true
+    end
+    lastUpdate = currentTime
+    for venue, banEndTime in pairs(self.stats.bannedVenues) do
+        if currentTime >= banEndTime then
+            self.stats.bannedVenues[venue] = nil
+            sendInfo = true
+        end
+    end
+    if sendInfo then
+        self:sendPerformerInfo()
+    end
+
+    self.handleMovement(dt)
+    if self.playing then
+        self.musicTime = self.musicTime + dt
+    end
+end
+
 function P:getPerformanceXPRequired()
-    return (self.performanceSkill.level + 1) * 10
+    return (self.stats.performanceSkill.level + 1) * (10 + math.floor(self.stats.performanceSkill.level / 10) * 3)
 end
 
 function P:getPerformanceProgress()
-    return self.performanceSkill.xp / self:getPerformanceXPRequired()
+    return self.stats.performanceSkill.xp / self:getPerformanceXPRequired()
 end
 
 function P:addPerformanceXP(xp)
-    if self.performanceSkill.level >= 100 then return 0 end
-    self.performanceSkill.xp = self.performanceSkill.xp + xp
+    if self.stats.performanceSkill.level >= 100 then return 0 end
+    self.stats.performanceSkill.xp = self.stats.performanceSkill.xp + xp
     local leveledUp = false
     local milestone = nil
     local levelGain = 0
     while self:getPerformanceProgress() >= 1 do
         leveledUp = true
         levelGain = levelGain + 1
-        self.performanceSkill.xp = self.performanceSkill.xp - self:getPerformanceXPRequired()
-        self.performanceSkill.level = self.performanceSkill.level + 1
-        if self.performanceSkill.level % 10 == 0 then
-            milestone = self.performanceSkill.level
+        self.stats.performanceSkill.xp = self.stats.performanceSkill.xp - self:getPerformanceXPRequired()
+        self.stats.performanceSkill.level = self.stats.performanceSkill.level + 1
+        if self.stats.performanceSkill.level % 10 == 0 then
+            milestone = self.stats.performanceSkill.level
         end
     end
     if omwself.type == types.Player then
         omwself:sendEvent('BC_GainPerformanceXP', { leveledUp = leveledUp, milestone = milestone })
-        --print("New skill level: " .. self.performanceSkill.level .. " (" .. self.performanceSkill.xp .. "/" .. self:getPerformanceXPRequired() .. ")")
     end
     if leveledUp then
         self:sendPerformerInfo()
@@ -88,29 +115,29 @@ function P:addPerformanceXP(xp)
 end
 
 function P:modReputation(mod)
-    self.reputation = self.reputation + mod
+    self.stats.reputation = self.stats.reputation + mod
     self:sendPerformerInfo()
 end
 
 function P:addKnownSong(song, confidences)
-    if not self.knownSongs[song.id] then
-        self.knownSongs[song.id] = {
+    if not self.stats.knownSongs[song.id] then
+        self.stats.knownSongs[song.id] = {
             partConfidences = {},
         }
     end
     for _, part in ipairs(song.parts) do
-        self.knownSongs[song.id].partConfidences[part.index] = (confidences and confidences[part.index]) or 0
+        self.stats.knownSongs[song.id].partConfidences[part.index] = (confidences and confidences[part.index]) or 0
     end
     self:sendPerformerInfo()
 end
 
 function P:teachSong(song)
-    if not self.knownSongs[song.id] then
-        self.knownSongs[song.id] = {
+    if not self.stats.knownSongs[song.id] then
+        self.stats.knownSongs[song.id] = {
             partConfidences = {},
         }
         for _, part in ipairs(song.parts) do
-            self.knownSongs[song.id].partConfidences[part.index] = 0
+            self.stats.knownSongs[song.id].partConfidences[part.index] = 0
         end
         self:sendPerformerInfo()
         return true
@@ -119,16 +146,16 @@ function P:teachSong(song)
 end
 
 function P:modSongConfidence(songId, part, mod)
-    if not self.knownSongs[songId] then
-        self.knownSongs[songId] = {
+    if not self.stats.knownSongs[songId] then
+        self.stats.knownSongs[songId] = {
             partConfidences = {},
         }
     end
-    local confidence = self.knownSongs[songId].partConfidences[part] or 0
+    local confidence = self.stats.knownSongs[songId].partConfidences[part] or 0
     if confidence ~= confidence then confidence = 0 end
     if mod ~= mod then mod = 0 end
     confidence = util.clamp(confidence + mod, 0, 1)
-    self.knownSongs[songId].partConfidences[part] = confidence
+    self.stats.knownSongs[songId].partConfidences[part] = confidence
     self:sendPerformerInfo()
 end
 
@@ -146,6 +173,8 @@ P.performanceType = nil
 P.wasMoving = false
 P.idleTimer = nil
 P.instrument = nil
+P.instrumentProfile = nil
+P.instrumentItem = nil
 
 P.lastNoteTime = nil
 P.noteIntervals = {}
@@ -160,11 +189,16 @@ P.levelGain = 0
 P.maxConfidenceGrowth = 0
 P.overallNoteEvents = {}
 
-local xpMult = {
-    [Song.PerformanceType.Tavern] = 1.5,
-    [Song.PerformanceType.Street] = 0.2,
-    [Song.PerformanceType.Practice] = 0.8,
-}
+local function getXpMult(type)
+    if type == Song.PerformanceType.Tavern then
+        return 1.5
+    elseif type == Song.PerformanceType.Street then
+        return 0.2
+    elseif type == Song.PerformanceType.Practice then
+        return 1.0 * P.stats.practiceEfficiency
+    end
+    return 1.0
+end
 
 local easyDensity = 1.0
 local hardDensity = 6.0
@@ -240,9 +274,17 @@ function P.handleMovement(dt, idleAnim)
 end
 
 function P.resetVfx()
+    if not P.instrumentItem then
+        anim.removeVfx(omwself, 'BO_Instrument')
+        return
+    end
+    local modelName = P.instrumentItem.model
+    -- Convert to our vfx directory path
+    local modelName = modelName:match("([^/]+)$")
+    modelName = 'meshes/bardcraft/vfx/' .. modelName
     if instrumentData[P.instrument] then
         anim.removeVfx(omwself, 'BO_Instrument')
-        anim.addVfx(omwself, instrumentData[P.instrument].path, {
+        anim.addVfx(omwself, modelName, {
             boneName = instrumentData[P.instrument].boneName,
             vfxId = 'BO_Instrument',
             loop = true,
@@ -272,16 +314,18 @@ function P.handlePerformEvent(data)
     local iData = instrumentData[data.instrument]
     if not iData then return end
     P.instrument = data.instrument
+    P.instrumentProfile = Song.getInstrumentProfile(Song.getInstrumentNumber(data.instrument))
+    P.instrumentItem = types.Miscellaneous.record(data.item)
     P.resetVfx()
     P.resetAnim()
     omwself.enableAI(omwself, false)
 
-    local songInfo = P.knownSongs[song.id]
+    local songInfo = P.stats.knownSongs[song.id]
     if not songInfo then
         P:addKnownSong(song)
     end
 
-    P.maxConfidence = P.knownSongs[song.id].partConfidences[data.part.index] or 0
+    P.maxConfidence = P.stats.knownSongs[song.id].partConfidences[data.part.index] or 0
     if P.maxConfidence ~= P.maxConfidence then
         P.maxConfidence = 0 -- NaN check
     end
@@ -325,12 +369,19 @@ function P.handleStopEvent(data)
     local maxGrowth = util.clamp(P.maxConfidenceGrowth * data.completion, 0, P.maxConfidenceGrowth)
     local oldConfidence = P.maxConfidence
     local mod = util.clamp(diff, -maxGrowth, maxGrowth)
+
+    if omwself.type == types.Player then
+        if P.performanceType == Song.PerformanceType.Practice then
+            mod = mod * P.stats.practiceEfficiency
+            P.stats.practiceEfficiency = util.clamp(P.stats.practiceEfficiency * 0.9, 0.25, 1)
+        elseif P.performanceType == Song.PerformanceType.Tavern then
+            P.stats.performedVenuesToday[data.cell] = true
+        end
+    end
     P:modSongConfidence(P.currentSong.id, P.currentPart.index, mod)
     if omwself.type == types.Player then
-        omwself:sendEvent('BC_GainConfidence', { songTitle = P.currentSong.title, partTitle = P.currentPart.title, oldConfidence = oldConfidence, newConfidence = P.knownSongs[P.currentSong.id].partConfidences[P.currentPart.index] })
-    end
-    if omwself.type == types.Player then
-        core.sendGlobalEvent('BC_PlayerPerfSkillLog', { xpGain = P.xpGain, levelGain = P.levelGain, level = P.performanceSkill.level, xpCurr = P.performanceSkill.xp, xpReq = P:getPerformanceXPRequired() })
+        omwself:sendEvent('BC_GainConfidence', { songTitle = P.currentSong.title, partTitle = P.currentPart.title, oldConfidence = oldConfidence, newConfidence = P.stats.knownSongs[P.currentSong.id].partConfidences[P.currentPart.index] })
+        core.sendGlobalEvent('BC_PlayerPerfSkillLog', { xpGain = P.xpGain, levelGain = P.levelGain, level = P.stats.performanceSkill.level, xpCurr = P.stats.performanceSkill.xp, xpReq = P:getPerformanceXPRequired() })
     end
     
     P.currentSong = nil
@@ -341,7 +392,7 @@ function P.getNoteAccuracy()
     local density = P.currentDensity
 
     local difficultyFactor = util.clamp((density - easyDensity) / (hardDensity - easyDensity), 0, 1)
-    local accuracy = math.pow(P.performanceSkill.level / 100, 1/2) * 1.1 - (difficultyFactor * 0.5) + (math.pow(P.currentConfidence, 1/2) * 0.5)
+    local accuracy = math.pow(P.stats.performanceSkill.level / 100, 1/2) * 1.1 - (difficultyFactor * 0.5) + (math.pow(P.currentConfidence, 1/2) * 0.5)
 
     return util.clamp(accuracy, 0, 1)
 end
@@ -369,11 +420,14 @@ end
 
 function P.handleNoteEvent(data)
     if omwself.type.isDead(omwself) then return false end
+    local intervalBase = 1 / P.instrumentProfile.densityMod
+    local interval = intervalBase
+    local weight = 1.0
+    
     if P.lastNoteTime then
-        local interval = data.time - P.lastNoteTime
-        local weight = 1
+        interval = interval * (data.time - P.lastNoteTime)
         if interval < 0.05 then
-            weight = 0.1
+            weight = weight * 0.1
         end
         table.insert(P.noteIntervals, { interval = interval, weight = weight })
         if #P.noteIntervals > P.maxHistory then
@@ -389,13 +443,14 @@ function P.handleNoteEvent(data)
         end
         local avgInterval = totalInterval / totalWeight
         P.currentDensity = 1 / avgInterval
+        print('Performer density: ' .. P.currentDensity)
     end
     P.lastNoteTime = data.time
     local success = P.playNote(data.note, data.velocity)
     if success then
         local gain = (P.maxConfidence - P.currentConfidence) / P.maxConfidence * 0.04
         P.currentConfidence = math.min(P.currentConfidence + gain, P.maxConfidence)
-        local xp = 1 * xpMult[P.performanceType]
+        local xp = 1 * getXpMult(P.performanceType) / intervalBase
         P.levelGain = P.levelGain + P:addPerformanceXP(xp)
         P.xpGain = P.xpGain + xp
     else
@@ -403,7 +458,7 @@ function P.handleNoteEvent(data)
         P.currentConfidence = math.max(P.currentConfidence - loss, 0)
     end
     table.insert(P.overallNoteEvents, success)
-    core.sendGlobalEvent('BC_PerformerNoteHandled', { success = success, part = P.currentPart })
+    core.sendGlobalEvent('BC_PerformerNoteHandled', { success = success, part = P.currentPart, mod = 1 / intervalBase * weight })
     return success
 end
 

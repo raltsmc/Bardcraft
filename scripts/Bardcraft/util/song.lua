@@ -30,6 +30,7 @@ local instrumentProfiles = {
         sustain = true,
         transpose = true,
         polyphonic = true, 
+        densityMod = 1.0,
         volume = 1.0,
     },
     [73] = {
@@ -38,6 +39,7 @@ local instrumentProfiles = {
         sustain = false,
         transpose = true,
         polyphonic = false,
+        densityMod = 1.2,
         volume = 1,
     },
     [79] = {
@@ -46,6 +48,7 @@ local instrumentProfiles = {
         sustain = false,
         transpose = true,
         polyphonic = false,
+        densityMod = 0.9,
         volume = 1,
     },
     [116] = {
@@ -54,6 +57,7 @@ local instrumentProfiles = {
         sustain = true,
         transpose = false,
         polyphonic = true,
+        densityMod = 0.5,
         volume = 1,
     },
     [0] = {
@@ -62,6 +66,7 @@ local instrumentProfiles = {
         sustain = false,
         transpose = false,
         polyphonic = false,
+        densityMod = 1.0,
         volume = 1,
     },
 }

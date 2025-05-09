@@ -34,6 +34,32 @@ Modify my mod, but credit me as the original creator
 Overview
 =========
 
+=========================
+Where to Buy Instruments
+=========================
+-- Ald'ruhn: Malpenix Blonia (Redoran Council Hall)
+-- Ald'ruhn: Tiras Sadus
+-- Ald Velothi: Sedam Omalen (Outpost)
+-- Balmora: Clagius Clanler
+-- Balmora: Ra'Virr
+-- Caldera: Verick Gemain
+-- Dagon Fel: Heifnir
+-- Ghostgate: Fonas Retheran (Tower of Dusk)
+-- Khuul: Thongar
+-- Molag Mar: Vasesius Viciulus (Waistworks)
+-- Pelagiad: Mebestian Ence
+-- Seyda Neen: Arrille
+-- Suran: Ashumanu Eraishah (Suran Tradehouse)
+-- Suran: Ralds Oril
+-- Tel Aruhn: Ferele Athram
+-- Tel Branora: Fadase Selvayn
+-- Tel Mora: Berwen
+-- Vivec, Foreign Quarter: Jeanne (Canalworks)
+-- Vivec, Hlaalu: Gadayn Andarys (Plaza)
+-- Vivec, Redoran: Balen Andrano (Waistworks)
+-- Vivec, St. Delyn: Lucretinaus Olcinius (Plaza)
+-- Vivec, St. Delyn: Mevel Fererus (Plaza)
+-- Vivec, St. Delyn: Tervur Braven (Plaza)
 
 =============
 Installation

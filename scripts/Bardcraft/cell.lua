@@ -45,8 +45,9 @@ function C.canPerformHere(cell, type)
         end
         return nil
     elseif type == Song.PerformanceType.Street then
+        if not cell.isExterior then return nil end
         -- Check if the cell is in the list of street performance locations
-        if not venues.street then return false end
+        if not venues.street then return nil end
         local streetData = venues.street
         for _, venue in ipairs(streetData.metropolises) do
             if string.find(cell.name, venue, 1, true) then

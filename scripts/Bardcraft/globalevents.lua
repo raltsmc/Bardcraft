@@ -8,8 +8,8 @@ local I = require('openmw.interfaces')
 local MIDI = require('scripts.Bardcraft.util.midi')
 local Song = require('scripts.Bardcraft.util.song').Song
 
-local function parseAll()
-    local metadataPath = 'midi/metadata.yaml'
+local function parseAllPreset()
+    local metadataPath = 'midi/preset/metadata.yaml'
     local exists = vfs.fileExists(metadataPath)
     local metadata = exists and markup.loadYaml(metadataPath) or {
         midiData = {}
@@ -23,9 +23,9 @@ local function parseAll()
     local storedSongs = bardData:getCopy('songs/preset') or {}
 
     local midiSongs = {}
-    for fileName in vfs.pathsWithPrefix(MIDI.MidiParser.midiFolder) do
-        if fileName:sub(-4) == ".mid" then
-            fileName = string.match(fileName, "([^/]+)$")
+    for filePath in vfs.pathsWithPrefix(MIDI.MidiParser.presetFolder) do
+        if filePath:sub(-4) == ".mid" then
+            local fileName = string.match(filePath, "([^/]+)$")
 
             local alreadyParsed = false
             for _, song in pairs(storedSongs) do
@@ -36,7 +36,7 @@ local function parseAll()
             end
 
             if not alreadyParsed then
-                local parser = MIDI.parseMidiFile(fileName)
+                local parser = MIDI.parseMidiFile(filePath)
                 if parser then
                     local song = Song.fromMidiParser(parser, metadata.midiData[fileName])
                     midiSongs[fileName] = song
@@ -81,10 +81,10 @@ return {
             item:moveInto(types.Actor.inventory(data.actor))
         end,
         BC_ConsumeItem = function(data)
-            data.item:remove()
+            data.item:remove(data.count)
         end,
         BC_ParseMidis = function()
-            parseAll()
+            parseAllPreset()
         end,
         BC_Trespass = function(data)
             I.Crimes.commitCrime(data.player, {

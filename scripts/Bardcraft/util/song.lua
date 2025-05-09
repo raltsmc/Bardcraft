@@ -301,6 +301,7 @@ function Song:noteMapToNoteEvents(noteMap)
 end
 
 function Song.fromMidiParser(parser, metadata)
+    parser.filename = string.match(parser.filename, "([^/]+)$")
     local fileName = string.match(parser.filename, "([^\\]+)%.mid$")
     local title = (metadata and metadata.title) or fileName:gsub("%f[%a].", string.upper)
     local desc = (metadata and metadata.description) or 'Imported from MIDI file'

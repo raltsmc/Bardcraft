@@ -41,10 +41,10 @@ UI_CheckboxOn: "On"
 UI_CheckboxOff: "Off"
 
 UI_PRoll: "Piano Roll"
-UI_PRoll_NewSong: "New Song"
-UI_PRoll_SaveSong: "Save Song"
-UI_PRoll_LoadSong: "Load Song"
-UI_PRoll_DeleteSong: "Delete Song"
+UI_PRoll_NewDraft: "+ New Draft"
+UI_PRoll_FinalizeDraft: "Finalize Draft"
+UI_PRoll_DeleteDraft: "Delete Draft"
+UI_PRoll_DraftCost: "Cost: %{amount} Blank Sheet Music"
 
 UI_PRoll_SongInfo: "Song Info"
 UI_PRoll_Parts: "Parts"
@@ -92,10 +92,13 @@ UI_PRoll_Snap: "Snap (beats)"
 UI_PRoll_PartName: "Name"
 UI_PRoll_PartInstrument: "Instr."
 UI_PRoll_DeletePartMsg: "Click %{count} more times to confirm part deletion."
+UI_PRoll_NewPart: "+ New Part"
 
 UI_Button_Perform: "Perform"
 UI_Button_Practice: "Practice"
 UI_Button_Close: "Close"
+UI_Button_Confirm: "Confirm"
+UI_Button_Cancel: "Cancel"
 
 UI_PartConfidence: "Confidence: %{confidence}%"
 
@@ -141,11 +144,15 @@ UI_LvlUp_Performance_10_Rare4: "In your hands, the crude becomes sublime. String
 UI_LvlUp_Performance_10_Rare5: "You draw forth music like a smith draws forth iron -- shaping it with patience, vision, and unbreakable will.\nYou are a Master of Bardcraft."
 UI_LvlUp_Performance_10_UltraRare: "The bards of history are no longer your teachers. They are your peers.\nYou are a Master of Bardcraft."
 
+UI_Msg_PRoll_InsufficientBlanks: "You do not have enough blank sheet music!"
+
 UI_Msg_Confidence_Up: "Your confidence in:\n%{songTitle}, %{partTitle}\nrose to %{confidence}%."
 UI_Msg_Confidence_Down: "Your confidence in:\n%{songTitle}, %{partTitle}\nfell to %{confidence}%."
 UI_Msg_Confidence_NoChange: "You gained no confidence from this performance."
+UI_Msg_PracticeEfficiency: "Your practice efficiency dropped to %{efficiency}%."
 UI_Msg_LearnSong_Success: "You learned a new song:\n%{songTitle}"
 UI_Msg_LearnSong_Fail: "You already know this song:\n%{songTitle}"
+UI_Msg_FinalizedDraft: "You wrote a new song:\n%{songTitle}"
 
 UI_Msg_PerfStartFail_NoPerformers: "You need at least one performer to start a performance."
 UI_Msg_PerfStartFail_NoInstrument: "Performer %{performer} is missing %{instrument_indef}!"
@@ -189,7 +196,7 @@ UI_Blurb_Vivec, Black Shalk Cornerclub: "A cramped watering hole nestled in the 
 # Tamriel Rebuilt
 
 # Project Cyrodiil
-UI_Blurb_Anvil, The Abecette: "Anvil's most upscale hotel, renowned the world over for its gambling halls, elegant rooms, and fighting pits. Home to wealthy patrons with distinguished tastes and deep pockets."
+UI_Blurb_Anvil, The Abecette: "Anvil's most upscale hotel, renowned the world over for its gambling halls, elegant rooms, and fighting pits. Houses many wealthy patrons with distinguished tastes and deep pockets."
 
 # Skyrim
 

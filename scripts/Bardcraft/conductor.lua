@@ -635,7 +635,7 @@ return {
                     for venue, banEndTime in pairs(bannedVenues) do
                         print("Banned from: " .. venue)
                         if venue == player.cell.name then
-                            player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_BannedVenue'):gsub('%%{date}', calendar.formatGameTime('%d %B', banEndTime)) })
+                            player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_BannedVenue'):gsub('%%{date}', calendar.formatGameTime('%d %B', banEndTime)):match("0*(.+)") })
                             return
                         end
                     end

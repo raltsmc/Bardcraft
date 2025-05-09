@@ -3,8 +3,6 @@
 
 local vfs = require('openmw.vfs')
 
-local Song = require('scripts.Bardcraft.util.song').Song
-
 -- Basic bit operations since Lua 5.1 doesn't have them built-in
 local bit = {}
 
@@ -49,7 +47,8 @@ local MidiParser = {}
 MidiParser.__index = MidiParser
 
 MidiParser.sampleFolder = 'sound\\Bardcraft\\samples\\'
-MidiParser.midiFolder = 'midi\\'
+MidiParser.presetFolder = 'midi\\preset\\'
+MidiParser.customFolder = 'midi\\custom\\'
 
 MidiParser.instrumentProfiles = {
     [24] = {
@@ -553,7 +552,6 @@ end
 
 -- Usage example
 function parseMidiFile(filename)
-    filename = MidiParser.midiFolder .. filename
     local parser = MidiParser.new(filename)
     local success, errorMsg = parser:parse()
 

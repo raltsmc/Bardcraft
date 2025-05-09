@@ -374,6 +374,7 @@ function P.handleStopEvent(data)
         if P.performanceType == Song.PerformanceType.Practice then
             mod = mod * P.stats.practiceEfficiency
             P.stats.practiceEfficiency = util.clamp(P.stats.practiceEfficiency * 0.9, 0.25, 1)
+            omwself:sendEvent('BC_PracticeEfficiency', { efficiency = P.stats.practiceEfficiency })
         elseif P.performanceType == Song.PerformanceType.Tavern then
             P.stats.performedVenuesToday[data.cell] = true
         end
@@ -427,7 +428,7 @@ function P.handleNoteEvent(data)
     if P.lastNoteTime then
         interval = interval * (data.time - P.lastNoteTime)
         if interval < 0.05 then
-            weight = weight * 0.1
+            weight = weight * 0.25
         end
         table.insert(P.noteIntervals, { interval = interval, weight = weight })
         if #P.noteIntervals > P.maxHistory then

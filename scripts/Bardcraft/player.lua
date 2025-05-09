@@ -91,6 +91,8 @@ local practiceOverlayRepopulateTime = practiceOverlayRepopulateTimeWindow
 local practiceOverlayNoteLayouts = {}
 local practiceOverlayLastShakeFactor = 0
 
+local practiceOverlayToggle = true
+
 local hurtOverlay = ui.create {
     layer = 'Notification',
     type = ui.TYPE.Image,
@@ -234,6 +236,7 @@ local function createPracticeOverlay()
             tileH = true,
             tileV = false,
             alpha = alpha,
+            visible = practiceOverlayToggle,
         },
         content = ui.content {
             practiceOverlayNotesWrapper,
@@ -263,6 +266,20 @@ local function createPracticeOverlay()
     practiceOverlayNoteSuccess = {}
     practiceOverlayRepopulateTime = practiceOverlayRepopulateTimeWindow 
     practiceOverlayLastShakeFactor = -1
+end
+
+local function togglePracticeOverlay()
+    if practiceOverlay then
+        practiceOverlayToggle = not practiceOverlayToggle
+        practiceOverlay.layout.props.visible = practiceOverlayToggle
+        if not practiceOverlayToggle then
+            practiceOverlayFadeInTimer = 0
+            practiceOverlay.layout.props.alpha = 0
+        else
+            practiceOverlayFadeInTimer = practiceOverlayFadeInDuration
+            practiceOverlay.layout.props.alpha = 0.4
+        end
+    end
 end
 
 local function destroyPracticeOverlay()
@@ -374,7 +391,11 @@ return {
         end,
         onKeyPress = function(e)
             if e.symbol == 'b' then
-                Editor:onToggle()
+                if input.isAltPressed() then
+                    togglePracticeOverlay()
+                else
+                    Editor:onToggle()
+                end
             elseif e.symbol == 'n' then
                 Performer:addPerformanceXP(1000) -- debug
             elseif Editor.active and e.code == input.KEY.Space then
@@ -532,6 +553,10 @@ return {
             end
             ui.showMessage(message:gsub('%%{songTitle}', data.songTitle):gsub('%%{partTitle}', data.partTitle):gsub('%%{confidence}', string.format('%.2f', data.newConfidence * 100)))
         end,
+        BC_PracticeEfficiency = function(data)
+            local message = l10n('UI_Msg_PracticeEfficiency'):gsub('%%{efficiency}', string.format('%d', data.efficiency * 100))
+            ui.showMessage(message)
+        end,
         BC_PerformerInfo = function(data)
             performersInfo[data.actor.id] = data.stats
             Editor.performersInfo = performersInfo
@@ -564,6 +589,11 @@ return {
         end,
         BC_StartPerformanceFail = function(data)
             ui.showMessage(data.reason)
+        end,
+        BC_FinalizeDraft = function(data)
+            Performer:teachSong(data.song)
+            ui.showMessage(l10n('UI_Msg_FinalizedDraft'):gsub('%%{songTitle}', data.song.title))
+            ambient.playSoundFile('sound\\Bardcraft\\finalize_draft.wav')
         end,
         UiModeChanged = function(data)
             if data.newMode == nil then

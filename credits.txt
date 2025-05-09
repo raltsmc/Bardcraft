@@ -7,6 +7,8 @@ Delete icon: https://www.flaticon.com/free-icons/trash-can Created by Freepik - 
 
 SOUNDS
 
+finalize_draft.wav: writing_pencil.aif by rui_aires -- https://freesound.org/s/365890/ -- License: Creative Commons 0
+
 boo1.wav: CRWDAngr_Booing, Angry_ShaneVincent_GSC24_XY-AKG214-96k.wav by ShangusBurger -- https://freesound.org/s/763807/ -- License: Creative Commons 0
 boo2, boo3.wav: Crowd Boo.wav by deleted_user_2104797 -- https://freesound.org/s/324893/ -- License: Creative Commons 0
 boo4.wav: S Disapproval - .wav by Processaurus -- https://freesound.org/s/440087/ -- License: Attribution 4.0
@@ -14,7 +16,6 @@ clap1.wav: Crowd Clap.wav by GB01 -- https://freesound.org/s/177083/ -- License:
 clap2.wav: small crowd cheering and clapping 2.wav by Tomlija -- https://freesound.org/s/99633/ -- License: Attribution 3.0
 clap3.wav: MORECLAPS.aif by nickrave -- https://freesound.org/s/245639/ -- License: Creative Commons 0
 clap4.wav: Applause Small Crowd 2 by qubodup -- https://freesound.org/s/169943/ -- License: Attribution 4.0
-
 hurl.wav: Hurling.mp3 by SnowFightStudios -- https://freesound.org/s/643654/ -- License: Creative Commons 0
 cough1.wav: Cough1_Mono.wav by johncanyon -- https://freesound.org/s/645991/ -- License: Creative Commons 0
 cough2.wav: Cough by Duisterwho -- https://freesound.org/s/638581/ -- License: Creative Commons 0

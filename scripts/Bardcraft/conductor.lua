@@ -54,7 +54,7 @@ local function start(data)
         partToPerformer[performerData.part.index] = performerData.actor
     end
 
-    song.loopCount = song.loopTimes
+    song.loopCount = (data.type == Song.PerformanceType.Street or data.type == Song.PerformanceType.Ambient) and 1e10 or song.loopTimes
     performance.noteEvents = {}
     performance.quality = 0
     performance.density = 0
@@ -75,13 +75,13 @@ end
 
 local logAwait = nil
 
-local function payPlayer(player, gold, message)
+local function payPlayer(player, gold, message, sfx)
     if gold > 0 then
         if player then
             local item = world.createObject('gold_001', gold or 1)
             item:moveInto(types.Actor.inventory(player))
             if message then
-                player:sendEvent('BC_PerformanceEvent', { type = 'Gold', amount = gold, message = message })
+                player:sendEvent('BC_PerformanceEvent', { type = 'Gold', amount = gold, message = message, sound = sfx })
             end
         end
     end
@@ -114,6 +114,49 @@ local function getRandomLocalizedLine(prefix)
 	return lines[math.random(#lines)]
 end
 
+local function getStatFactor()
+    local player = world.players[1]
+    if player then
+        local speechcraftFactor = (types.NPC.stats.skills.speechcraft(player).modified - 50) / 50 * 0.125
+        local personalityFactor = (types.Actor.stats.attributes.personality(player).modified - 50) / 50 * 0.25
+        return speechcraftFactor + personalityFactor
+    end
+    return 0
+end
+
+local function getQualityFactor(statFactor)
+    if not performance then return 0 end
+    local minQualityModifier = 30 * (1 - statFactor)
+    local minPerfQualityToPay = util.clamp(minQualityModifier, 16, 99)
+    local scaledQuality = math.pow(performance.quality / 100, 2) * 100
+    local qualityFactor = util.clamp((scaledQuality - minPerfQualityToPay) / (100 - minPerfQualityToPay), 0, 1)
+    return qualityFactor
+end
+
+local getImpressivenessFactor = function()
+    if not performance then return 0 end
+    return math.min(1, performance.density / 8)
+end
+
+local function getBasePayAmount()
+    if not performance then return 0 end
+    local player = world.players[1]
+    if player then
+        local payment = 0
+        local statSumFactor = getStatFactor()
+        local qualityFactor = getQualityFactor(statSumFactor)
+        local impressivenessFactor = getImpressivenessFactor()
+        local payScale = math.max(0, 1 + statSumFactor)
+        local timeScale = math.min(performance.time / 60, 3)
+        -- Base: A maximum impressiveness song (density > 8) with a 100% quality should reward 250 gold
+        local basePayment = 250 * impressivenessFactor * qualityFactor
+        payment = math.max(0, math.floor(basePayment * payScale * timeScale))
+        payment = math.floor(payment * (1 + math.random() * 0.1))
+        return payment
+    end
+    return 0
+end
+
 local function stop()
     if song then
         song:resetPlayback()
@@ -123,7 +166,7 @@ local function stop()
         performerData.actor:sendEvent('BO_ConductorEvent', { type = 'PerformStop', completion = song and (performance.time / song:lengthInSeconds()) or 0, cell = performance.streetName or performance.cell.name })
     end
 
-    if performance.type == Song.PerformanceType.Practice then
+    if performance.type == Song.PerformanceType.Practice or performance.type == Song.PerformanceType.Ambient then
         return
     end
 
@@ -142,10 +185,8 @@ local function stop()
     local player = world.players[1]
     if player then
         local timeScale = math.min(performance.time / 60, 2)
-        local speechcraftFactor = (types.NPC.stats.skills.speechcraft(player).modified - 50) / 50 * 0.125
-        local personalityFactor = (types.Actor.stats.attributes.personality(player).modified - 50) / 50 * 0.25
-        local statSumFactor = speechcraftFactor + personalityFactor
-        local impressiveness = math.min(1, performance.density / 8)
+        local statSumFactor = getStatFactor()
+        local impressiveness = getImpressivenessFactor()
 
         -- Calculate rep gain/loss
         local rep = 0
@@ -249,22 +290,12 @@ local function stop()
                 end
             end
 
-            local minQualityModifier = 30 * (1 - statSumFactor)
-
             local kickOut = (performanceLog.effects and performanceLog.effects.kickPlayer) or performance.quality < 15 and performance.time >= 10
 
             -- Calculate how much the publican pays
             local payment = 0
             if not kickOut then
-                local minPerfQualityToPay = util.clamp(minQualityModifier, 16, 99)
-                local payScale = math.max(0, 1 + statSumFactor)
-                -- Base: A maximum impressiveness song (density > 8) with a 100% quality should reward 250 gold
-                local impressivenessFactor = math.min(1, performance.density / 8)
-                local scaledQuality = math.pow(performance.quality / 100, 2) * 100
-                local qualityFactor = util.clamp((scaledQuality - minPerfQualityToPay) / (100 - minPerfQualityToPay), 0, 1)
-                local basePayment = 250 * impressivenessFactor * qualityFactor
-                payment = math.max(0, math.floor(basePayment * payScale * timeScale))
-                payment = math.floor(payment * (1 + math.random() * 0.1))
+                payment = getBasePayAmount()
             end
 
             -- Calculate publican disposition change
@@ -324,7 +355,7 @@ local function stop()
             performanceLog.newDisp = newDisp
             performanceLog.payment = payment
             performanceLog.kickedOut = kickOut
-            payPlayer(player, payment, l10n('UI_Msg_PerfTavern_Payment'))
+            payPlayer(player, payment, l10n('UI_Msg_PerfTavern_Payment'), 'sound\\Fx\\item\\money.wav')
         elseif performance.type == Song.PerformanceType.Street then
             rep = rep * 0.1
         end
@@ -402,7 +433,6 @@ local function tickJudge(dt)
                 totalDensity = totalDensity + density
             end
             performance.density = maxDensity
-            print('Conductor density: ' .. performance.density)
             performance.complexity = totalDensity
         end
     else
@@ -413,13 +443,6 @@ end
 local ThrownItemType = {
     Drink = 1,
     Bread = 2,
-}
-
-local ThrownItemOutcome = {
-    Hit = 1,
-    CriticalHit = 2,
-    Catch = 3,
-    Miss = 4,
 }
 
 local function createThrownItemData(threshold, probability, damage, type, items, chances, messagePrefix)
@@ -491,13 +514,49 @@ local function selectItemFromProbabilityList(list, roll)
     return lastItem
 end
 
+local TipType = {
+    Normal = 1,
+    Wealthy = 2,
+    Pitiful = 3,
+}
+
 local function doRandomEvent()
     local player = world.players[1]
     if not player then return end
+    if performance.type == Song.PerformanceType.Practice or performance.type == Song.PerformanceType.Ambient then return end
 
     local function giveItem(item, count)
         local itemObj = world.createObject(item, count or 1)
         itemObj:moveInto(types.Actor.inventory(player))
+    end
+    
+    local tipChance = 0.5
+    local tipAmount = 1
+    local tipType = TipType.Normal
+
+    local statFactor = getStatFactor()
+    local qualityFactor = getQualityFactor(statFactor)
+    local perfFactor = (qualityFactor - 0.5) * (getImpressivenessFactor() + 0.5)
+    if performance.type == Song.PerformanceType.Street then
+        tipChance = 0.25
+        tipAmount = 0.25
+
+        if performance.streetType == Cell.StreetType.Metropolis then
+            tipChance = tipChance * 2
+        elseif performance.streetType == Cell.StreetType.City then
+            tipChance = tipChance * 1.5
+        end
+    end
+
+    tipChance = (tipChance + statFactor) * perfFactor
+    tipAmount = tipAmount * math.random() * 40 * perfFactor * (1 + statFactor)
+
+    if perfFactor < 0.15 then
+        tipType = TipType.Pitiful
+        tipAmount = tipAmount * 0.2
+    elseif math.random() < 0.05 then
+        tipType = TipType.Wealthy
+        tipAmount = tipAmount * 5
     end
 
     if performance.type == Song.PerformanceType.Tavern then
@@ -559,6 +618,37 @@ local function doRandomEvent()
             end
         end
     end
+
+    -- Tips
+    if performance.time >= 5 and math.random() < tipChance then
+        local message
+        local sfx
+        local speechXp
+        if tipType == TipType.Normal then
+            message = l10n(performance.type == Song.PerformanceType.Tavern and getRandomLocalizedLine('UI_Msg_PerfTavern_Tip') or getRandomLocalizedLine('UI_Msg_PerfBusking_Tip'))
+            sfx = 'sound\\Bardcraft\\crowd\\coin-few.wav'
+            speechXp = 2
+        elseif tipType == TipType.Wealthy then
+            message = l10n(performance.type == Song.PerformanceType.Tavern and getRandomLocalizedLine('UI_Msg_PerfTavern_Tip_Wealthy') or getRandomLocalizedLine('UI_Msg_PerfBusking_Tip_Wealthy'))
+            sfx = 'sound\\Bardcraft\\crowd\\coin-many.wav'
+            speechXp = 5
+        else
+            message = l10n(performance.type == Song.PerformanceType.Tavern and getRandomLocalizedLine('UI_Msg_PerfTavern_Tip_Bad') or getRandomLocalizedLine('UI_Msg_PerfBusking_Ignore'))
+            sfx = 'sound\\Bardcraft\\crowd\\coin-one.wav'
+            speechXp = 1
+        end
+        local tipAmount = math.ceil(tipAmount)
+        if tipAmount > 0 then
+            payPlayer(player, tipAmount, message, sfx)
+            performance.tips = performance.tips + tipAmount
+            player:sendEvent('BC_SpeechcraftXP', { amount = speechXp, })
+            return
+        end
+    elseif tipChance <= 0 and performance.type == Song.PerformanceType.Street then
+        if math.random() < 0.25 then
+            player:sendEvent('BC_PerformanceEvent', { type = 'Flavor', message = l10n(getRandomLocalizedLine('UI_Msg_PerfBusking_Ignore')) })
+        end
+    end
 end
 
 local lastCrowdBoo = 0
@@ -576,7 +666,7 @@ local function doCrowdNoise()
         if not core.sound.isSoundFilePlaying(soundFile, world.players[1]) then
             core.sound.playSoundFile3d(soundFile, world.players[1], { volume = 0.1 + 0.4 * (35 - performance.quality) / 35 })
         end
-    elseif performance.quality > 90 and performance.density > 4 then
+    elseif performance.quality >= 90 and performance.density > 4 then
         local crowdNoiseNum = math.random(2, 4)
         if crowdNoiseNum <= lastCrowdClap then
             crowdNoiseNum = crowdNoiseNum - 1
@@ -593,9 +683,7 @@ local function tickRandomEvents(dt)
     if performanceRandomEventTimer <= 0 then
         performanceRandomEventTimer = math.random() * (performanceRandomEventInterval[2] - performanceRandomEventInterval[1]) + performanceRandomEventInterval[1]
         doCrowdNoise()
-        if math.random() < 0.5 then
-            doRandomEvent()
-        end
+        doRandomEvent()
     else
         performanceRandomEventTimer = performanceRandomEventTimer - dt
     end
@@ -626,6 +714,8 @@ return {
                 if not type then
                     if data.type == Song.PerformanceType.Practice then
                         player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_InvalidPracticeLocation') })
+                    elseif data.type == Song.PerformanceType.Ambient then
+                        player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_InvalidAmbientLocation') })
                     else
                         player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_InvalidLocation') })
                     end
@@ -633,7 +723,6 @@ return {
                 elseif type == Song.PerformanceType.Tavern then
                     local bannedVenues = data.playerStats.bannedVenues
                     for venue, banEndTime in pairs(bannedVenues) do
-                        print("Banned from: " .. venue)
                         if venue == player.cell.name then
                             player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_BannedVenue'):gsub('%%{date}', calendar.formatGameTime('%d %B', banEndTime)):match("0*(.+)") })
                             return
@@ -681,7 +770,6 @@ return {
                     for item, _ in pairs(validItems) do
                         if inventory:find(item) then
                             perfList[i].item = item
-                            print('Item found: ' .. item)
                             break
                         end
                     end
@@ -699,6 +787,21 @@ return {
 
                 player:sendEvent('BC_StartPerformanceSuccess')
             else
+                stop()
+            end
+        end,
+        BC_RecheckCell = function(data)
+            if not playing then return end
+            
+            local type, streetName = Cell.canPerformHere(data.player.cell, performance.type)
+
+            if performance.type == Song.PerformanceType.Tavern then
+                stop()
+            elseif performance.type == Song.PerformanceType.Street then
+                if not type or streetName ~= performance.streetName then
+                    stop()
+                end
+            elseif not type then
                 stop()
             end
         end,

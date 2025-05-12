@@ -235,7 +235,7 @@ local headerSection = {
     }
 }
 
-local function uiButton(text, onClick)
+local function uiButton(text, active, onClick)
     return {
         template = I.MWUI.templates.boxThick,
         content = ui.content {
@@ -246,6 +246,7 @@ local function uiButton(text, onClick)
                         template = I.MWUI.templates.textNormal,
                         props = {
                             text = text,
+                            textColor = active and Editor.uiColors.WHITE or Editor.uiColors.DEFAULT,
                         },
                     }
                 },
@@ -523,100 +524,102 @@ local addDraft, saveDraft, setDraft
 local uiTemplates
 
 uiTemplates = {
-    wrapper = {
-        layer = 'Windows',
-        template = I.MWUI.templates.boxTransparentThick,
-        content = ui.content {
-            {
-                type = ui.TYPE.Flex,
-                props = {
-                    autoSize = false,
-                    size = util.vector2(0, 0),
-                },
-                content = ui.content {
-                    {
-                        type = ui.TYPE.Flex,
-                        props = {
-                            horizontal = true,
-                            autoSize = false,
-                            relativeSize = util.vector2(1, 0),
-                            size = util.vector2(0, Editor.windowCaptionHeight)
-                        },
-                        content = ui.content { 
-                            headerSection, 
-                            {
-                                template = I.MWUI.templates.textNormal,
-                                props = {
-                                    text = '   ' .. l10n("UI_Title") .. '   ',
-                                }
-                            },
-                            headerSection,
-                        },
+    wrapper = function() 
+        return {
+            layer = 'Windows',
+            template = I.MWUI.templates.boxTransparentThick,
+            content = ui.content {
+                {
+                    type = ui.TYPE.Flex,
+                    props = {
+                        autoSize = false,
+                        size = util.vector2(0, 0),
                     },
-                    {
-                        template = I.MWUI.templates.bordersThick,
-                        external = {
-                            grow = 1,
-                            stretch = 1,
-                        },
-                        content = ui.content {
-                            {
-                                type = ui.TYPE.Flex,
-                                name = 'mainContent',
-                                props = {
-                                    autoSize = false,
-                                    relativeSize = util.vector2(1, 1),
+                    content = ui.content {
+                        {
+                            type = ui.TYPE.Flex,
+                            props = {
+                                horizontal = true,
+                                autoSize = false,
+                                relativeSize = util.vector2(1, 0),
+                                size = util.vector2(0, Editor.windowCaptionHeight)
+                            },
+                            content = ui.content { 
+                                headerSection, 
+                                {
+                                    template = I.MWUI.templates.textNormal,
+                                    props = {
+                                        text = '   ' .. l10n("UI_Title") .. '   ',
+                                    }
                                 },
-                                content = ui.content {
-                                    {
-                                        template = I.MWUI.templates.borders,
-                                        props = {
-                                            size = util.vector2(0, Editor.windowTabsHeight),
-                                            relativeSize = util.vector2(1, 0),
-                                        },
-                                        content = ui.content {
-                                            {
-                                                type = ui.TYPE.Flex,
-                                                props = {
-                                                    horizontal = true,
-                                                    autoSize = false,
-                                                    size = util.vector2(0, Editor.windowTabsHeight),
-                                                    relativeSize = util.vector2(1, 0),
+                                headerSection,
+                            },
+                        },
+                        {
+                            template = I.MWUI.templates.bordersThick,
+                            external = {
+                                grow = 1,
+                                stretch = 1,
+                            },
+                            content = ui.content {
+                                {
+                                    type = ui.TYPE.Flex,
+                                    name = 'mainContent',
+                                    props = {
+                                        autoSize = false,
+                                        relativeSize = util.vector2(1, 1),
+                                    },
+                                    content = ui.content {
+                                        {
+                                            template = I.MWUI.templates.borders,
+                                            props = {
+                                                size = util.vector2(0, Editor.windowTabsHeight),
+                                                relativeSize = util.vector2(1, 0),
+                                            },
+                                            content = ui.content {
+                                                {
+                                                    type = ui.TYPE.Flex,
+                                                    props = {
+                                                        horizontal = true,
+                                                        autoSize = false,
+                                                        size = util.vector2(0, Editor.windowTabsHeight),
+                                                        relativeSize = util.vector2(1, 0),
+                                                    },
+                                                    external = {
+                                                        grow = 1,
+                                                        stretch = 1,
+                                                    },
+                                                    content = ui.content {
+                                                        uiButton(l10n('UI_Tab_Performance'), Editor.state == Editor.STATE.PERFORMANCE, function()
+                                                            Editor:setState(Editor.STATE.PERFORMANCE)
+                                                        end),
+                                                        uiButton(l10n('UI_Tab_Stats'), Editor.state == Editor.STATE.STATS, function()
+                                                            Editor:setState(Editor.STATE.STATS)
+                                                        end),
+                                                        uiButton(l10n('UI_Tab_Songwriting'), Editor.state == Editor.STATE.SONG, function()
+                                                            Editor:setState(Editor.STATE.SONG)
+                                                        end),
+                                                    }
                                                 },
-                                                external = {
-                                                    grow = 1,
-                                                    stretch = 1,
-                                                },
-                                                content = ui.content {
-                                                    uiButton(l10n('UI_Tab_Performance'), function()
-                                                        Editor:setState(Editor.STATE.PERFORMANCE)
-                                                    end),
-                                                    uiButton(l10n('UI_Tab_Songwriting'), function()
-                                                        Editor:setState(Editor.STATE.SONG)
-                                                    end),
-                                                    uiButton(l10n('UI_Tab_Stats'), function()
-                                                        Editor:setState(Editor.STATE.STATS)
-                                                    end),
-                                                }
                                             },
                                         },
-                                    },
-                                }
-                            },
-                        }
-                    },
+                                    }
+                                },
+                            }
+                        },
+                    }
                 }
+            },
+            props = {
+                anchor = util.vector2(0.5, 0.5),
+                relativePosition = util.vector2(0.5, 0.5),
+            },
+            events = {
+                keyPress = async:callback(function(e)
+                end),
             }
-        },
-        props = {
-            anchor = util.vector2(0.5, 0.5),
-            relativePosition = util.vector2(0.5, 0.5),
-        },
-        events = {
-            keyPress = async:callback(function(e)
-            end),
-        }
-    },
+        } 
+    end,
     songManager = {
         type = ui.TYPE.Flex,
         props = {
@@ -2119,7 +2122,7 @@ end
 local function calcSheetMusicCost()
     if not Editor.song then return 0 end
     local lengthBars = Editor.song.lengthBars
-    local cost = math.max(1, math.floor((lengthBars - 2) / 8)) -- 1 sheet for every 8 bars + 2, minimum 1 sheet
+    local cost = math.max(1, math.floor((lengthBars - 2) / 8) + 1) -- 1 sheet for every 8 bars + 2, minimum 1 sheet
     return cost
 end
 
@@ -2889,7 +2892,7 @@ getPerformanceTab = function()
     local scrollableSongContent = ui.content{}
     local itemHeight = 48
     local scrollableHeight = 450 * screenSize.y / 1080
-    local scrollableWidth = 300 * screenSize.x / 1920
+    local scrollableWidth = 450 * screenSize.x / 1920 -- TODO change to 300
 
     if screenSize.y <= 720 then
         scrollableHeight = scrollableHeight / 2
@@ -2901,6 +2904,8 @@ getPerformanceTab = function()
     if player then
         knownSongs = Editor.performersInfo[player.id] and Editor.performersInfo[player.id].knownSongs or {}
     end
+
+    Editor.performanceSelectedPerformer = player
 
     for i, song in ipairs(Editor.songs) do
         if knownSongs[song.id] then
@@ -3040,6 +3045,12 @@ getPerformanceTab = function()
                 uiTemplates.button(l10n('UI_Button_Practice'), util.vector2(192, 32), function()
                     startPerformance(Song.PerformanceType.Practice)
                 end),
+                {
+                    template = I.MWUI.templates.interval,
+                },
+                uiTemplates.button(l10n('UI_Button_PlayIdly'), util.vector2(192, 32), function()
+                    startPerformance(Song.PerformanceType.Ambient)
+                end),
             }
         }
     end
@@ -3053,55 +3064,42 @@ getPerformanceTab = function()
             arrange = ui.ALIGNMENT.Center,
         },
         content = ui.content {
+            createPaddingTemplate(16),
             {
-                template = I.MWUI.templates.textNormal,
-                props = {
-                    text = l10n('UI_Tab_Performance'),
-                },
-            },
-            {
-                template = createPaddingTemplate(16),
-                props = {
-                    anchor = util.vector2(0.5, 0.5),
-                },
+                type = ui.TYPE.Flex,
                 content = ui.content {
                     {
                         type = ui.TYPE.Flex,
+                        props = {
+                            horizontal = true,
+                        },
                         content = ui.content {
+                            scrollableSong,
                             {
-                                type = ui.TYPE.Flex,
-                                props = {
-                                    horizontal = true,
-                                },
-                                content = ui.content {
-                                    scrollableSong,
-                                    {
-                                        template = I.MWUI.templates.interval
-                                    },
-                                    scrollablePerformers,
-                                    {
-                                        template = I.MWUI.templates.interval
-                                    },
-                                    scrollableParts
-                                }
+                                template = I.MWUI.templates.interval
                             },
+                            --[[scrollablePerformers,
                             {
-                                template = I.MWUI.templates.interval,
-                            },
-                            {
-                                type = ui.TYPE.Flex,
-                                external = {
-                                    stretch = 1,
-                                },
-                                content = ui.content {
-                                    selectedSongInfoTitle,
-                                    selectedSongInfoDescription,
-                                }
-                            },
+                                template = I.MWUI.templates.interval
+                            },]]
+                            scrollableParts
                         }
                     },
-                },
-            },        
+                    {
+                        template = I.MWUI.templates.interval,
+                    },
+                    {
+                        type = ui.TYPE.Flex,
+                        external = {
+                            stretch = 1,
+                        },
+                        content = ui.content {
+                            selectedSongInfoTitle,
+                            selectedSongInfoDescription,
+                        }
+                    },
+                }
+            },      
         }
     })
     table.insert(performance.content[1].content, selectedSongPerformButtons)
@@ -3109,34 +3107,137 @@ getPerformanceTab = function()
 end
 
 getStatsTab = function()
+    local playerInfo = Editor.performersInfo[nearby.players[1].id]
+    if not playerInfo then return end
+
+    local level = playerInfo.performanceSkill.level or 1
+    local maxLevel = level >= 100
+    local xp = playerInfo.performanceSkill.xp or 0
+    local req = playerInfo.performanceSkill.req or 10
+    local progress = maxLevel and 1 or (xp / req)
+    local rank = l10n('UI_Lvl_Performance_' .. math.floor(level / 10))
+
     local stats = auxUi.deepLayoutCopy(uiTemplates.baseTab)
     local flexContent = stats.content[1].content[1].content
     table.insert(flexContent, {
         type = ui.TYPE.Flex,
         props = {
             autoSize = false,
-            size = util.vector2(0, 32),
-            relativeSize = util.vector2(1, 0),
-            align = ui.ALIGNMENT.Start,
+            relativeSize = util.vector2(1, 1),
             arrange = ui.ALIGNMENT.Center,
-            relativePosition = util.vector2(0, 1),
-            anchor = util.vector2(0, 1),
-            position = util.vector2(0, -32),
         },
         content = ui.content {
+            createPaddingTemplate(8),
             {
-                template = createPaddingTemplate(16),
+                type = ui.TYPE.Flex,
                 props = {
-                    anchor = util.vector2(0.5, 0.5),
+                    autoSize = false,
+                    relativeSize = util.vector2(1, 0),
+                    size = util.vector2(0, 32),
+                    horizontal = true,
+                    arrange = ui.ALIGNMENT.Center,
+                    align = ui.ALIGNMENT.Center,
                 },
                 content = ui.content {
                     {
+                        template = I.MWUI.templates.textHeader,
+                        props = {
+                            text = l10n('UI_Lvl_Rank') .. ':',
+                            textSize = 24,
+                        }
+                    },
+                    createPaddingTemplate(4),
+                    {
                         template = I.MWUI.templates.textNormal,
                         props = {
-                            text = l10n('UI_Tab_Stats'),
-                        },
+                            text = rank,
+                            textSize = 24,
+                        }
                     },
+                }
+            },
+            createPaddingTemplate(8),
+            {
+                type = ui.TYPE.Flex,
+                props = {
+                    autoSize = false,
+                    relativeSize = util.vector2(1, 0),
+                    size = util.vector2(0, 128),
+                    arrange = ui.ALIGNMENT.Center,
                 },
+                content = ui.content {
+                    {
+                        type = ui.TYPE.Flex,
+                        props = {
+                            autoSize = false,
+                            relativeSize = util.vector2(1, 0),
+                            size = util.vector2(0, 32),
+                            horizontal = true,
+                            arrange = ui.ALIGNMENT.Center,
+                            align = ui.ALIGNMENT.Center,
+                        },
+                        content = ui.content {
+                            {
+                                template = I.MWUI.templates.textNormal,
+                                props = {
+                                    text = tostring(level),
+                                    textSize = 16,
+                                    textColor = Editor.uiColors.DEFAULT,
+                                }
+                            },
+                            createPaddingTemplate(8),
+                            {
+                                template = I.MWUI.templates.borders,
+                                props = {
+                                    autoSize = false,
+                                    relativeSize = util.vector2(0.8, 0),
+                                    size = util.vector2(0, 32),
+                                },
+                                content = ui.content {
+                                    {
+                                        type = ui.TYPE.Image,
+                                        props = {
+                                            resource = ui.texture {
+                                                path = 'textures/Bardcraft/ui/xpbar.dds',
+                                            },
+                                            tileH = true,
+                                            tileV = false,
+                                            relativeSize = util.vector2(progress, 1),
+                                        }
+                                    },
+                                    maxLevel and {
+                                        template = I.MWUI.templates.textNormal,
+                                        props = {
+                                            text = 'Max Level!',
+                                            textColor = Editor.uiColors.DEFAULT_LIGHT,
+                                            anchor = util.vector2(0.5, 0.5),
+                                            relativePosition = util.vector2(0.5, 0.5),
+                                            relativeSize = util.vector2(0, 1),
+                                            textAlignV = ui.ALIGNMENT.Center,
+                                        }
+                                    } or {},
+                                }
+                            },
+                            createPaddingTemplate(8),
+                            {
+                                template = I.MWUI.templates.textNormal,
+                                props = {
+                                    text = maxLevel and '--' or (tostring(level + 1)),
+                                    textColor = Editor.uiColors.DEFAULT,
+                                }
+                            },
+                        }
+                    },
+                    createPaddingTemplate(4),
+                    not maxLevel and {
+                        template = I.MWUI.templates.textNormal,
+                        props = {
+                            text = (util.round(xp) .. '/' .. util.round(req) .. ' (' .. util.round(progress * 100) .. '%) to next level'),
+                            textColor = Editor.uiColors.DEFAULT,
+                        }
+                    } or {},
+                    createPaddingTemplate(4),
+                }
             },
         }
     })
@@ -3715,7 +3816,7 @@ local function tickPlayback(dt)
             --     stopSounds(instrument)
             -- end
             if velocity > 0 and Editor.partsPlaying[part] then
-                ambient.playSoundFile(filePath, { volume = velocity / 127 })
+                ambient.playSoundFile(filePath, { volume = velocity / 127 * profile.volume })
             end
         end, 
         function(filePath, instrument)
@@ -3751,7 +3852,7 @@ end
 
 function Editor:createUI()
     self:destroyUI()
-    local wrapper = uiTemplates.wrapper
+    local wrapper = uiTemplates.wrapper()
     screenSize = ui.screenSize()
     self.windowXOff = self.state == self.STATE.SONG and 20 or (screenSize.x * 1 / 3)
     wrapper.content[1].props.size = util.vector2(screenSize.x-Editor.windowXOff, screenSize.y - Editor.windowYOff)

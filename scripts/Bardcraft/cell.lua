@@ -65,9 +65,9 @@ function C.canPerformHere(cell, type)
             end
         end
         return nil
-    elseif type == Song.PerformanceType.Practice then
+    elseif (type == Song.PerformanceType.Practice or type == Song.PerformanceType.Ambient) then
         if not C.canPerformHere(cell, Song.PerformanceType.Tavern) then
-            return Song.PerformanceType.Practice
+            return type
         else
             return nil
         end

@@ -13,7 +13,7 @@ midiData:
     startUnlocked: true
   vivecnights.mid:
     title: Little Vivec Nights
-    description: A cheerful ascending waltz typically taught to Dunmer children as a lullaby, but also serviceable as a tavern jig when played uptempo.
+    description: A cheerful ascending waltz typically taught to Dunmer children as a lullaby, but serviceable enough as a tavern jig when played uptempo.
     loopBars:
       - 0
       - 16
@@ -38,7 +38,7 @@ midiData:
     startUnlocked: true
   bwv997-adv.mid:
     title: The Guar - Adv.
-    description: "The Guar and the Scrib's lute steals the show in this advanced solo arrangement, carrying both melody and chords at a quicker pace. A nostalgic romp for skilled lutists looking to return to their roots."
+    description: The Guar and the Scrib's lute steals the show in this advanced solo arrangement, carrying both melody and chords at a quicker pace. A nostalgic romp for skilled lutists looking to return to their roots.
     scale:
       root: A
       mode: Minor
@@ -57,7 +57,20 @@ midiData:
     loopCount: 1
     scale:
       root: C
+      mode: Minor
+    texture: tavern
+    startUnlocked: true # false
+  imp1.mid:
+    title: Courting the Alewife
+    description: Not quite a waltz nor a jig, this spirited Imperial dance could equally satisfy a Nibenese court and a tavern full of drunken Dunmer. A favorite of the Bards' College of Cyrodiil, which uses it to train intermediate lutists and ocarinists in counterpoint.
+    loopBars:
+      - 0
+      - 24
+    loopCount: 0
+    scale:
+      root: E
       mode: Major
+    tempoMod: 0.5
     texture: tavern
     startUnlocked: true # false
   moonsong.mid:
@@ -84,18 +97,11 @@ midiData:
     tempoMod: 0.5
     texture: ashlander
     startUnlocked: true # false
-  estampie1.mid:
-    title: Estampie
-    scale:
-      root: G
-      mode: Major
-    loopCount: 0
-    texture: tavern
-    startUnlocked: true # false
 
 sheetMusicMappings:
   generic:
     - greensleeves.mid
+    - imp1.mid
   expensive:
     - bwv997-adv.mid
   elsweyr:

@@ -16,9 +16,13 @@ clap1.wav: Crowd Clap.wav by GB01 -- https://freesound.org/s/177083/ -- License:
 clap2.wav: small crowd cheering and clapping 2.wav by Tomlija -- https://freesound.org/s/99633/ -- License: Attribution 3.0
 clap3.wav: MORECLAPS.aif by nickrave -- https://freesound.org/s/245639/ -- License: Creative Commons 0
 clap4.wav: Applause Small Crowd 2 by qubodup -- https://freesound.org/s/169943/ -- License: Attribution 4.0
+clap-polite.wav: Light, slow uncomfortable clapping by TurboFool -- https://freesound.org/s/561020/ -- License: Creative Commons 0
 hurl.wav: Hurling.mp3 by SnowFightStudios -- https://freesound.org/s/643654/ -- License: Creative Commons 0
 cough1.wav: Cough1_Mono.wav by johncanyon -- https://freesound.org/s/645991/ -- License: Creative Commons 0
 cough2.wav: Cough by Duisterwho -- https://freesound.org/s/638581/ -- License: Creative Commons 0
+coin-one.wav: Coin Dropped by kermite607 -- https://freesound.org/s/368203/ -- License: Creative Commons 0
+coin-few.wav: coins-falling-022.wav by Gerent -- https://freesound.org/s/558991/ -- License: Creative Commons 0
+coin-many.wav: Coin Drop by Universfield -- https://freesound.org/s/750240/ -- License: Attribution 4.0
 
 
 MIDI FILES:

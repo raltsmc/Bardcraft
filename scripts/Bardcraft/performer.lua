@@ -23,11 +23,18 @@ P.stats = {
     performanceSkill = {
         level = 1,
         xp = 0,
+        req = 10,
     },
     reputation = 0,
     bannedVenues = {},
     performedVenuesToday = {},
     practiceEfficiency = 1.0,
+    performanceCount = {
+        [Song.PerformanceType.Tavern] = 0,
+        [Song.PerformanceType.Street] = 0,
+        [Song.PerformanceType.Practice] = 0,
+    },
+    performanceLogs = {},
 }
 
 function P:onSave()
@@ -62,7 +69,7 @@ function P:onUpdate(dt)
     local sendInfo = false
     if lastDay and currentDay ~= lastDay then
         self.stats.performedVenuesToday = {}
-        self.stats.practiceEfficiency = util.clamp(math.pow(self.stats.practiceEfficiency, 0.15), 0.25, 1)
+        self.stats.practiceEfficiency = util.clamp(math.pow(self.stats.practiceEfficiency, 0.2), 0.25, 1)
         sendInfo = true
     end
     lastUpdate = currentTime
@@ -83,7 +90,7 @@ function P:onUpdate(dt)
 end
 
 function P:getPerformanceXPRequired()
-    return (self.stats.performanceSkill.level + 1) * (10 + math.floor(self.stats.performanceSkill.level / 10) * 3)
+    return self.stats.performanceSkill.level * (10 + math.floor(self.stats.performanceSkill.level / 10) * 3)
 end
 
 function P:getPerformanceProgress()
@@ -111,6 +118,7 @@ function P:addPerformanceXP(xp)
     if leveledUp then
         self:sendPerformerInfo()
     end
+    self.stats.performanceSkill.req = self:getPerformanceXPRequired()
     return levelGain
 end
 
@@ -197,7 +205,7 @@ local function getXpMult(type)
     elseif type == Song.PerformanceType.Practice then
         return 1.0 * P.stats.practiceEfficiency
     end
-    return 1.0
+    return 0.0
 end
 
 local easyDensity = 1.0
@@ -244,33 +252,33 @@ function P.resyncAnim(animKey)
 end
 
 function P.handleMovement(dt, idleAnim)
-    if not P.playing then return false end
-    if idleAnim == nil then
-        idleAnim = 'idle'
-    end
-    local lowerBodyAnim = anim.getActiveGroup(omwself, anim.BONE_GROUP.LowerBody)
-    local isMoving = lowerBodyAnim and (lowerBodyAnim:find('walk') or lowerBodyAnim:find('run') or lowerBodyAnim:find('sneak') or lowerBodyAnim:find('turn'))
-    if P.wasMoving and not isMoving then
-        I.AnimationController.playBlendedAnimation(idleAnim, { 
-            loops = 1000000000,
-            priority = {
-                [anim.BONE_GROUP.LeftArm] = 0,
-                [anim.BONE_GROUP.RightArm] = 0,
-                [anim.BONE_GROUP.Torso] = 0,
-                [anim.BONE_GROUP.LowerBody] = anim.PRIORITY.Scripted
-            },
-            blendMask = anim.BLEND_MASK.LowerBody
-        })
-        P.idleTimer = 0.25
-    elseif P.idleTimer and P.idleTimer > 0 then
-        P.idleTimer = P.idleTimer - dt
-        if P.idleTimer <= 0 then
-            anim.cancel(omwself, idleAnim)
-            P.idleTimer = nil
-        end
-    end
+    -- if not P.playing then return false end
+    -- if idleAnim == nil then
+    --     idleAnim = 'idle'
+    -- end
+    -- local lowerBodyAnim = anim.getActiveGroup(omwself, anim.BONE_GROUP.LowerBody)
+    -- local isMoving = lowerBodyAnim and (lowerBodyAnim:find('walk') or lowerBodyAnim:find('run') or lowerBodyAnim:find('sneak') or lowerBodyAnim:find('turn'))
+    -- if P.wasMoving and not isMoving then
+    --     I.AnimationController.playBlendedAnimation(idleAnim, { 
+    --         loops = 1000000000,
+    --         priority = {
+    --             [anim.BONE_GROUP.LeftArm] = 0,
+    --             [anim.BONE_GROUP.RightArm] = 0,
+    --             [anim.BONE_GROUP.Torso] = 0,
+    --             [anim.BONE_GROUP.LowerBody] = anim.PRIORITY.Scripted
+    --         },
+    --         blendMask = anim.BLEND_MASK.LowerBody
+    --     })
+    --     P.idleTimer = 0.25
+    -- elseif P.idleTimer and P.idleTimer > 0 then
+    --     P.idleTimer = P.idleTimer - dt
+    --     if P.idleTimer <= 0 then
+    --         anim.cancel(omwself, idleAnim)
+    --         P.idleTimer = nil
+    --     end
+    -- end
 
-    P.wasMoving = isMoving
+    -- P.wasMoving = isMoving
 end
 
 function P.resetVfx()
@@ -358,6 +366,12 @@ function P.handleStopEvent(data)
     P.instrument = nil
     omwself.enableAI(omwself, true)
 
+    if P.performanceType == Song.PerformanceType.Ambient then 
+        P.currentSong = nil
+        P.currentPart = nil
+        return 
+    end
+
     local successCount = 0
     for _, success in ipairs(P.overallNoteEvents) do
         if success then
@@ -373,12 +387,19 @@ function P.handleStopEvent(data)
     if omwself.type == types.Player then
         if P.performanceType == Song.PerformanceType.Practice then
             mod = mod * P.stats.practiceEfficiency
-            P.stats.practiceEfficiency = util.clamp(P.stats.practiceEfficiency * 0.9, 0.25, 1)
+            local practiceMod = math.pow(0.9, (#P.overallNoteEvents / 200))
+            P.stats.practiceEfficiency = util.clamp(P.stats.practiceEfficiency * practiceMod, 0.125, 1)
             omwself:sendEvent('BC_PracticeEfficiency', { efficiency = P.stats.practiceEfficiency })
         elseif P.performanceType == Song.PerformanceType.Tavern then
-            P.stats.performedVenuesToday[data.cell] = true
+            local gameTime = core.getGameTime()
+            local timeOfDay = gameTime % time.day
+            local isEvening = timeOfDay >= 18 * time.hour
+            if isEvening then
+                P.stats.performedVenuesToday[data.cell] = true
+            end
         end
     end
+    P.stats.performanceCount[P.performanceType] = P.stats.performanceCount[P.performanceType] + 1
     P:modSongConfidence(P.currentSong.id, P.currentPart.index, mod)
     if omwself.type == types.Player then
         omwself:sendEvent('BC_GainConfidence', { songTitle = P.currentSong.title, partTitle = P.currentPart.title, oldConfidence = oldConfidence, newConfidence = P.stats.knownSongs[P.currentSong.id].partConfidences[P.currentPart.index] })
@@ -392,8 +413,8 @@ end
 function P.getNoteAccuracy()
     local density = P.currentDensity
 
-    local difficultyFactor = util.clamp((density - easyDensity) / (hardDensity - easyDensity), 0, 1)
-    local accuracy = math.pow(P.stats.performanceSkill.level / 100, 1/2) * 1.1 - (difficultyFactor * 0.5) + (math.pow(P.currentConfidence, 1/2) * 0.5)
+    local difficultyFactor = util.clamp((density - easyDensity) / (hardDensity - easyDensity), 0, 1) - 0.2
+    local accuracy = math.pow(P.stats.performanceSkill.level / 100, 1/2) * 1.1 - (difficultyFactor * 0.6) + (math.pow(P.currentConfidence, 1/2) * 0.5)
 
     return util.clamp(accuracy, 0, 1)
 end
@@ -444,22 +465,25 @@ function P.handleNoteEvent(data)
         end
         local avgInterval = totalInterval / totalWeight
         P.currentDensity = 1 / avgInterval
-        print('Performer density: ' .. P.currentDensity)
     end
     P.lastNoteTime = data.time
     local success = P.playNote(data.note, data.velocity)
-    if success then
-        local gain = (P.maxConfidence - P.currentConfidence) / P.maxConfidence * 0.04
-        P.currentConfidence = math.min(P.currentConfidence + gain, P.maxConfidence)
-        local xp = 1 * getXpMult(P.performanceType) / intervalBase
-        P.levelGain = P.levelGain + P:addPerformanceXP(xp)
-        P.xpGain = P.xpGain + xp
+    if P.performanceType ~= Song.PerformanceType.Ambient then
+        if success then
+            local gain = (P.maxConfidence - P.currentConfidence) / P.maxConfidence * 0.04
+            P.currentConfidence = math.min(P.currentConfidence + gain, P.maxConfidence)
+            local xp = 1 * getXpMult(P.performanceType) / intervalBase
+            P.levelGain = P.levelGain + P:addPerformanceXP(xp)
+            P.xpGain = P.xpGain + xp
+        else
+            local loss = P.currentConfidence / P.maxConfidence * 0.04
+            P.currentConfidence = math.max(P.currentConfidence - loss, 0)
+        end
+        table.insert(P.overallNoteEvents, success)
+        core.sendGlobalEvent('BC_PerformerNoteHandled', { success = success, part = P.currentPart, mod = 1 / intervalBase * weight })
     else
-        local loss = P.currentConfidence / P.maxConfidence * 0.04
-        P.currentConfidence = math.max(P.currentConfidence - loss, 0)
+        P.currentConfidence = P.maxConfidence
     end
-    table.insert(P.overallNoteEvents, success)
-    core.sendGlobalEvent('BC_PerformerNoteHandled', { success = success, part = P.currentPart, mod = 1 / intervalBase * weight })
     return success
 end
 

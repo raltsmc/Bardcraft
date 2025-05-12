@@ -49,7 +49,7 @@ local instrumentProfiles = {
         transpose = true,
         polyphonic = false,
         densityMod = 0.9,
-        volume = 1,
+        volume = 2,
     },
     [116] = {
         name = "Drum",
@@ -185,7 +185,8 @@ Song.PerformanceType = {
     Tavern = 1,
     Street = 2,
     Practice = 3,
-    NPCTeaching = 4,
+    Ambient = 4,
+    NPCTeaching = 5,
 }
 
 Song.playbackTickPrev = 0
@@ -237,25 +238,27 @@ function Song:noteEventsToNoteMap(noteEvents)
     for _, event in ipairs(noteEvents) do
         if event.type == 'noteOn' and event.velocity > 0 then
             local key = event.note .. '_' .. event.part
-            activeNotes[key] = {
+            activeNotes[key] = activeNotes[key] or {}
+            table.insert(activeNotes[key], {
                 start = event.time,
                 velocity = event.velocity,
-            }
+                id = event.id,
+            })
         elseif (event.type == 'noteOff') or (event.type == 'noteOn' and event.velocity == 0) then
             local key = event.note .. '_' .. event.part
-            if activeNotes[key] then
-                local duration = event.time - activeNotes[key].start
+            if activeNotes[key] and #activeNotes[key] > 0 then
+                local noteStart = table.remove(activeNotes[key], 1)
+                local duration = event.time - noteStart.start
                 if duration > 0 then
                     local noteData = {
-                        id = event.id,
+                        id = noteStart.id,
                         note = event.note,
-                        velocity = activeNotes[key].velocity,
+                        velocity = noteStart.velocity,
                         part = event.part,
-                        time = activeNotes[key].start,
+                        time = noteStart.start,
                         duration = duration,
                     }
                     map[noteData.id] = noteData
-                    activeNotes[key] = nil
                     self.noteIdCounter = math.max(self.noteIdCounter, noteData.id + 1)
                 end
             end

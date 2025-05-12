@@ -329,10 +329,17 @@ local function startTrespassTimer()
     ui.showMessage(l10n('UI_Msg_Warn_Trespass'))
 end
 
+local function setPerformerInfo()
+    performersInfo[self.id] = Performer.stats
+    Editor.performersInfo = performersInfo
+end
+
 return {
     engineHandlers = {
         onInit = function()
             Editor:init()
+            populateKnownSongs()
+            setPerformerInfo()
         end,
         onLoad = function(data)
             Performer:onLoad(data)
@@ -343,6 +350,7 @@ return {
             if data.BC_PerformersInfo then
                 performersInfo = data.BC_PerformersInfo
             end
+            setPerformerInfo()
         end,
         onSave = function()
             local data = Performer:onSave()
@@ -371,6 +379,8 @@ return {
                 if not currentCell or currentCell ~= self.cell then
                     currentCell = self.cell
 
+                    core.sendGlobalEvent('BC_RecheckCell', { player = self, })
+
                     local banEndTime = Performer.stats.bannedVenues[currentCell.name]
                     if banEndTime and core.getGameTime() < banEndTime then
                         -- Player is in a banned venue
@@ -394,6 +404,7 @@ return {
                 if input.isAltPressed() then
                     togglePracticeOverlay()
                 else
+                    setPerformerInfo()
                     Editor:onToggle()
                 end
             elseif e.symbol == 'n' then
@@ -401,6 +412,19 @@ return {
             elseif Editor.active and e.code == input.KEY.Space then
                 Editor:togglePlayback(input.isCtrlPressed())
             end
+        end,
+        onConsoleCommand = function(mode, command)
+            -- Parse into tokens
+            local tokens = {}
+            for token in command:gmatch('%S+') do
+                table.insert(tokens, token)
+            end
+            if string.lower(tokens[1]) ~= 'luabclevel' then return end
+            if not tonumber(tokens[2]) then return end
+            Performer.stats.performanceSkill.level = util.clamp(tonumber(tokens[2]), 1, 100)
+            Performer.stats.performanceSkill.xp = 0
+            Performer.stats.performanceSkill.req = Performer:getPerformanceXPRequired()
+            ui.showMessage('DEBUG: Set Bardcraft level to ' .. Performer.stats.performanceSkill.level)
         end,
         onMouseWheel = function(v, h)
             Editor:onMouseWheel(v, h)
@@ -572,8 +596,17 @@ return {
             elseif data.type == 'Gold' then
                 local message = data.message:gsub('%%{amount}', data.amount)
                 ui.showMessage(message)
-                ambient.playSoundFile('sound\\Fx\\item\\money.wav')
+                ambient.playSoundFile(data.sound)
+            elseif data.type == 'Flavor' then
+                ui.showMessage(data.message)
             end
+        end,
+        BC_SpeechcraftXP = function(data)
+            local options = {
+                skillGain = data.amount,
+                useType = I.SkillProgression.SKILL_USE_TYPES.Speechcraft_Success,
+            }
+            I.SkillProgression.skillUsed('speechcraft', options)
         end,
         BC_PerformanceLog = function(data)
             data.oldRep = Performer.stats.reputation
@@ -583,6 +616,24 @@ return {
                 data.banEndTime = banFromVenue(data.cell, data.gameTime, 1)
             end
             Editor:showPerformanceLog(data)
+
+            if data.type == Song.PerformanceType.Tavern then
+                local crowdSound
+                if data.quality >= 90 and data.density > 4 then
+                    crowdSound = 'clap1.wav'
+                elseif data.quality >= 70 then
+                    crowdSound = 'clap3.wav'
+                elseif data.quality >= 50 then
+                    crowdSound = 'clap-polite.wav'
+                elseif data.quality < 30 then
+                    crowdSound = 'boo' .. math.random(1, 4) .. '.wav'
+                end
+
+                if crowdSound then
+                    ambient.playSoundFile('sound\\Bardcraft\\crowd\\' .. crowdSound)
+                end
+            end
+            table.insert(Performer.stats.performanceLogs, data)
         end,
         BC_StartPerformanceSuccess = function()
             Editor:onToggle()
@@ -602,6 +653,7 @@ return {
                 local book = data.arg
                 local id = book.recordId
                 local suffix = id:match("_(%w+)$")
+                if not suffix then return end
                 local prefix = id:sub(1, -#suffix - 2)
                 if prefix ~= '_rlts_bc_sheetmusic' then return end
 

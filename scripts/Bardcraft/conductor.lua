@@ -32,6 +32,8 @@ local performanceEvalInterval = 1.0 -- seconds
 local performanceRandomEventInterval = { 3.0, 5.0 }
 local performanceRandomEventTimer = performanceRandomEventInterval[1]
 
+local logAwait = nil
+
 local function resyncActor(performer)
     local part = performer.part
     local instrumentName = Song.getInstrumentProfile(part.instrument).name
@@ -72,8 +74,6 @@ local function start(data)
 
     resyncAllActors()
 end
-
-local logAwait = nil
 
 local function payPlayer(player, gold, message, sfx)
     if gold > 0 then
@@ -145,7 +145,7 @@ local function getBasePayAmount()
         local payment = 0
         local statSumFactor = getStatFactor()
         local qualityFactor = getQualityFactor(statSumFactor)
-        local impressivenessFactor = getImpressivenessFactor()
+        local impressivenessFactor = math.pow(getImpressivenessFactor(), 1.5)
         local payScale = math.max(0, 1 + statSumFactor)
         local timeScale = math.min(performance.time / 60, 3)
         -- Base: A maximum impressiveness song (density > 8) with a 100% quality should reward 250 gold
@@ -536,7 +536,7 @@ local function doRandomEvent()
 
     local statFactor = getStatFactor()
     local qualityFactor = getQualityFactor(statFactor)
-    local perfFactor = (qualityFactor - 0.5) * (getImpressivenessFactor() + 0.5)
+    local perfFactor = (qualityFactor - 0.5) * (math.pow(getImpressivenessFactor(), 1.5) + 0.5)
     if performance.type == Song.PerformanceType.Street then
         tipChance = 0.25
         tipAmount = 0.25
@@ -755,6 +755,7 @@ return {
 
                 local perfList = data.performers
                 local activeActors = world.activeActors
+                local playerItem = nil
                 for i, performer in ipairs(data.performers) do
                     for _, actor in ipairs(activeActors) do
                         if actor.id == performer.actorId then
@@ -780,15 +781,22 @@ return {
                                     :gsub('%%{instrument_indef}', l10n('UI_Msg_' .. instrument .. '_Indef')) })
                         return
                     end
+                    if performer.actorId == player.id then
+                        playerItem = perfList[i].item
+                    end
                 end
                 performers = perfList
                 song:resetPlayback()
                 start(data)
 
-                player:sendEvent('BC_StartPerformanceSuccess')
+                player:sendEvent('BC_StartPerformanceSuccess', { item = playerItem and playerItem.recordId or nil, })
             else
                 stop()
             end
+        end,
+        BO_StopPerformance = function(data)
+            if not playing then return end
+            stop()
         end,
         BC_RecheckCell = function(data)
             if not playing then return end

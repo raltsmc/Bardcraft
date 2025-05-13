@@ -61,6 +61,12 @@ Where to Buy Instruments
 -- Vivec, St. Delyn: Mevel Fererus (Plaza)
 -- Vivec, St. Delyn: Tervur Braven (Plaza)
 
+============================
+Where to Buy Other Supplies
+============================
+- All vanilla booksellers will carry some blank sheet music and songbooks (restocking every few months).
+- Arrille in Seyda Neen will always carry a lute and a restocking beginner songbook.
+
 =============
 Installation
 =============

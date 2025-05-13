@@ -24,6 +24,7 @@ Editor.STATE = {
     PERFORMANCE = 0,
     SONG = 1,
     STATS = 2,
+    MODAL = 3,
 }
 
 Editor.ZOOM_LEVELS = {
@@ -266,6 +267,8 @@ local wrapperElement = nil
 local modalElement = nil
 local screenSize = nil
 local playingNoteSound = nil
+
+local onModalDecline = nil
 
 local scrollableFocused = nil
 
@@ -1319,7 +1322,7 @@ uiTemplates = {
                 },
             },
             events = {
-                mouseClick = async:callback(function()
+                mousePress = async:callback(function()
                     if callback then
                         callback()
                     end
@@ -1757,6 +1760,57 @@ uiTemplates = {
             },
             util.vector2(300, 150),
             "Confirmation"
+        )
+    end,
+    choiceModal = function(title, choices)
+        return uiTemplates.modal(
+            {
+                type = ui.TYPE.Flex,
+                props = {
+                    autoSize = false,
+                    relativeSize = util.vector2(1, 1),
+                    arrange = ui.ALIGNMENT.Center,
+                },
+                content = ui.content {
+                    createPaddingTemplate(16),
+                    {
+                        template = I.MWUI.templates.textNormal,
+                        props = {
+                            text = title or "Choose an option:",
+                            textAlignH = ui.ALIGNMENT.Center,
+                        },
+                    },
+                    createPaddingTemplate(16),
+                    {
+                        type = ui.TYPE.Flex,
+                        props = {
+                            horizontal = false,
+                            autoSize = false,
+                            relativeSize = util.vector2(1, 0),
+                            align = ui.ALIGNMENT.Center,
+                        },
+                        content = (function()
+                            local buttons = {}
+                            for _, choice in ipairs(choices) do
+                                table.insert(buttons, uiTemplates.button(choice.text, util.vector2(200, 32), function()
+                                    if choice.callback then
+                                        choice.callback()
+                                    end
+                                    if modalElement then
+                                        modalElement:destroy()
+                                        modalElement = nil
+                                    end
+                                end))
+                                table.insert(buttons, createPaddingTemplate(8))
+                            end
+                            return buttons
+                        end)(),
+                    },
+                    createPaddingTemplate(16),
+                },
+            },
+            util.vector2(300, 200),
+            title or "Choice"
         )
     end,
 }
@@ -3872,6 +3926,10 @@ function Editor:destroyUI()
     logShowing = false
 end
 
+function Editor:closeUI()
+    I.UI.removeMode(I.UI.MODE.Interface)
+end
+
 function Editor:onToggle()
     if self.active then
         self:destroyUI()
@@ -3986,6 +4044,103 @@ function Editor:init()
     self.state = self.STATE.PERFORMANCE
     self.song = nil
     self.noteMap = nil
+end
+
+function Editor:playerConfirmModal(player, onYes, onNo)
+    self:destroyUI()
+    core.sendGlobalEvent('Pause', 'BO_Editor')
+    I.UI.setMode(I.UI.MODE.Interface, {windows = {}})
+    modalElement = ui.create(uiTemplates.modal(
+        {
+            type = ui.TYPE.Flex,
+            props = {
+                autoSize = false,
+                relativeSize = util.vector2(1, 1),
+                arrange = ui.ALIGNMENT.Center,
+            },
+            content = ui.content {
+                createPaddingTemplate(16),
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = "Stop performing?",
+                        textAlignH = ui.ALIGNMENT.Center,
+                    },
+                },
+                createPaddingTemplate(16),
+                {
+                    type = ui.TYPE.Flex,
+                    props = {
+                        horizontal = true,
+                        autoSize = false,
+                        relativeSize = util.vector2(1, 0),
+                        size = util.vector2(0, 32),
+                        align = ui.ALIGNMENT.Center,
+                    },
+                    content = ui.content {
+                        uiTemplates.button("Yes", util.vector2(128, 32), function()
+                            if onYes then onYes() end
+                            self:closeUI()
+                        end),
+                        {
+                            template = I.MWUI.templates.interval,
+                        },
+                        uiTemplates.button("No", util.vector2(128, 32), function()
+                            if onNo then onNo() end
+                            self:closeUI()
+                        end),
+                    },
+                },
+                createPaddingTemplate(16),
+            },
+        },
+        util.vector2(300, 150),
+        "Confirmation"
+    ))
+end
+
+function Editor:playerChoiceModal(player, title, choices)
+    self:destroyUI()
+    core.sendGlobalEvent('Pause', 'BO_Editor')
+    I.UI.setMode(I.UI.MODE.Interface, {windows = {}})
+    modalElement = ui.create(uiTemplates.modal(
+        {
+            type = ui.TYPE.Flex,
+            props = {
+                autoSize = false,
+                relativeSize = util.vector2(1, 1),
+                arrange = ui.ALIGNMENT.Center,
+            },
+            content = ui.content {
+                createPaddingTemplate(16),
+                {
+                    type = ui.TYPE.Flex,
+                    props = {
+                        horizontal = false,
+                        autoSize = false,
+                        relativeSize = util.vector2(1, 1),
+                        arrange = ui.ALIGNMENT.Center,
+                    },
+                    content = (function()
+                        local buttons = {}
+                        for _, choice in ipairs(choices) do
+                            table.insert(buttons, uiTemplates.button(choice.text, util.vector2(200, 32), function()
+                                if choice.callback then
+                                    choice.callback()
+                                end
+                                self:closeUI()
+                            end))
+                            table.insert(buttons, createPaddingTemplate(8))
+                        end
+                        return ui.content(buttons)
+                    end)(),
+                },
+                createPaddingTemplate(16),
+            },
+        },
+        util.vector2(400, 160),
+        title--"Choice"
+    ))
 end
 
 return Editor

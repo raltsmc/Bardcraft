@@ -41,11 +41,6 @@ end
 
 return {
     engineHandlers = {
-        onInit = function()
-            core.sendGlobalEvent('BC_ParseMidis')
-            parseAllCustom()
-            --storage.playerSection('Bardcraft'):set('songs/custom', nil) -- Clear the old data
-        end,
         onLoad = function()
             core.sendGlobalEvent('BC_ParseMidis')
             parseAllCustom()

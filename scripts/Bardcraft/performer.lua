@@ -288,8 +288,8 @@ function P.resetVfx()
     end
     local modelName = P.instrumentItem.model
     -- Convert to our vfx directory path
-    local modelName = modelName:match("([^/]+)$")
-    modelName = 'meshes/bardcraft/vfx/' .. modelName
+    modelName = modelName:match("([^/]+)$")
+    modelName = 'meshes/bardcraft/vfx/play/' .. modelName
     if instrumentData[P.instrument] then
         anim.removeVfx(omwself, 'BO_Instrument')
         anim.addVfx(omwself, modelName, {

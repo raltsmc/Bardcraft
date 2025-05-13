@@ -1,17 +1,10 @@
 ConfigCategoryKeybinds: "Keybinds"
-ConfigCategoryOptions: "Options"
-ConfigCategoryTechnical: "Technical"
-ConfigCategoryTechnicalDesc: "Tweak various values to your liking."
+ConfigCategoryPlayerOptions: "Player Options"
+ConfigCategoryGlobalOptions: "Global Options"
 ConfigTitle: "Bardcraft"
 ConfigSummary: "Adds a deep musical performance system, with custom songwriting using a piano roll interface.\n--- v%{version} ---"
 ConfigAmbientMusic: "Silence ambient music"
 ConfigAmbientMusicDesc: "Background music will be silenced during a performance."
-ConfigNearbyNpcsDance: "Nearby NPCs dance"
-ConfigNearbyNpcsDanceDesc: "Nearby NPCs will dance during a performance."
-ConfigDanceTimingVariation: "Vary dance timing"
-ConfigDanceTimingVariationDesc: "Dance animations will be offset randomly for each NPC."
-ConfigNpcDanceDistance: "NPC dance distance"
-ConfigNpcDanceDistanceDesc: "The distance in which NPCs will dance during a performance.\n0 = no dance."
 
 Instr_Lute: "Lute"
 Instr_Drum: "Drum"
@@ -149,12 +142,15 @@ UI_LvlUp_Performance_10_UltraRare: "The bards of history are no longer your teac
 
 UI_Msg_PRoll_InsufficientBlanks: "You do not have enough blank sheet music!"
 
+UI_Msg_QuestReward_Ahemmusa: "Sinnammu Mirpal seems to have tucked a scroll of ancient music into your reward, a melody of her people."
+
 UI_Msg_Confidence_Up: "Your confidence in:\n%{songTitle}, %{partTitle}\nrose to %{confidence}%."
 UI_Msg_Confidence_Down: "Your confidence in:\n%{songTitle}, %{partTitle}\nfell to %{confidence}%."
 UI_Msg_Confidence_NoChange: "You gained no confidence from this performance."
 UI_Msg_PracticeEfficiency: "Your practice efficiency dropped to %{efficiency}%."
 UI_Msg_LearnSong_Success: "You learned a new song:\n%{songTitle}"
 UI_Msg_LearnSong_Fail: "You already know this song:\n%{songTitle}"
+UI_Msg_BookReadFail: "You have already learned all you can from this."
 UI_Msg_FinalizedDraft: "You wrote a new song:\n%{songTitle}"
 
 UI_Msg_PerfStartFail_NoPerformers: "You need at least one performer to start a performance."

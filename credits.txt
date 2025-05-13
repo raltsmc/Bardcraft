@@ -24,6 +24,13 @@ coin-one.wav: Coin Dropped by kermite607 -- https://freesound.org/s/368203/ -- L
 coin-few.wav: coins-falling-022.wav by Gerent -- https://freesound.org/s/558991/ -- License: Creative Commons 0
 coin-many.wav: Coin Drop by Universfield -- https://freesound.org/s/750240/ -- License: Attribution 4.0
 
+equip.wav: Sound Effect by freesound_community from Pixabay https://pixabay.com/sound-effects/item-equip-6904/ 
+
+musbox-start.wav: 
+    Wind_up_musicbox.wav by jobro -- https://freesound.org/s/172208/ -- License: Attribution 3.0
+    Winding Up a Music box by BM007 -- https://freesound.org/s/540958/ -- License: Attribution NonCommercial 3.0
+musbox-loop.wav:
+    Ratchet (ratchet2.wav) by sgossner -- https://freesound.org/s/375709/ -- License: Creative Commons 0
 
 MIDI FILES:
 (Any not listed are my original compositions)

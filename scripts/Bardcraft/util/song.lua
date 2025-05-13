@@ -501,6 +501,15 @@ function Song:lengthInSeconds()
     return self:ticksToSeconds(lengthInTicks)
 end
 
+function Song:lengthInSecondsWithLoops()
+    local lengthInTicks = self.lengthBars * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
+    local loopEnd = self:barToTick(self.loopBars[2])
+    if self.loopTimes > 0 then
+        lengthInTicks = lengthInTicks + (loopEnd - self:barToTick(self.loopBars[1])) * self.loopTimes
+    end
+    return self:ticksToSeconds(lengthInTicks)
+end
+
 function Song.noteNumberToName(noteNumber)
     local octave = math.floor(noteNumber / 12) - 1
     local noteName = Song.Note[(noteNumber % 12) + 1]

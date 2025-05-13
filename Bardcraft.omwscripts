@@ -4,4 +4,6 @@ GLOBAL: scripts/Bardcraft/settings/global.lua
 GLOBAL: scripts/Bardcraft/conductor.lua
 GLOBAL: scripts/Bardcraft/globalevents.lua
 PLAYER: scripts/Bardcraft/player.lua
+PLAYER: scripts/Bardcraft/questrewards.lua
 NPC: scripts/Bardcraft/npc.lua
+MISC_ITEM, ACTIVATOR: scripts/Bardcraft/musicbox.lua

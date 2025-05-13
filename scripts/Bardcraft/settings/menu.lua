@@ -150,3 +150,19 @@ I.Settings.registerGroup {
     settings = {
     },
 }
+I.Settings.registerGroup {
+	key = 'Settings/Bardcraft/2_PlayerOptions',
+	page = 'Bardcraft',
+	l10n = 'Bardcraft',
+	name = 'ConfigCategoryPlayerOptions',
+	permanentStorage = true,
+	settings = {
+        {
+            key = 'silenceAmbientMusic',
+            renderer = 'checkbox',
+            name = 'ConfigAmbientMusic',
+            description = 'ConfigAmbientMusicDesc',
+            default = true,
+        },
+	},
+}

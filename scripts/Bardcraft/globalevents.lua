@@ -7,6 +7,7 @@ local I = require('openmw.interfaces')
 
 local MIDI = require('scripts.Bardcraft.util.midi')
 local Song = require('scripts.Bardcraft.util.song').Song
+local Data = require('scripts.Bardcraft.data')
 
 local function parseAllPreset()
     local metadataPath = 'midi/preset/metadata.yaml'
@@ -48,9 +49,6 @@ local function parseAllPreset()
         table.insert(storedSongs, song)
     end
     bardData:set('songs/preset', storedSongs)
-    if metadata and metadata.sheetMusicMappings then
-        bardData:set('sheetmusic', metadata.sheetMusicMappings)
-    end
 
     local feedbackPath = 'scripts/Bardcraft/feedback.yaml'
     exists = vfs.fileExists(feedbackPath)
@@ -71,12 +69,44 @@ local function parseAllPreset()
     end
 end
 
+local mwscriptQueue = {}
+
+I.ItemUsage.addHandlerForType(types.Miscellaneous, function(item, actor)
+    if actor.type ~= types.Player then return true end
+    local record = item.type.record(item)
+    for instr, _ in pairs(Data.SheathableInstruments) do
+        for recordId, _ in pairs(Data.InstrumentItems[instr]) do
+            if record.id == recordId then
+                actor:sendEvent('BC_SheatheInstrument', { record = {
+                    id = record.id,
+                    model = record.model,
+                } })
+                return true
+            end
+        end
+    end
+    return true
+end)
+
 return {
     engineHandlers = {
         --onInit = parseAll,
+        onUpdate = function()
+            if #mwscriptQueue > 0 then
+                for _, data in ipairs(mwscriptQueue) do
+                    local item = data.object
+                    local mwscript = world.mwscript.getLocalScript(item)
+                    if mwscript then
+                        mwscript.variables.hasbeenplayed = data.hasBeenPlayed or 0
+                        mwscript.variables.songid = data.songId or 0
+                    end
+                end
+                mwscriptQueue = {}
+            end
+        end
     },
     eventHandlers = {
-        BC_ThrowItem = function(data)
+        BC_GiveItem = function(data)
             local item = world.createObject(data.item, data.count or 1)
             item:moveInto(types.Actor.inventory(data.actor))
         end,
@@ -90,6 +120,54 @@ return {
             I.Crimes.commitCrime(data.player, {
                 type = types.Player.OFFENSE_TYPE.Trespassing,
             })
+        end,
+        BC_BookRead = function(data)
+            local book = data.book
+            if book then
+                local mwscript = world.mwscript.getLocalScript(book)
+                if not mwscript or mwscript.recordId ~= '_bcsheetmusic' then 
+                    data.player:sendEvent('BC_BookReadResult', { id = book.recordId, success = true })
+                    return 
+                end
+                if not mwscript.variables.hasbeenread or mwscript.variables.hasbeenread == 0 then
+                    mwscript.variables.hasbeenread = 1
+                    data.player:sendEvent('BC_BookReadResult', { id = book.recordId, success = true })
+                else
+                    data.player:sendEvent('BC_BookReadResult', { success = false })
+                end
+            end
+        end,
+        BC_ReplaceMusicBox = function(data)
+            local object = data.object
+            if data.object.type ~= types.Miscellaneous then return end
+            if data.object.count < 1 then return end
+            if not object.cell then return end
+
+            local mwscript = world.mwscript.getLocalScript(object)
+            local hasBeenPlayed = mwscript.variables.hasbeenplayed or 0
+            local songId = mwscript.variables.songid or 0
+
+            local activatorId = object.recordId .. '_a'
+            local activator = world.createObject(activatorId, 1)
+            activator:teleport(object.cell, object.position, object.rotation)
+            activator:sendEvent('BC_MusicBoxInit', { hasBeenPlayed = hasBeenPlayed, songId = songId })
+            object:remove()
+        end,
+        BC_MusicBoxPickup = function(data)
+            local object = data.object
+            if object.type ~= types.Activator then return end
+
+            local itemId = object.recordId:sub(1, -3)
+            local item = world.createObject(itemId, 1)
+
+            table.insert(mwscriptQueue, {
+                object = item,
+                hasBeenPlayed = data.hasBeenPlayed or 0,
+                songId = data.songId or 0,
+            })
+
+            item:moveInto(types.Actor.inventory(data.actor))
+            object:remove()
         end,
     }
 }

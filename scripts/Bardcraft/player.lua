@@ -7,19 +7,22 @@ local camera = require('openmw.camera')
 local ui = require('openmw.ui')
 local auxUi = require('openmw_aux.ui')
 local ambient = require('openmw.ambient')
-local nearby = require('openmw.nearby')
 local util = require('openmw.util')
 local storage = require('openmw.storage')
 local async = require('openmw.async')
 local time = require('openmw_aux.time')
-local calendar = require('openmw_aux.calendar')
+local types = require('openmw.types')
 
 local l10n = core.l10n('Bardcraft')
 
 local Performer = require('scripts.Bardcraft.performer')
 local Editor = require('scripts.Bardcraft.editor')
 local Song = require('scripts.Bardcraft.util.song').Song
-local Feedback = require('scripts.Bardcraft.feedback')
+local Songbooks = require('scripts.Bardcraft.data').SongBooks
+local MusicBoxes = require('scripts.Bardcraft.data').MusicBoxes
+local SongIds = require('scripts.Bardcraft.data').SongIds
+
+local configPlayer = require('scripts.Bardcraft.config.player')
 
 local performersInfo = {}
 
@@ -48,7 +51,6 @@ end
 
 local function banFromVenue(cellName, startTime, days)
     if Performer.stats.bannedVenues[cellName] then
-        print('Already banned from ' .. cellName)
         return Performer.stats.bannedVenues[cellName]
     end
     local startDay = math.ceil(startTime / time.day)
@@ -103,6 +105,13 @@ local hurtOverlay = ui.create {
     },
 }
 local hurtAlpha = 0
+
+local backInstrument = nil
+local performInstrument = nil
+local lastCameraMode = nil
+local setVfxNextFrame = false
+local nearbyPlaying = false
+local nearbyPlayingTimer = 0
 
 local function getPracticeNoteMap()
     if not practiceSong then return {} end
@@ -334,6 +343,127 @@ local function setPerformerInfo()
     Editor.performersInfo = performersInfo
 end
 
+local function setSheathVfx()
+    anim.removeVfx(self, 'BC_BackInstrument')
+    if backInstrument and camera.getMode() ~= camera.MODE.FirstPerson and (not performInstrument or backInstrument.id ~= performInstrument.id) then
+        local modelName = backInstrument.model
+        modelName = 'meshes/bardcraft/vfx/sheathe/' .. modelName:match("([^/]+)$")
+        anim.addVfx(self, modelName, {
+            vfxId = 'BC_BackInstrument',
+            boneName = 'Bip01 BOInstrumentBack',
+            loop = true,
+            useAmbientLight = false,
+        })
+    end
+end
+
+local function verifySheathInstrument() -- Make sure the player still has the given item
+    if backInstrument then
+        local inventory = self.type.inventory(self)
+        if not inventory:find(backInstrument.id) then
+            backInstrument = nil
+        end
+    end
+    setSheathVfx()
+end
+
+local function verifyPerformInstrument()
+    if performInstrument then
+        local inventory = self.type.inventory(self)
+        if not inventory:find(performInstrument.id) then
+            performInstrument = nil
+            core.sendGlobalEvent('BO_StopPerformance')
+        end
+    end
+end
+
+local function confirmModal(onYes, onNo)
+    if Performer.playing then
+        Editor:playerConfirmModal(self, onYes, onNo)
+    end
+end
+
+local function onStanceChange(stance)
+    if not Performer.playing then return end
+    confirmModal(function()
+        core.sendGlobalEvent('BO_StopPerformance')
+        self.type.setStance(self, stance)
+    end,
+    function()
+        self.type.setStance(self, self.type.STANCE.Nothing)
+    end)
+    self.type.setStance(self, self.type.STANCE.Nothing)
+end
+
+input.registerTriggerHandler('ToggleWeapon', async:callback(function()
+    onStanceChange(self.type.STANCE.Weapon)
+end))
+
+input.registerTriggerHandler('ToggleSpell', async:callback(function()
+    onStanceChange(self.type.STANCE.Spell)
+end))
+
+input.registerActionHandler('Use', async:callback(function(e)
+    if e and not core.isWorldPaused() then
+        onStanceChange(self.type.STANCE.Weapon)
+    end
+end))
+
+local function silenceAmbientMusic()
+    if configPlayer.options.silenceAmbientMusic == true then
+        ambient.streamMusic("sound\\Bardcraft\\silence.opus", { fadeOut = 0.5 })
+    end
+end
+
+local function unsilenceAmbientMusic()
+    if configPlayer.options.silenceAmbientMusic == true then
+        ambient.stopMusic()
+    end
+end
+
+local function getRandomSong(pool)
+    -- Keep trying until we find a song that the player doesn't know, or we run out of choices
+    local availableChoices = {}
+
+    -- Create a copy of the choices array to safely modify it
+    for _, sourceFile in ipairs(pool) do
+        table.insert(availableChoices, sourceFile)
+    end
+
+    -- Try to find a song the player doesn't know yet
+    while #availableChoices > 0 do
+        local index = math.random(1, #availableChoices)
+        local sourceFile = availableChoices[index]
+        local candidateSong = getSongBySourceFile(sourceFile)
+        
+        if candidateSong and not Performer.stats.knownSongs[candidateSong.id] then
+            -- Found a song the player doesn't know
+            return candidateSong
+        end
+        
+        -- Remove this choice regardless of whether we found a usable song
+        table.remove(availableChoices, index)
+    end
+
+    -- If no unknown songs were found, pick a random valid song
+    if #pool > 0 then
+        local shuffledChoices = {}
+        for _, sourceFile in ipairs(pool) do
+            table.insert(shuffledChoices, sourceFile)
+        end
+        -- Shuffle the choices
+        for i = #shuffledChoices, 2, -1 do
+            local j = math.random(1, i)
+            shuffledChoices[i], shuffledChoices[j] = shuffledChoices[j], shuffledChoices[i]
+        end
+        -- Pick the first valid song from the shuffled list
+        for _, sourceFile in ipairs(shuffledChoices) do
+            local song = getSongBySourceFile(sourceFile)
+            if song then return song end
+        end
+    end
+end
+
 return {
     engineHandlers = {
         onInit = function()
@@ -342,6 +472,7 @@ return {
             setPerformerInfo()
         end,
         onLoad = function(data)
+            if not data then return end
             Performer:onLoad(data)
             populateKnownSongs()
             anim.removeAllVfx(self)
@@ -350,11 +481,16 @@ return {
             if data.BC_PerformersInfo then
                 performersInfo = data.BC_PerformersInfo
             end
+            if data.BC_BackInstrument then
+                backInstrument = data.BC_BackInstrument
+            end
+            setSheathVfx()
             setPerformerInfo()
         end,
         onSave = function()
             local data = Performer:onSave()
             data.BC_PerformersInfo = performersInfo
+            data.BC_BackInstrument = backInstrument
             return data
         end,
         onUpdate = function(dt)
@@ -398,14 +534,28 @@ return {
                     bannedVenueTrespassTimer = 0
                 end
             end
+
+            if nearbyPlayingTimer > 0 then
+                nearbyPlayingTimer = math.max(nearbyPlayingTimer - dt, 0)
+                if nearbyPlayingTimer <= 0 then
+                    nearbyPlaying = false
+                    unsilenceAmbientMusic()
+                end
+            else
+                nearbyPlaying = false
+            end
         end,
         onKeyPress = function(e)
             if e.symbol == 'b' then
                 if input.isAltPressed() then
                     togglePracticeOverlay()
-                else
+                elseif not Performer.playing then
                     setPerformerInfo()
                     Editor:onToggle()
+                else
+                    confirmModal(function()
+                        core.sendGlobalEvent('BO_StopPerformance')
+                    end)
                 end
             elseif e.symbol == 'n' then
                 Performer:addPerformanceXP(1000) -- debug
@@ -430,7 +580,16 @@ return {
             Editor:onMouseWheel(v, h)
         end,
         onFrame = function(dt)
-            Editor:onFrame(self)
+            if setVfxNextFrame then
+                setVfxNextFrame = false
+                setSheathVfx()
+            end
+            local camMode = camera.getMode()
+            if camMode ~= lastCameraMode then
+                lastCameraMode = camMode
+                setVfxNextFrame = true
+            end
+            Editor:onFrame()
             Performer:onFrame()
             if practiceOverlay and practiceSong then
                 practiceOverlayTick = practiceSong:secondsToTicks(Performer.musicTime)
@@ -531,8 +690,12 @@ return {
                 performancePart = data.part.index
                 setmetatable(practiceSong, Song)
                 createPracticeOverlay()
+                performInstrument = types.Miscellaneous.record(data.item)
+                silenceAmbientMusic()
             elseif data.type == 'PerformStop' then
                 destroyPracticeOverlay()
+                performInstrument = nil
+                unsilenceAmbientMusic()
             elseif data.type == 'NoteEvent' then
                 if practiceOverlay and practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]] then
                     local content = practiceOverlayNotesWrapper.layout.content[1].content
@@ -556,6 +719,7 @@ return {
                     end
                 end
             end
+            verifySheathInstrument()
         end,
         BC_GainPerformanceXP = function(data)
             if data.leveledUp then
@@ -635,8 +799,9 @@ return {
             end
             table.insert(Performer.stats.performanceLogs, data)
         end,
-        BC_StartPerformanceSuccess = function()
+        BC_StartPerformanceSuccess = function(data)
             Editor:onToggle()
+            self.type.setStance(self, self.type.STANCE.Nothing)
         end,
         BC_StartPerformanceFail = function(data)
             ui.showMessage(data.reason)
@@ -646,55 +811,26 @@ return {
             ui.showMessage(l10n('UI_Msg_FinalizedDraft'):gsub('%%{songTitle}', data.song.title))
             ambient.playSoundFile('sound\\Bardcraft\\finalize_draft.wav')
         end,
-        UiModeChanged = function(data)
-            if data.newMode == nil then
-                Editor:onUINil()
-            elseif data.newMode == 'Scroll' then
-                local book = data.arg
-                local id = book.recordId
-                local suffix = id:match("_(%w+)$")
-                if not suffix then return end
-                local prefix = id:sub(1, -#suffix - 2)
-                if prefix ~= '_rlts_bc_sheetmusic' then return end
+        BC_SheatheInstrument = function(data)
+            if backInstrument and backInstrument.id == data.record.id then
+                -- Remove the instrument from the back
+                backInstrument = nil
+            else
+                -- Add the instrument to the back
+                backInstrument = data.record
+            end
+            ambient.playSoundFile('sound\\Bardcraft\\equip.wav')
+            setSheathVfx()
+        end,
+        BC_BookReadResult = function(data)
+            if data.success then
+                local id = data.id
 
-                local bardData = storage.globalSection('Bardcraft')
-                local mappings = bardData:get('sheetmusic') or {}
-                local choices = mappings[suffix]
-                if not choices or #choices == 0 then return end
+                local songChoices = Songbooks[id]
+                if not songChoices or #songChoices == 0 then return end
                 
-                -- Keep trying until we find a song that the player doesn't know, or we run out of choices
-                local song = nil
+                local song = getRandomSong(songChoices)
                 local success = false
-                local availableChoices = {}
-
-                -- Create a copy of the choices array to safely modify it
-                for _, sourceFile in ipairs(choices) do
-                    table.insert(availableChoices, sourceFile)
-                end
-
-                -- Try to find a song the player doesn't know yet
-                while #availableChoices > 0 and not song do
-                    local index = math.random(1, #availableChoices)
-                    local sourceFile = availableChoices[index]
-                    local candidateSong = getSongBySourceFile(sourceFile)
-                    
-                    if candidateSong and not Performer.stats.knownSongs[candidateSong.id] then
-                        -- Found a song the player doesn't know
-                        song = candidateSong
-                    end
-                    
-                    -- Remove this choice regardless of whether we found a usable song
-                    table.remove(availableChoices, index)
-                end
-
-                -- If no unknown songs were found, just pick the first valid song
-                if not song and #choices > 0 then
-                    for _, sourceFile in ipairs(choices) do
-                        song = getSongBySourceFile(sourceFile)
-                        if song then break end
-                    end
-                end
-
                 success = song and Performer:teachSong(song) or false
 
                 if success then
@@ -703,8 +839,69 @@ return {
                 elseif song then
                     ui.showMessage(l10n('UI_Msg_LearnSong_Fail'):gsub('%%{songTitle}', song.title))
                 end
-
-                core.sendGlobalEvent('BC_ConsumeItem', { item = book })
+            else
+                ui.showMessage(l10n('UI_Msg_BookReadFail'))
+            end
+        end,
+        BC_MusicBoxActivate = function(data)
+            local object = data.object
+            Editor:playerChoiceModal(self, 'Music Box', {
+                {
+                    text = 'Toggle Playing',
+                    callback = function()
+                        local musicBoxPool = MusicBoxes[object.recordId]
+                        if not musicBoxPool or #musicBoxPool == 0 then return end
+                        -- Convert pool from IDs to sourcefiles
+                        local musicBoxPoolSourceFiles = {}
+                        for _, id in ipairs(musicBoxPool) do
+                            table.insert(musicBoxPoolSourceFiles, SongIds[id])
+                        end
+                        local song = getRandomSong(musicBoxPoolSourceFiles)
+                        object:sendEvent('BC_MusicBoxToggle', { actor = self, prefSong = song.sourceFile, })
+                    end,
+                },
+                {
+                    text = 'Pick Up',
+                    callback = function()
+                        object:sendEvent('BC_MusicBoxPickup', { actor = self, })
+                        ambient.playSoundFile('Sound\\fx\\item\\item.wav')
+                    end,
+                }
+            })
+        end,
+        BC_NearbyPlaying = function()
+            nearbyPlayingTimer = 10
+            if not nearbyPlaying then
+                nearbyPlaying = true
+                silenceAmbientMusic()
+            end
+        end,
+        BC_TeachSong = function(data)
+            local song = data.song
+            if song then
+                local success = Performer:teachSong(song)
+                if success then
+                    ui.showMessage(l10n('UI_Msg_LearnSong_Success'):gsub('%%{songTitle}', song.title))
+                    ambient.playSoundFile('Sound\\fx\\inter\\levelUP.wav')
+                end
+            end
+        end,
+        DM_TrackStarted = function()
+            if Performer.playing or nearbyPlaying then
+                silenceAmbientMusic()
+            end
+        end,
+        UiModeChanged = function(data)
+            verifySheathInstrument()
+            verifyPerformInstrument()
+            if data.newMode == nil then
+                Editor:onUINil()
+            elseif data.newMode == 'Scroll' or data.newMode == 'Book' then
+                local book = data.arg
+                local id = book.recordId
+                if Songbooks[id] then
+                    core.sendGlobalEvent('BC_BookRead', { player = self, book = book })
+                end
             end
         end,
     }

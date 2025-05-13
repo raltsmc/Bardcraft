@@ -11,19 +11,6 @@ midiData:
       mode: Major
     texture: tavern
     startUnlocked: true
-  vivecnights.mid:
-    title: Little Vivec Nights
-    description: A cheerful ascending waltz typically taught to Dunmer children as a lullaby, but serviceable enough as a tavern jig when played uptempo.
-    loopBars:
-      - 0
-      - 16
-    loopCount: 1
-    scale:
-      root: D
-      mode: Major
-    tempoMod: 0.5
-    texture: vivec
-    startUnlocked: true
   bwv997.mid:
     title: The Guar and the Scrib
     description: A relaxed lute accompaniment supports a lively ocarina melody; perfect for confidence-building for aspiring lutists looking to move on from basic scales.
@@ -35,7 +22,7 @@ midiData:
       - 20
     loopCount: 0
     texture: tavern
-    startUnlocked: true
+    startUnlocked: false
   bwv997-adv.mid:
     title: The Guar - Adv.
     description: The Guar and the Scrib's lute steals the show in this advanced solo arrangement, carrying both melody and chords at a quicker pace. A nostalgic romp for skilled lutists looking to return to their roots.
@@ -47,7 +34,7 @@ midiData:
       - 16
     loopCount: 1
     texture: tavern
-    startUnlocked: true # false
+    startUnlocked: false
   greensleeves.mid:
     title: Greensleeves
     description: A traditional folk melody of uncertain origin, a staple in taverns throughout the provinces of the Empire.
@@ -59,7 +46,7 @@ midiData:
       root: C
       mode: Minor
     texture: tavern
-    startUnlocked: true # false
+    startUnlocked: false
   imp1.mid:
     title: Courting the Alewife
     description: Not quite a waltz nor a jig, this spirited Imperial dance could equally satisfy a Nibenese court and a tavern full of drunken Dunmer. A favorite of the Bards' College of Cyrodiil, which uses it to train intermediate lutists and ocarinists in counterpoint.
@@ -72,7 +59,7 @@ midiData:
       mode: Major
     tempoMod: 0.5
     texture: tavern
-    startUnlocked: true # false
+    startUnlocked: false
   moonsong.mid:
     title: Ja-Kha'jay's Moonsong
     description: A beloved Khajiiti folk tune, said to echo the laughter of Jone and Jode as they chase across the night sky. Commonly heard during celebrations such as the New Life Festival.
@@ -83,7 +70,7 @@ midiData:
       root: D
       mode: Rajhinic
     texture: elsweyr
-    startUnlocked: true # false
+    startUnlocked: false
   ahemmusa.mid:
     title: Ahemmusan Lament
     description: A contemplative elegy of the Ahemmusa tribe of Azura's Coast, often played in remembrance of lost loved ones.
@@ -96,15 +83,91 @@ midiData:
       mode: Velothi
     tempoMod: 0.5
     texture: ashlander
-    startUnlocked: true # false
-
-sheetMusicMappings:
-  generic:
-    - greensleeves.mid
-    - imp1.mid
-  expensive:
-    - bwv997-adv.mid
-  elsweyr:
-    - moonsong.mid
-  ashlander:
-    - ahemmusa.mid
+    startUnlocked: false
+  molagberan.mid:
+    title: The Battle of Molag Beran
+    description: TODO
+    startUnlocked: false
+  rollbretonnia.mid:
+    title: Roll, Bretonnia, Roll
+    description: TODO
+    startUnlocked: false
+  wondrouslove.mid:
+    title: Wondrous Love
+    description: TODO
+    startUnlocked: false
+  redmountain.mid:
+    title: Red Mountain
+    description: TODO
+    startUnlocked: false
+  shrinktodust.mid:
+    title: May I Shrink to Dust
+    description: TODO
+    startUnlocked: false
+  brooding.mid:
+    title: Brooding Beneath Red Mountain
+    description: TODO
+    startUnlocked: false
+  jornibret.mid:
+    title: Jornibret's Last Dance
+    description: TODO
+    startUnlocked: false
+  start-altmer.mid:
+    title: The Twilight Boughs
+    description: TODO
+    startUnlocked: true
+    race: altmer
+  start-argonian.mid:
+    title: Hiss and Rain
+    description: TODO
+    startUnlocked: true
+    race: argonian
+  start-bosmer.mid:
+    title: Oakling's Song
+    description: TODO
+    startUnlocked: true
+    race: bosmer
+  start-breton.mid:
+    title: Hearthlight Waltz
+    description: TODO
+    startUnlocked: true
+    race: breton
+  start-dunmer.mid:
+    title: Little Vivec Nights
+    description: A cheerful ascending waltz typically taught to Dunmer children as a lullaby, but serviceable enough as a tavern jig when played uptempo.
+    loopBars:
+      - 0
+      - 16
+    loopCount: 1
+    scale:
+      root: D
+      mode: Major
+    tempoMod: 0.5
+    texture: vivec
+    startUnlocked: true
+    race: dunmer
+  start-imperial.mid:
+    title: Little Legionnaire
+    description: TODO
+    startUnlocked: true
+    race: imperial
+  start-khajiit.mid:
+    title: Moon-Sugar Dreams
+    description: TODO
+    startUnlocked: true
+    race: khajiit
+  start-nord.mid:
+    title: Snowfall on the Hearth
+    description: TODO
+    startUnlocked: true
+    race: nord
+  start-orc.mid:
+    title: Iron Mother's Rumble
+    description: TODO
+    startUnlocked: true
+    race: orc
+  start-redguard.mid:
+    title: Waves at Dawn
+    description: TODO
+    startUnlocked: true
+    race: redguard

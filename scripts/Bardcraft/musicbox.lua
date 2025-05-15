@@ -26,6 +26,7 @@ local teachTime = 0
 local state = STATE.Idle
 local notifyNearbyTimer = 0
 local valid = false
+local playerPlaced = false
 
 local function getSongBySourceFile(sourceFile)
     -- Search songs/preset
@@ -96,8 +97,9 @@ local function startPlaying()
     if not valid then return end
     if self.type ~= types.Activator then return end
     if not song then return end
-    if state == STATE.Idle then
+    if state ~= STATE.Play then
         state = STATE.Start
+        anim.clearAnimationQueue(self, true)
         anim.playQueued(self, 'musboxstart')
         core.sound.playSoundFile3d('sound/Bardcraft/musbox-start.wav', self)
         playing = true
@@ -175,12 +177,14 @@ return {
             return {
                 BC_HasBeenPlayed = hasBeenPlayed,
                 BC_SongId = songId,
+                BC_PlayerPlaced = playerPlaced,
             }
         end,
         onLoad = function(data)
             if not data then return end
             hasBeenPlayed = data.BC_HasBeenPlayed or 0
             songId = data.BC_SongId or 0
+            playerPlaced = data.BC_PlayerPlaced or false
         end,
         onActivated = function(actor)
             if not valid then return end
@@ -195,13 +199,19 @@ return {
             if not valid then return end
             if self.type == types.Miscellaneous then
                 core.sendGlobalEvent('BC_ReplaceMusicBox', { object = self })
+            else
+                --anim.playQueued(self, 'musboxidle')
+                if not playerPlaced then
+                    core.sendGlobalEvent('BC_PruneMusicBox', { object = self })
+                end
             end
         end,
     },
     eventHandlers = {
         BC_MusicBoxInit = function(data)
-            hasBeenPlayed = data.hasBeenPlayed or false
+            hasBeenPlayed = data.hasBeenPlayed or 0
             songId = data.songId or 0
+            playerPlaced = data.playerPlaced or false
         end,
         BC_MusicBoxPickup = function(data)
             if not valid then return end

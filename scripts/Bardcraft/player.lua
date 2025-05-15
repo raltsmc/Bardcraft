@@ -18,21 +18,36 @@ local l10n = core.l10n('Bardcraft')
 local Performer = require('scripts.Bardcraft.performer')
 local Editor = require('scripts.Bardcraft.editor')
 local Song = require('scripts.Bardcraft.util.song').Song
-local Songbooks = require('scripts.Bardcraft.data').SongBooks
-local MusicBoxes = require('scripts.Bardcraft.data').MusicBoxes
-local SongIds = require('scripts.Bardcraft.data').SongIds
+local Data = require('scripts.Bardcraft.data')
 
 local configPlayer = require('scripts.Bardcraft.config.player')
 
 local performersInfo = {}
 
+local function getSongBySourceFile(sourceFile)
+    -- Search songs/preset
+    local bardData = storage.globalSection('Bardcraft')
+    local storedSongs = bardData:get('songs/preset') or {}
+    for _, song in pairs(storedSongs) do
+        if song.sourceFile == sourceFile then
+            return song
+        end
+    end
+    return nil
+end
+
 local function populateKnownSongs()
-    -- Check the stored preset songs; if any are set to startUnlocked but are missing from knownSongs, add them
     local bardData = storage.globalSection('Bardcraft')
     local storedSongs = bardData:getCopy('songs/preset') or {}
+    local race = self.type.record(self).race
     for _, song in pairs(storedSongs) do
-        if song.startUnlocked and not Performer.stats.knownSongs[song.id] then
-            Performer:addKnownSong(song)
+        local record = Data.StartingSongs[song.id]
+        if record then
+            local raceMatches = record == 'any' or record == race
+            print('Found record for ' .. song.id .. ': ' .. record .. ' race matches: ' .. tostring(raceMatches))
+            if raceMatches and not Performer.stats.knownSongs[song.id] then
+                Performer:addKnownSong(song)
+            end
         end
     end
 end
@@ -321,18 +336,6 @@ local function playSwoosh()
     ambient.playSoundFile('sound\\fx\\swoosh ' .. math.random(1, 3) .. '.wav')
 end
 
-local function getSongBySourceFile(sourceFile)
-    -- Search songs/preset
-    local bardData = storage.globalSection('Bardcraft')
-    local storedSongs = bardData:get('songs/preset') or {}
-    for _, song in pairs(storedSongs) do
-        if song.sourceFile == sourceFile then
-            return song
-        end
-    end
-    return nil
-end
-
 local function startTrespassTimer()
     bannedVenueTrespassTimer = 0
     ui.showMessage(l10n('UI_Msg_Warn_Trespass'))
@@ -472,6 +475,7 @@ return {
             setPerformerInfo()
         end,
         onLoad = function(data)
+            core.sendGlobalEvent('BC_ParseMidis')
             if not data then return end
             Performer:onLoad(data)
             populateKnownSongs()
@@ -539,7 +543,9 @@ return {
                 nearbyPlayingTimer = math.max(nearbyPlayingTimer - dt, 0)
                 if nearbyPlayingTimer <= 0 then
                     nearbyPlaying = false
-                    unsilenceAmbientMusic()
+                    if not Performer.playing then
+                        unsilenceAmbientMusic()
+                    end
                 end
             else
                 nearbyPlaying = false
@@ -826,7 +832,7 @@ return {
             if data.success then
                 local id = data.id
 
-                local songChoices = Songbooks[id]
+                local songChoices = Data.SongBooks[id]
                 if not songChoices or #songChoices == 0 then return end
                 
                 local song = getRandomSong(songChoices)
@@ -849,12 +855,13 @@ return {
                 {
                     text = 'Toggle Playing',
                     callback = function()
-                        local musicBoxPool = MusicBoxes[object.recordId]
+                        local musicBox = Data.MusicBoxes[object.recordId]
+                        local musicBoxPool = musicBox and musicBox.songs or nil
                         if not musicBoxPool or #musicBoxPool == 0 then return end
                         -- Convert pool from IDs to sourcefiles
                         local musicBoxPoolSourceFiles = {}
                         for _, id in ipairs(musicBoxPool) do
-                            table.insert(musicBoxPoolSourceFiles, SongIds[id])
+                            table.insert(musicBoxPoolSourceFiles, Data.SongIds[id])
                         end
                         local song = getRandomSong(musicBoxPoolSourceFiles)
                         object:sendEvent('BC_MusicBoxToggle', { actor = self, prefSong = song.sourceFile, })
@@ -899,7 +906,7 @@ return {
             elseif data.newMode == 'Scroll' or data.newMode == 'Book' then
                 local book = data.arg
                 local id = book.recordId
-                if Songbooks[id] then
+                if Data.SongBooks[id] then
                     core.sendGlobalEvent('BC_BookRead', { player = self, book = book })
                 end
             end

@@ -107,15 +107,59 @@ local SONGBOOKS = {
 }
 
 local MUSICBOXES = {
+    _rlts_bc_musbox_beg_a = {
+        songs = {
+            0x10000, -- bwv997.mid
+        },
+        spawnChance = 0.2,
+    },
     _rlts_bc_musbox_int_a = {
-        0x20000, -- greensleeves.mid
-        0x20001, -- imp1.mid
+        songs = {
+            0x20000, -- greensleeves.mid
+            0x20001, -- imp1.mid
+            0x20002, -- reddiamond.mid
+        },
+        spawnChance = 0.2,
+    },
+    _rlts_bc_musbox_adv_a = {
+        songs = {
+            0x30000, -- bwv997-adv.mid
+        },
+        spawnChance = 0.4,
+    },
+    _rlts_bc_musbox_dwv_a = {
+        songs = {},
+        spawnChance = 0.5,
+    },
+    _rlts_bc_musbox_imp_a = {
+        songs = {},
+        spawnChance = 0.5,
     }
 }
 
 local SONG_IDS = {
+    -- Beginner
+    [0x10000] = "bwv997.mid",
+    -- Intermediate
     [0x20000] = "greensleeves.mid",
     [0x20001] = "imp1.mid",
+    [0x20002] = "reddiamond.mid",
+    -- Advanced
+    [0x30000] = "bwv997-adv.mid",
+}
+
+local STARTING_SONGS = {
+    ["scales.mid"] = "any",
+    ["start-altmer.mid"] = "high elf",
+    ["start-argonian.mid"] = "argonian",
+    ["start-bosmer.mid"] = "wood elf",
+    ["start-breton.mid"] = "breton",
+    ["start-dunmer.mid"] = "dark elf",
+    ["start-imperial.mid"] = "imperial",
+    ["start-khajiit.mid"] = "khajiit",
+    ["start-nord.mid"] = "nord",
+    ["start-orc.mid"] = "orc",
+    ["start-redguard.mid"] = "redguard",
 }
 
 return {
@@ -126,4 +170,5 @@ return {
     SongBooks = SONGBOOKS,
     MusicBoxes = MUSICBOXES,
     SongIds = SONG_IDS,
+    StartingSongs = STARTING_SONGS,
 }

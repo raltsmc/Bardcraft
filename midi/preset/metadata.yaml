@@ -10,7 +10,45 @@ midiData:
       root: C
       mode: Major
     texture: tavern
-    startUnlocked: true
+  start-altmer.mid:
+    title: The Twilight Boughs
+    description: TODO
+  start-argonian.mid:
+    title: Hiss and Rain
+    description: TODO
+  start-bosmer.mid:
+    title: Oakling's Song
+    description: TODO
+  start-breton.mid:
+    title: Hearthlight Waltz
+    description: TODO
+  start-dunmer.mid:
+    title: Little Vivec Nights
+    description: A cheerful ascending waltz typically taught to Dunmer children as a lullaby, but serviceable enough as a tavern jig when played uptempo.
+    loopBars:
+      - 0
+      - 16
+    loopCount: 1
+    scale:
+      root: D
+      mode: Major
+    tempoMod: 0.5
+    texture: vivec
+  start-imperial.mid:
+    title: Little Legionnaire
+    description: TODO
+  start-khajiit.mid:
+    title: Moon-Sugar Dreams
+    description: TODO
+  start-nord.mid:
+    title: Snowfall on the Hearth
+    description: TODO
+  start-orc.mid:
+    title: Iron Mother's Rumble
+    description: TODO
+  start-redguard.mid:
+    title: Waves at Dawn
+    description: TODO
   bwv997.mid:
     title: The Guar and the Scrib
     description: A relaxed lute accompaniment supports a lively ocarina melody; perfect for confidence-building for aspiring lutists looking to move on from basic scales.
@@ -60,6 +98,18 @@ midiData:
     tempoMod: 0.5
     texture: tavern
     startUnlocked: false
+  reddiamond.mid:
+    title: Chim-el Adabal
+    description: |
+      An Imperial ballad about a powerful artifact called the Amulet of Kings, bearing the red diamond Chim-el Adabal.
+      "Red Diamond! Red Diamond! The heart and soul of Men. Red Diamond! Red Diamond! Protect us 'til the end!"
+    loopCount: 0
+    scale:
+      root: D
+      mode: Minor
+    tempoMod: 0.5
+    texture: imperial
+    startUnlocked: false
   moonsong.mid:
     title: Ja-Kha'jay's Moonsong
     description: A beloved Khajiiti folk tune, said to echo the laughter of Jone and Jode as they chase across the night sky. Commonly heard during celebrations such as the New Life Festival.
@@ -94,7 +144,8 @@ midiData:
     startUnlocked: false
   wondrouslove.mid:
     title: Wondrous Love
-    description: TODO
+    description: A solemn Ashlander hymn from the Urshilaku, honoring the sacred bonds of love and truth shared through all trials, from first breath to final whisper.
+    texture: ashlander
     startUnlocked: false
   redmountain.mid:
     title: Red Mountain
@@ -112,62 +163,3 @@ midiData:
     title: Jornibret's Last Dance
     description: TODO
     startUnlocked: false
-  start-altmer.mid:
-    title: The Twilight Boughs
-    description: TODO
-    startUnlocked: true
-    race: altmer
-  start-argonian.mid:
-    title: Hiss and Rain
-    description: TODO
-    startUnlocked: true
-    race: argonian
-  start-bosmer.mid:
-    title: Oakling's Song
-    description: TODO
-    startUnlocked: true
-    race: bosmer
-  start-breton.mid:
-    title: Hearthlight Waltz
-    description: TODO
-    startUnlocked: true
-    race: breton
-  start-dunmer.mid:
-    title: Little Vivec Nights
-    description: A cheerful ascending waltz typically taught to Dunmer children as a lullaby, but serviceable enough as a tavern jig when played uptempo.
-    loopBars:
-      - 0
-      - 16
-    loopCount: 1
-    scale:
-      root: D
-      mode: Major
-    tempoMod: 0.5
-    texture: vivec
-    startUnlocked: true
-    race: dunmer
-  start-imperial.mid:
-    title: Little Legionnaire
-    description: TODO
-    startUnlocked: true
-    race: imperial
-  start-khajiit.mid:
-    title: Moon-Sugar Dreams
-    description: TODO
-    startUnlocked: true
-    race: khajiit
-  start-nord.mid:
-    title: Snowfall on the Hearth
-    description: TODO
-    startUnlocked: true
-    race: nord
-  start-orc.mid:
-    title: Iron Mother's Rumble
-    description: TODO
-    startUnlocked: true
-    race: orc
-  start-redguard.mid:
-    title: Waves at Dawn
-    description: TODO
-    startUnlocked: true
-    race: redguard

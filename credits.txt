@@ -37,4 +37,6 @@ MIDI FILES:
 
 bwv997.mid: Transcribed from https://musescore.com/user/17040701/scores/5435954 (CC-BY-NC-SA)
 bwv997-adv.mid: Transcribed from https://musescore.com/user/4459451/scores/5034251 (CC-BY-NC-SA)
-estampie1.mid: From https://musescore.com/user/4068041/scores/6592497 (CC-BY-SA)
+
+The following songs are my own MIDI arrangements based on Elder Scrolls Online music boxes/bard songs. All credit for the original compositions belongs to ZeniMax and their talented composers; they have been included out of love and homage to the worldbuilding of ESO, and I will readily oblige any request to remove them.
+reddiamond.mid: Chim-el Adabal / Diamond Melody

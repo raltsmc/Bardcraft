@@ -1617,7 +1617,7 @@ uiTemplates = {
                     return
                 end
                 if e.button == 1 then
-                    pianoRoll.dragLastNoteSize = duration
+                    pianoRoll.lastNoteSize = duration
                     pianoRoll.activeNote = tonumber(self.name)
                     pianoRoll.dragStart = editorOffsetToRealOffset(self.props.position + e.offset)
                     local resizeArea = math.min(8, noteWidth / 2)
@@ -1980,7 +1980,7 @@ local function redrawPianoRollEditor()
     if not Editor.song then return end
     if alreadyRedrewThisFrame then return end
     alreadyRedrewThisFrame = true
-    if pianoRoll.editorWrapper then
+    if pianoRoll.editorWrapper and pianoRoll.editorWrapper.layout then
         auxUi.deepDestroy(pianoRoll.editorWrapper.layout)
     end
     initPianoRoll()
@@ -2771,8 +2771,10 @@ getSongTab = function()
                                     end
                                 end
                                 storage.playerSection('Bardcraft'):set('songs/drafts', songs)
-                                setDraft(nil)
-                                setMainContent(getSongTab())
+                                -- setDraft(nil)
+                                -- setMainContent(getSongTab())
+                                Editor.song = nil
+                                Editor:setState(Editor.STATE.SONG)
                             end))
                         end),
                     }
@@ -2840,7 +2842,7 @@ getSongTab = function()
                             end
                         end
                         layout[notePos] = uiTemplates.pianoRollNote(noteData.id, noteData.note, noteData.time, noteData.duration)
-                        --pianoRollLastNoteSize = noteData.duration
+                        pianoRoll.lastNoteSize = noteData.duration
                         pianoRoll.editorWrapper:update()
                     end
                 end),

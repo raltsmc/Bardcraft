@@ -1,3 +1,4 @@
+local core = require('openmw.core')
 local world = require('openmw.world')
 local types = require('openmw.types')
 local storage = require('openmw.storage')
@@ -8,6 +9,7 @@ local I = require('openmw.interfaces')
 local MIDI = require('scripts.Bardcraft.util.midi')
 local Song = require('scripts.Bardcraft.util.song').Song
 local Data = require('scripts.Bardcraft.data')
+local random = require('scripts.Bardcraft.util.random')
 
 local function parseAllPreset()
     local metadataPath = 'midi/preset/metadata.yaml'
@@ -20,7 +22,7 @@ local function parseAllPreset()
     end
 
     local bardData = storage.globalSection('Bardcraft')
-    bardData:set('songs/preset', nil) -- Clear the old data
+    bardData:set('songs/preset', nil) -- Clear the old data TODO remove
     local storedSongs = bardData:getCopy('songs/preset') or {}
 
     local midiSongs = {}
@@ -107,39 +109,44 @@ return {
     },
     eventHandlers = {
         BC_GiveItem = function(data)
+            if not data then return end
             local item = world.createObject(data.item, data.count or 1)
             item:moveInto(types.Actor.inventory(data.actor))
         end,
         BC_ConsumeItem = function(data)
+            if not data then return end
             data.item:remove(data.count)
         end,
         BC_ParseMidis = function()
             parseAllPreset()
         end,
         BC_Trespass = function(data)
+            if not data then return end
             I.Crimes.commitCrime(data.player, {
                 type = types.Player.OFFENSE_TYPE.Trespassing,
             })
         end,
         BC_BookRead = function(data)
+            if not data then return end
             local book = data.book
-            if book then
-                local mwscript = world.mwscript.getLocalScript(book)
-                if not mwscript or mwscript.recordId ~= '_bcsheetmusic' then 
-                    data.player:sendEvent('BC_BookReadResult', { id = book.recordId, success = true })
-                    return 
-                end
-                if not mwscript.variables.hasbeenread or mwscript.variables.hasbeenread == 0 then
-                    mwscript.variables.hasbeenread = 1
-                    data.player:sendEvent('BC_BookReadResult', { id = book.recordId, success = true })
-                else
-                    data.player:sendEvent('BC_BookReadResult', { success = false })
-                end
+            if not book then return end
+
+            local mwscript = world.mwscript.getLocalScript(book)
+            if not mwscript or mwscript.recordId ~= '_bcsheetmusic' then 
+                data.player:sendEvent('BC_BookReadResult', { id = book.recordId, success = true })
+                return 
+            end
+            if not mwscript.variables.hasbeenread or mwscript.variables.hasbeenread == 0 then
+                mwscript.variables.hasbeenread = 1
+                data.player:sendEvent('BC_BookReadResult', { id = book.recordId, success = true })
+            else
+                data.player:sendEvent('BC_BookReadResult', { success = false })
             end
         end,
         BC_ReplaceMusicBox = function(data)
+            if not data then return end
             local object = data.object
-            if data.object.type ~= types.Miscellaneous then return end
+            if not object or data.object.type ~= types.Miscellaneous then return end
             if data.object.count < 1 then return end
             if not object.cell then return end
 
@@ -150,8 +157,37 @@ return {
             local activatorId = object.recordId .. '_a'
             local activator = world.createObject(activatorId, 1)
             activator:teleport(object.cell, object.position, object.rotation)
-            activator:sendEvent('BC_MusicBoxInit', { hasBeenPlayed = hasBeenPlayed, songId = songId })
+            activator:sendEvent('BC_MusicBoxInit', { hasBeenPlayed = hasBeenPlayed, songId = songId, playerPlaced = true })
             object:remove()
+        end,
+        BC_PruneMusicBox = function(data)
+            if not data then return end
+            local object = data.object
+            if not object or object.type ~= types.Activator then return end
+
+            local globalVars = world.mwscript.getGlobalVariables()
+            if not globalVars.bcInitTime or globalVars.bcInitTime == 0 then
+                globalVars.bcInitTime = math.floor(core.getRealTime() * 1000)
+                print("Bardcraft global seed set to: " .. globalVars.bcInitTime)
+            end
+
+            local cellName = object.cell and object.cell.name or "UnknownCell"
+            local position = object.position
+            local hashInput = string.format("%s_%.0f_%.0f_%.0f", cellName, position.x, position.y, position.z)
+            local randomValue = random.hashStringToUnitFloat(globalVars.bcInitTime, hashInput)
+            local record = Data.MusicBoxes[object.recordId]
+            local spawnChance = record and record.spawnChance or 0.5
+
+            print("Hash input: " .. hashInput)
+            print("Random value: " .. randomValue)
+            print("Spawn chance: " .. spawnChance)
+
+            if randomValue > Data.Vals.musicBoxSpawnChance then
+                object:remove()
+                print("Music box removed based on spawn chance.")
+            else
+                print("Music box left in place.")
+            end
         end,
         BC_MusicBoxPickup = function(data)
             local object = data.object
@@ -159,6 +195,18 @@ return {
 
             local itemId = object.recordId:sub(1, -3)
             local item = world.createObject(itemId, 1)
+            local value = item.type.record(item).value
+            local owner = object.owner
+            if owner.factionId or owner.recordId then
+                I.Crimes.commitCrime(data.actor, {
+                    arg = value,
+                    type = types.Player.OFFENSE_TYPE.Theft,
+                    faction = owner.factionId,
+                })
+            end
+            item.owner.factionId = object.owner.factionId
+            item.owner.factionRank = object.owner.factionRank
+            item.owner.recordId = object.owner.recordId
 
             table.insert(mwscriptQueue, {
                 object = item,
@@ -168,6 +216,13 @@ return {
 
             item:moveInto(types.Actor.inventory(data.actor))
             object:remove()
+        end,
+        BC_SetCreationTime = function()
+            local globalVars = world.mwscript.getGlobalVariables()
+            if not globalVars.bcInitTime or globalVars.bcInitTime == 0 then
+                globalVars.bcInitTime = math.floor(core.getRealTime() * 1000)
+                print("Bardcraft global seed set to: " .. globalVars.bcInitTime)
+            end
         end,
     }
 }

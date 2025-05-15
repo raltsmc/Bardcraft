@@ -1,12 +1,14 @@
 local core = require('openmw.core')
 local storage = require('openmw.storage')
 local vfs = require('openmw.vfs')
+local menu = require('openmw.menu')
 
 local MIDI = require('scripts.Bardcraft.util.midi')
 local Song = require('scripts.Bardcraft.util.song').Song
 
 local function parseAllCustom()
     local bardData = storage.playerSection('Bardcraft')
+    --bardData:set('songs/drafts', nil) -- Clear the old data TODO remove
     local storedSongs = bardData:getCopy('songs/drafts') or {}
 
     local midiSongs = {}
@@ -41,10 +43,12 @@ end
 
 return {
     engineHandlers = {
-        onLoad = function()
-            core.sendGlobalEvent('BC_ParseMidis')
-            parseAllCustom()
-            --storage.playerSection('Bardcraft'):set('songs/custom', nil) -- Clear the old data
+        onStateChanged = function() 
+            if menu.getState() == menu.STATE.Running then
+                core.sendGlobalEvent('BC_ParseMidis')
+                parseAllCustom()
+                core.sendGlobalEvent('BC_SetCreationTime')
+            end
         end,
     }
 }

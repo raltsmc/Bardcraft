@@ -6,8 +6,7 @@ local storage = require('openmw.storage')
 local nearby = require('openmw.nearby')
 local util = require('openmw.util')
 
-local MusicBoxes = require('scripts.Bardcraft.data').MusicBoxes
-local SongIds = require('scripts.Bardcraft.data').SongIds
+local Data = require('scripts.Bardcraft.data')
 local Song = require('scripts.Bardcraft.util.song').Song
 
 local STATE = {
@@ -41,13 +40,13 @@ local function getSongBySourceFile(sourceFile)
 end
 
 local function getSongById(id)
-    local sourceFile = SongIds[id]
+    local sourceFile = Data.SongIds[id]
     if not sourceFile then return nil end
     return getSongBySourceFile(sourceFile)
 end
 
 local function sourceFileToSongId(sourceFile)
-    for k, v in pairs(SongIds) do
+    for k, v in pairs(Data.SongIds) do
         if v == sourceFile then
             return k
         end
@@ -55,7 +54,26 @@ local function sourceFileToSongId(sourceFile)
 end
 
 local function pickRandomSong()
-    local songChoices = MusicBoxes[self.recordId]
+    local boxData = Data.MusicBoxes[self.recordId]
+    local songChoices = {}
+
+    if boxData.songs then
+        songChoices = boxData.songs
+    elseif boxData.pools then
+        local seen = {}
+        for _, poolId in ipairs(boxData.pools) do
+            local pool = Data.SongPools[poolId]
+            if pool then
+                for _, songId in ipairs(pool) do
+                    if not seen[songId] then
+                        table.insert(songChoices, songId)
+                        seen[songId] = true
+                    end
+                end
+            end
+        end
+    end
+
     if not songChoices or #songChoices == 0 then return end
     local song = songChoices[math.random(#songChoices)]
     return song
@@ -190,7 +208,7 @@ return {
             if not valid then return end
             if self.type == types.Activator then
                 if actor.type == types.Player then
-                    actor:sendEvent('BC_MusicBoxActivate', { object = self })
+                    actor:sendEvent('BC_MusicBoxActivate', { object = self, songName = hasBeenPlayed == 1 and getSongById(songId).title or nil })
                 end
             end
         end,

@@ -122,6 +122,15 @@ function P:addPerformanceXP(xp)
     return levelGain
 end
 
+function P:setPerformanceLevel(level)
+    level = util.clamp(math.floor(level), 1, 100)
+    self.stats.performanceSkill.level = level
+    self.stats.performanceSkill.xp = 0
+    self.stats.performanceSkill.req = self:getPerformanceXPRequired()
+    self:sendPerformerInfo()
+    print('Set performance level to ' .. level .. ' for ' .. omwself.recordId)
+end
+
 function P:modReputation(mod)
     self.stats.reputation = self.stats.reputation + mod
     self:sendPerformerInfo()
@@ -164,6 +173,28 @@ function P:modSongConfidence(songId, part, mod)
     if mod ~= mod then mod = 0 end
     confidence = util.clamp(confidence + mod, 0, 1)
     self.stats.knownSongs[songId].partConfidences[part] = confidence
+    self:sendPerformerInfo()
+end
+
+function P:resetAllStats()
+    self.stats = {
+        knownSongs = {},
+        performanceSkill = {
+            level = 1,
+            xp = 0,
+            req = 10,
+        },
+        reputation = 0,
+        bannedVenues = {},
+        performedVenuesToday = {},
+        practiceEfficiency = 1.0,
+        performanceCount = {
+            [Song.PerformanceType.Tavern] = 0,
+            [Song.PerformanceType.Street] = 0,
+            [Song.PerformanceType.Practice] = 0,
+        },
+        performanceLogs = {},
+    }
     self:sendPerformerInfo()
 end
 
@@ -326,7 +357,6 @@ function P.handlePerformEvent(data)
     P.instrumentItem = types.Miscellaneous.record(data.item)
     P.resetVfx()
     P.resetAnim()
-    omwself.enableAI(omwself, false)
 
     local songInfo = P.stats.knownSongs[song.id]
     if not songInfo then
@@ -354,7 +384,35 @@ function P.handlePerformEvent(data)
     P.currentPart = data.part
 end
 
+function P.playNote(note, velocity)
+    local success = true
+    local pitch = 1.0
+    local volume = velocity * (1 + math.random() * 0.2 - 0.1)
+    if math.random() > P.getNoteAccuracy() then
+        pitch = 1.0 + (math.random() * 0.2 - 0.1) -- Random pitch shift between -10% and +10%
+        volume = volume * 0.5 + math.random() * (volume)
+        success = false
+    end
+    local noteName = Song.noteNumberToName(note)
+    local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
+    core.sound.playSoundFile3d(filePath, omwself, { volume = volume, pitch = pitch })
+    return success
+end
+
+function P.stopNote(note)
+    local noteName = Song.noteNumberToName(note)
+    local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
+    core.sound.stopSoundFile3d(filePath, omwself)
+end
+
+function P.stopAllNotes()
+    for note = 0, 127 do
+        P.stopNote(note)
+    end
+end
+
 function P.handleStopEvent(data)
+    P.stopAllNotes()
     anim.removeVfx(omwself, 'BO_Instrument')
     anim.cancel(omwself, instrumentData[P.instrument].anim)
     if animData[P.instrument] then
@@ -364,7 +422,6 @@ function P.handleStopEvent(data)
     end
     P.playing = false
     P.instrument = nil
-    omwself.enableAI(omwself, true)
 
     if P.performanceType == Song.PerformanceType.Ambient then 
         P.currentSong = nil
@@ -413,31 +470,10 @@ end
 function P.getNoteAccuracy()
     local density = P.currentDensity
 
-    local difficultyFactor = util.clamp((density - easyDensity) / (hardDensity - easyDensity), 0, 1) - 0.2
-    local accuracy = math.pow(P.stats.performanceSkill.level / 100, 1/2) * 1.1 - (difficultyFactor * 0.6) + (math.pow(P.currentConfidence, 1/2) * 0.5)
+    local difficultyFactor = util.clamp((density - easyDensity) / (hardDensity - easyDensity), 0, 1) - 0.3
+    local accuracy = math.pow(P.stats.performanceSkill.level / 100, 1/2) * 1.1 - (difficultyFactor * 0.7) + (math.pow(P.currentConfidence, 1/2) * 0.5)
 
     return util.clamp(accuracy, 0, 1)
-end
-
-function P.playNote(note, velocity)
-    local success = true
-    local pitch = 1.0
-    local volume = velocity
-    if math.random() > P.getNoteAccuracy() then
-        pitch = 1.0 + (math.random() * 0.2 - 0.1) -- Random pitch shift between -10% and +10%
-        volume = volume * 0.5 + math.random() * (volume)
-        success = false
-    end
-    local noteName = Song.noteNumberToName(note)
-    local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
-    core.sound.playSoundFile3d(filePath, omwself, { volume = volume, pitch = pitch })
-    return success
-end
-
-function P.stopNote(note)
-    local noteName = Song.noteNumberToName(note)
-    local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
-    core.sound.stopSoundFile3d(filePath, omwself)
 end
 
 function P.handleNoteEvent(data)

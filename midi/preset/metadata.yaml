@@ -9,19 +9,24 @@ midiData:
     scale:
       root: C
       mode: Major
-    texture: tavern
+    texture: generic
+    difficulty: starter
   start-altmer.mid:
     title: The Twilight Boughs
     description: TODO
+    difficulty: starter
   start-argonian.mid:
     title: Hiss and Rain
     description: TODO
+    difficulty: starter
   start-bosmer.mid:
     title: Oakling's Song
     description: TODO
+    difficulty: starter
   start-breton.mid:
     title: Hearthlight Waltz
     description: TODO
+    difficulty: starter
   start-dunmer.mid:
     title: Little Vivec Nights
     description: A cheerful ascending waltz typically taught to Dunmer children as a lullaby, but serviceable enough as a tavern jig when played uptempo.
@@ -34,21 +39,82 @@ midiData:
       mode: Major
     tempoMod: 0.5
     texture: vivec
+    difficulty: starter
   start-imperial.mid:
     title: Little Legionnaire
     description: TODO
+    difficulty: starter
   start-khajiit.mid:
     title: Moon-Sugar Dreams
     description: TODO
+    difficulty: starter
   start-nord.mid:
     title: Snowfall on the Hearth
     description: TODO
+    difficulty: starter
   start-orc.mid:
     title: Iron Mother's Rumble
     description: TODO
+    difficulty: starter
   start-redguard.mid:
     title: Waves at Dawn
     description: TODO
+    difficulty: starter
+  beg1.mid:
+    title: Guar Driver Song
+    description: A simple, cloying melody said to echo the pace of a guar's stride. While often attributed to caravan drivers, scholars note the tune's true origin is likely as meandering as the creatures themselves.
+    scale:
+      root: F
+      mode: Major
+    loopBars:
+      - 0
+      - 32
+    loopCount: 0
+    texture: westgash
+    startUnlocked: false
+    difficulty: beginner
+  beg2.mid:
+    title: The Odai Trail
+    description: A well-known traveling song throughout western Vvardenfell. A wistful yet pleasant piece for a traveling bard, good for keeping spirits up on a long walk.
+    scale:
+      root: B
+      mode: Minor
+    loopBars:
+      - 0
+      - 30
+    loopCount: 0
+    tempoMod: 0.5
+    texture: balmora2
+    startUnlocked: false
+    difficulty: beginner
+  beg3.mid:
+    title: Eyes Like Smoke
+    description: A traditional Velothi love lament, said to have been first sung by a pilgrim returning from Red Mountain after losing their beloved to the Blight.
+    scale:
+      root: D
+      mode: Minor
+    loopBars:
+      - 0
+      - 32.66666666666666667
+    loopCount: 0
+    tempoMod: 0.5
+    texture: temple1
+    startUnlocked: false
+    difficulty: beginner
+  int1.mid:
+    title: Evening in Gwynnen
+    description: This dance, born in the courts of High Rock, found favor with Imperial statesmen and soon spread throughout the provinces. A testament to Wayrest's enduring cultural influence, now even Dunmer tap their feet to its rhythm.
+    scale:
+      root: E
+      mode: Minor
+    loopBars:
+      - 0.333333333333333333
+      - 56.33333333333333333
+    loopCount: 0
+    tempoMod: 0.5
+    texture: wayrest
+    startUnlocked: false
+    difficulty: intermediate
   bwv997.mid:
     title: The Guar and the Scrib
     description: A relaxed lute accompaniment supports a lively ocarina melody; perfect for confidence-building for aspiring lutists looking to move on from basic scales.
@@ -59,8 +125,9 @@ midiData:
       - 0 
       - 20
     loopCount: 0
-    texture: tavern
+    texture: generic
     startUnlocked: false
+    difficulty: beginner
   bwv997-adv.mid:
     title: The Guar - Adv.
     description: The Guar and the Scrib's lute steals the show in this advanced solo arrangement, carrying both melody and chords at a quicker pace. A nostalgic romp for skilled lutists looking to return to their roots.
@@ -71,8 +138,9 @@ midiData:
       - 0
       - 16
     loopCount: 1
-    texture: tavern
+    texture: generic
     startUnlocked: false
+    difficulty: advanced
   greensleeves.mid:
     title: Greensleeves
     description: A traditional folk melody of uncertain origin, a staple in taverns throughout the provinces of the Empire.
@@ -85,9 +153,10 @@ midiData:
       mode: Minor
     texture: tavern
     startUnlocked: false
+    difficulty: intermediate
   imp1.mid:
     title: Courting the Alewife
-    description: Not quite a waltz nor a jig, this spirited Imperial dance could equally satisfy a Nibenese court and a tavern full of drunken Dunmer. A favorite of the Bards' College of Cyrodiil, which uses it to train intermediate lutists and ocarinists in counterpoint.
+    description: Not quite a waltz nor a jig, this spirited Imperial dance could equally satisfy a Nibenese court and a tavern full of drunken Dunmer. A favorite of the Minstrels' Guild of Cyrodiil, which uses it to train intermediate lutists and ocarinists in counterpoint.
     loopBars:
       - 0
       - 24
@@ -98,6 +167,7 @@ midiData:
     tempoMod: 0.5
     texture: tavern
     startUnlocked: false
+    difficulty: intermediate
   reddiamond.mid:
     title: Chim-el Adabal
     description: |
@@ -110,6 +180,7 @@ midiData:
     tempoMod: 0.5
     texture: imperial
     startUnlocked: false
+    difficulty: intermediate
   moonsong.mid:
     title: Ja-Kha'jay's Moonsong
     description: A beloved Khajiiti folk tune, said to echo the laughter of Jone and Jode as they chase across the night sky. Commonly heard during celebrations such as the New Life Festival.
@@ -121,6 +192,7 @@ midiData:
       mode: Rajhinic
     texture: elsweyr
     startUnlocked: false
+    difficulty: intermediate
   ahemmusa.mid:
     title: Ahemmusan Lament
     description: A contemplative elegy of the Ahemmusa tribe of Azura's Coast, often played in remembrance of lost loved ones.
@@ -132,8 +204,9 @@ midiData:
       root: F
       mode: Velothi
     tempoMod: 0.5
-    texture: ashlander
+    texture: ahemmusa
     startUnlocked: false
+    difficulty: intermediate
   molagberan.mid:
     title: The Battle of Molag Beran
     description: TODO
@@ -147,6 +220,7 @@ midiData:
     description: A solemn Ashlander hymn from the Urshilaku, honoring the sacred bonds of love and truth shared through all trials, from first breath to final whisper.
     texture: ashlander
     startUnlocked: false
+    difficulty: beginner
   redmountain.mid:
     title: Red Mountain
     description: TODO

@@ -5,6 +5,7 @@ local storage = require('openmw.storage')
 local vfs = require('openmw.vfs')
 local markup = require('openmw.markup')
 local I = require('openmw.interfaces')
+local async = require('openmw.async')
 
 local MIDI = require('scripts.Bardcraft.util.midi')
 local Song = require('scripts.Bardcraft.util.song').Song
@@ -108,6 +109,35 @@ return {
         end
     },
     eventHandlers = {
+        BC_RecheckTroupe = function(data)
+            local player = data and data.player or world.players[1]
+            if not player then return end
+
+            local troupeMembers = {}
+            for _, actor in ipairs(world.activeActors) do
+                local mwscript = world.mwscript.getLocalScript(actor)
+                if mwscript and mwscript.recordId == "_bchireablebard" then
+                    if mwscript.variables.followplayer == 1 then
+                        table.insert(troupeMembers, actor)
+                    end
+                    if mwscript.variables.tphome == 1 then
+                        local bardInfo = Data.BardNpcs[actor.recordId]
+                        local home = bardInfo and bardInfo.home
+                        if home then
+                            mwscript.variables.tphome = 0
+                            actor:teleport(home.cell, home.position, home.rotation)
+                            player:sendEvent('BC_TPFadeIn')
+                            player:sendEvent('AttendMeFollowerStatus', { -- Attend Me compatibility
+                                actor = actor,
+                                status = false,
+                            }) 
+                        end
+                    end
+                end
+            end
+
+            player:sendEvent("BC_TroupeStatus", { members = troupeMembers })
+        end,
         BC_GiveItem = function(data)
             if not data then return end
             local item = world.createObject(data.item, data.count or 1)
@@ -178,15 +208,12 @@ return {
             local record = Data.MusicBoxes[object.recordId]
             local spawnChance = record and record.spawnChance or 0.5
 
-            print("Hash input: " .. hashInput)
-            print("Random value: " .. randomValue)
-            print("Spawn chance: " .. spawnChance)
+            -- print("Hash input: " .. hashInput)
+            -- print("Random value: " .. randomValue)
+            -- print("Spawn chance: " .. spawnChance)
 
-            if randomValue > Data.Vals.musicBoxSpawnChance then
+            if randomValue > spawnChance then
                 object:remove()
-                print("Music box removed based on spawn chance.")
-            else
-                print("Music box left in place.")
             end
         end,
         BC_MusicBoxPickup = function(data)

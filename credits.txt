@@ -25,6 +25,7 @@ coin-few.wav: coins-falling-022.wav by Gerent -- https://freesound.org/s/558991/
 coin-many.wav: Coin Drop by Universfield -- https://freesound.org/s/750240/ -- License: Attribution 4.0
 
 equip.wav: Sound Effect by freesound_community from Pixabay https://pixabay.com/sound-effects/item-equip-6904/ 
+gohome.wav: Rapid Footsteps Upon Gravel by ExplosiveTamale -- https://freesound.org/s/448357/ -- License: Creative Commons 0
 
 musbox-start.wav: 
     Wind_up_musicbox.wav by jobro -- https://freesound.org/s/172208/ -- License: Attribution 3.0
@@ -37,6 +38,8 @@ MIDI FILES:
 
 bwv997.mid: Transcribed from https://musescore.com/user/17040701/scores/5435954 (CC-BY-NC-SA)
 bwv997-adv.mid: Transcribed from https://musescore.com/user/4459451/scores/5034251 (CC-BY-NC-SA)
+beg3.mid: Transcribed from https://musescore.com/jakerussell/scores/1724406 (Public domain)
+int1.mid: Modified from https://musescore.com/user/34711090/scores/22831834 (CC-BY)
 
-The following songs are my own MIDI arrangements based on Elder Scrolls Online music boxes/bard songs. All credit for the original compositions belongs to ZeniMax and their talented composers; they have been included out of love and homage to the worldbuilding of ESO, and I will readily oblige any request to remove them.
+The following songs are my own MIDI arrangements based on Elder Scrolls Online bard/music box songs. All credit for the original compositions belongs to ZeniMax and their talented composers; they have been included out of love and homage to the worldbuilding of ESO, and I will readily oblige any request to remove them.
 reddiamond.mid: Chim-el Adabal / Diamond Melody

@@ -1,3 +1,5 @@
+local util = require('openmw.util')
+
 local INSTRUMENT_ITEMS = {
     Lute = {
         misc_de_lute_01 = true, -- Vanilla
@@ -58,74 +60,169 @@ local PUBLICAN_CLASSES = {
     t_glb_publican = true,
 }
 
+local BARD_NPCS = {
+    _rlts_bc_bard_oc1 = { -- Sees-Silent-Reeds
+        home = {
+            cell = "Seyda Neen, Arrille's Tradehouse",
+            position = util.vector3(-586, -381, 385),
+            rotation = util.transform.rotateZ(1.6),
+        },
+        startingLevel = 25,
+    }
+}
+
 local QUEST_REWARDS = {
     B2_AhemmusaSafe = {
         stage = 50,
         msg = "UI_Msg_QuestReward_Ahemmusa",
         item = "_rlts_bc_songscroll_ahemmusa",
+    },
+    DA_Sheogorath = {
+        stage = 70,
+        msg = "UI_Msg_QuestReward_Sheogorath",
+        item = "_rlts_bc_musbox_sheo_a",
     }
 }
 
-local SONGBOOKS = {
+local SONG_IDS = {
+    -- Starting:        0x00000 - 0x0FFFF
+    [0x00000] = "scales.mid",
+    [0x00001] = "start-altmer.mid",
+    [0x00002] = "start-argonian.mid",
+    [0x00003] = "start-bosmer.mid",
+    [0x00004] = "start-breton.mid",
+    [0x00005] = "start-dunmer.mid",
+    [0x00006] = "start-imperial.mid",
+    [0x00007] = "start-khajiit.mid",
+    [0x00008] = "start-nord.mid",
+    [0x00009] = "start-orc.mid",
+    [0x0000A] = "start-redguard.mid",
+    -- Beginner:        0x10000 - 0x1FFFF
+    [0x10000] = "beg1.mid",
+    [0x10001] = "beg2.mid",
+    [0x10002] = "beg3.mid",
+    [0x10100] = "bwv997.mid",
+    -- Intermediate:    0x20000 - 0x2FFFF
+    [0x20000] = "int1.mid",
+    [0x20100] = "greensleeves.mid",
+    [0x20101] = "imp1.mid",
+    [0x20102] = "reddiamond.mid",
+    -- Advanced:        0x30000 - 0x3FFFF
+    [0x30000] = "adv1.mid",
+    [0x30100] = "bwv997-adv.mid",
+    -- Misc:            0xE0000 - 0xFFFFF
+    [0xE0000] = "ahemmusa.mid",
+    [0xE0001] = "molagberan.mid",
+    [0xE0002] = "rollbretonnia.mid",
+    [0xE0003] = "wondrouslove.mid",
+    [0xE0004] = "redmountain.mid",
+    [0xE0005] = "shrinktodust.mid",
+    [0xE0006] = "brooding.mid",
+    [0xE0007] = "lessrude.mid",
+    [0xE0008] = "jornibret.mid",
+    [0xE0009] = "moonsong.mid",
+}
+
+local SONG_POOLS = {
+    beginner = {
+        0x10000, -- beg1.mid
+        0x10001, -- beg2.mid
+        0x10002, -- beg3.mid
+        0x10100, -- bwv997.mid
+    },
+    intermediate = {
+        0x20000, -- int1.mid
+        0x20100, -- greensleeves.mid
+        0x20101, -- imp1.mid
+        0x20102, -- reddiamond.mid
+    },
+    advanced = {
+        0x30000, -- adv1.mid
+        0x30100, -- bwv997-adv.mid
+    },
+}
+
+local SONG_BOOKS = {
     _rlts_bc_songbook_gen_beg = {
-        "bwv997.mid",
+        pools = {
+            "beginner",
+        },
     },
     _rlts_bc_songbook_gen_int = {
-        "greensleeves.mid",
-        "imp1.mid",
+        pools = {
+            "intermediate",
+        },
     },
     _rlts_bc_songbook_gen_adv = {
-        "bwv997-adv.mid",
+        pools = {
+            "advanced",
+        },
     },
     _rlts_bc_songscroll_ahemmusa = {
-        "ahemmusa.mid",
+        songs = {
+            0xE0000, -- ahemmusa.mid
+        }
     },
     bk_battle_molag_beran = { -- Entertainers plug-in book
-        "molagberan.mid",
+        songs = {
+            0xE0001, -- molagberan.mid
+        }
     },
     bk_balladeers_fakebook = { -- Entertainers plug-in book
-        "rollbretonnia.mid",
+        songs = {
+            0xE0002, -- rollbretonnia.mid
+        }
     },
     bk_ashland_hymns = { -- Vanilla book
-        "wondrouslove.mid"
+        songs = {
+            0xE0003, -- wondrouslove.mid
+        }
     },
     bk_five_far_stars = { -- Vanilla book
-        "redmountain.mid",
+        songs = {
+            0xE0004, -- redmountain.mid
+        }
     },
     bk_words_of_the_wind = { -- Vanilla book
-        "shrinktodust.mid",
+        songs = {
+            0xE0005, -- shrinktodust.mid
+        }
     },
     bk_cantatasofvivec = { -- Vanilla book
-        "brooding.mid",
+        songs = {
+            0xE0006, -- brooding.mid
+        }
     },
     bk_istunondescosmology = { -- Vanilla book
-        "lessrude.mid",
+        songs = {
+            0xE0007, -- lessrude.mid
+        }
     },
     ["bookskill_light armor3"] = { -- Vanilla book
-        "jornibret.mid",
+        songs = {
+            0xE0008, -- jornibret.mid
+        }
     }
 }
 
-local MUSICBOXES = {
+local MUSIC_BOXES = {
     _rlts_bc_musbox_beg_a = {
-        songs = {
-            0x10000, -- bwv997.mid
+        pools = {
+            "beginner",
         },
-        spawnChance = 0.2,
+        spawnChance = 0.5,
     },
     _rlts_bc_musbox_int_a = {
-        songs = {
-            0x20000, -- greensleeves.mid
-            0x20001, -- imp1.mid
-            0x20002, -- reddiamond.mid
+        pools = {
+            "intermediate",
         },
-        spawnChance = 0.2,
+        spawnChance = 0.3,
     },
     _rlts_bc_musbox_adv_a = {
-        songs = {
-            0x30000, -- bwv997-adv.mid
+        pools = {
+            "advanced",
         },
-        spawnChance = 0.4,
+        spawnChance = 0.7,
     },
     _rlts_bc_musbox_dwv_a = {
         songs = {},
@@ -134,18 +231,15 @@ local MUSICBOXES = {
     _rlts_bc_musbox_imp_a = {
         songs = {},
         spawnChance = 0.5,
+    },
+    _rlts_bc_musbox_sheo_a = { -- Sheogorath's Music Box; picks a random song from all music box pools
+        pools = {
+            "beginner",
+            "intermediate",
+            "advanced",
+        },
+        spawnChance = 0.5,
     }
-}
-
-local SONG_IDS = {
-    -- Beginner
-    [0x10000] = "bwv997.mid",
-    -- Intermediate
-    [0x20000] = "greensleeves.mid",
-    [0x20001] = "imp1.mid",
-    [0x20002] = "reddiamond.mid",
-    -- Advanced
-    [0x30000] = "bwv997-adv.mid",
 }
 
 local STARTING_SONGS = {
@@ -166,9 +260,11 @@ return {
     InstrumentItems = INSTRUMENT_ITEMS,
     SheathableInstruments = SHEATHABLE_INSTRUMENTS,
     PublicanClasses = PUBLICAN_CLASSES,
+    BardNpcs = BARD_NPCS,
     QuestRewards = QUEST_REWARDS,
-    SongBooks = SONGBOOKS,
-    MusicBoxes = MUSICBOXES,
+    SongBooks = SONG_BOOKS,
+    MusicBoxes = MUSIC_BOXES,
     SongIds = SONG_IDS,
+    SongPools = SONG_POOLS,
     StartingSongs = STARTING_SONGS,
 }

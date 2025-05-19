@@ -2,6 +2,7 @@ local self = require('openmw.self')
 local anim = require('openmw.animation')
 
 local Performer = require('scripts.Bardcraft.performer')
+local Data = require('scripts.Bardcraft.data')
 
 return {
     engineHandlers = {
@@ -11,10 +12,13 @@ return {
         onLoad = function(data)
             Performer:onLoad(data)
         end,
-        onUpdate = function(dt)
-            Performer.handleMovement(dt)
-            if Performer.playing then
-                self.enableAI(self, false)
+        onActive = function()
+            local bardInfo = Data.BardNpcs[self.recordId]
+            local startingLevel = bardInfo and bardInfo.startingLevel
+            if not startingLevel then return end
+
+            if Performer.stats.performanceSkill.level < startingLevel then
+                Performer:setPerformanceLevel(startingLevel)
             end
         end,
     },

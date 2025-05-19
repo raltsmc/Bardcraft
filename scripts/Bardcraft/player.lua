@@ -110,6 +110,19 @@ local practiceOverlayLastShakeFactor = 0
 
 local practiceOverlayToggle = true
 
+local tpFadeOverlay = ui.create {
+    layer = 'Notification',
+    type = ui.TYPE.Image,
+    props = {
+        resource = ui.texture { path = 'white' },
+        relativeSize = util.vector2(1, 1),
+        color = Editor.uiColors.BLACK,
+        alpha = 0,
+    },
+}
+local tpFadeInTimer = nil
+local tpFadeOutTimer = nil
+
 local hurtOverlay = ui.create {
     layer = 'Notification',
     type = ui.TYPE.Image,
@@ -528,6 +541,7 @@ return {
                     else
                         -- Player is not in a banned venue
                         unbanFromVenue(currentCell.name)
+                        bannedVenueTrespassTimer = nil
                     end
                 end
             end
@@ -549,6 +563,24 @@ return {
                 end
             else
                 nearbyPlaying = false
+            end
+
+            if tpFadeInTimer then
+                tpFadeInTimer = math.min(tpFadeInTimer + dt, 3)
+                tpFadeOverlay.layout.props.alpha = 1 - (tpFadeInTimer / 3)
+                if tpFadeInTimer >= 3 then
+                    tpFadeInTimer = nil
+                    tpFadeOverlay.layout.props.alpha = 0
+                end
+                tpFadeOverlay:update()
+            elseif tpFadeOutTimer then
+                tpFadeOutTimer = math.min(tpFadeOutTimer + dt, 0.1)
+                tpFadeOverlay.layout.props.alpha = tpFadeOutTimer / 0.1
+                if tpFadeOutTimer >= 0.1 then
+                    tpFadeOutTimer = nil
+                    tpFadeOverlay.layout.props.alpha = 1
+                end
+                tpFadeOverlay:update()
             end
         end,
         onKeyPress = function(e)
@@ -575,12 +607,17 @@ return {
             for token in command:gmatch('%S+') do
                 table.insert(tokens, token)
             end
-            if string.lower(tokens[1]) ~= 'luabclevel' then return end
-            if not tonumber(tokens[2]) then return end
-            Performer.stats.performanceSkill.level = util.clamp(tonumber(tokens[2]), 1, 100)
-            Performer.stats.performanceSkill.xp = 0
-            Performer.stats.performanceSkill.req = Performer:getPerformanceXPRequired()
-            ui.showMessage('DEBUG: Set Bardcraft level to ' .. Performer.stats.performanceSkill.level)
+            if string.lower(tokens[1]) == 'luabclevel' then
+                if not tonumber(tokens[2]) then return end
+                Performer.stats.performanceSkill.level = util.clamp(tonumber(tokens[2]), 1, 100)
+                Performer.stats.performanceSkill.xp = 0
+                Performer.stats.performanceSkill.req = Performer:getPerformanceXPRequired()
+                ui.showMessage('DEBUG: Set Bardcraft level to ' .. Performer.stats.performanceSkill.level)
+            elseif string.lower(tokens[1]) == 'luabcreset' then
+                Performer:resetAllStats()
+                populateKnownSongs()
+                ui.showMessage('DEBUG: Reset Bardcraft stats')
+            end
         end,
         onMouseWheel = function(v, h)
             Editor:onMouseWheel(v, h)
@@ -831,11 +868,38 @@ return {
         BC_BookReadResult = function(data)
             if data.success then
                 local id = data.id
+                local songBook = Data.SongBooks[id]
+                if not songBook then return end
 
-                local songChoices = Data.SongBooks[id]
-                if not songChoices or #songChoices == 0 then return end
-                
-                local song = getRandomSong(songChoices)
+                local songBookPoolSourceFiles = {}
+                local seen = {}
+
+                if songBook.pools and #songBook.pools > 0 then
+                    for _, poolId in ipairs(songBook.pools) do
+                        local pool = Data.SongPools[poolId]
+                        if pool and #pool > 0 then
+                            for _, songIdInPool in ipairs(pool) do
+                                local sourceFile = Data.SongIds[songIdInPool]
+                                if sourceFile and not seen[sourceFile] then
+                                    table.insert(songBookPoolSourceFiles, sourceFile)
+                                    seen[sourceFile] = true
+                                end
+                            end
+                        end
+                    end
+                elseif songBook.songs and #songBook.songs > 0 then
+                    for _, songId in ipairs(songBook.songs) do
+                        local sourceFile = Data.SongIds[songId]
+                        if sourceFile and not seen[sourceFile] then
+                            table.insert(songBookPoolSourceFiles, sourceFile)
+                            seen[sourceFile] = true
+                        end
+                    end
+                end
+
+                if #songBookPoolSourceFiles == 0 then return end
+
+                local song = getRandomSong(songBookPoolSourceFiles)
                 local success = false
                 success = song and Performer:teachSong(song) or false
 
@@ -856,16 +920,43 @@ return {
                     text = 'Toggle Playing',
                     callback = function()
                         local musicBox = Data.MusicBoxes[object.recordId]
-                        local musicBoxPool = musicBox and musicBox.songs or nil
-                        if not musicBoxPool or #musicBoxPool == 0 then return end
-                        -- Convert pool from IDs to sourcefiles
+                        if not musicBox then return end
+
                         local musicBoxPoolSourceFiles = {}
-                        for _, id in ipairs(musicBoxPool) do
-                            table.insert(musicBoxPoolSourceFiles, Data.SongIds[id])
+                        local seen = {}
+
+                        if musicBox.pools and #musicBox.pools > 0 then
+                            for _, poolId in ipairs(musicBox.pools) do
+                                local pool = Data.SongPools[poolId]
+                                if pool and #pool > 0 then
+                                    for _, songIdInPool in ipairs(pool) do
+                                        local sourceFile = Data.SongIds[songIdInPool]
+                                        if sourceFile and not seen[sourceFile] then
+                                            table.insert(musicBoxPoolSourceFiles, sourceFile)
+                                            seen[sourceFile] = true
+                                        end
+                                    end
+                                end
+                            end
+                        elseif musicBox.songs and #musicBox.songs > 0 then
+                            -- This music box has its own list of songs
+                            for _, songId in ipairs(musicBox.songs) do
+                                local sourceFile = Data.SongIds[songId]
+                                if sourceFile and not seen[sourceFile] then
+                                    table.insert(musicBoxPoolSourceFiles, sourceFile)
+                                    seen[sourceFile] = true
+                                end
+                            end
                         end
+                        
+                        if #musicBoxPoolSourceFiles == 0 then return end -- No songs found to pick from
+
                         local song = getRandomSong(musicBoxPoolSourceFiles)
-                        object:sendEvent('BC_MusicBoxToggle', { actor = self, prefSong = song.sourceFile, })
-                    end,
+                        
+                        if song then -- Check if getRandomSong found a suitable song
+                            object:sendEvent('BC_MusicBoxToggle', { actor = self, prefSong = song.sourceFile, })
+                        end
+                    end
                 },
                 {
                     text = 'Pick Up',
@@ -874,7 +965,7 @@ return {
                         ambient.playSoundFile('Sound\\fx\\item\\item.wav')
                     end,
                 }
-            })
+            }, data.songName)
         end,
         BC_NearbyPlaying = function()
             nearbyPlayingTimer = 10
@@ -893,6 +984,22 @@ return {
                 end
             end
         end,
+        BC_TroupeStatus = function(data)
+            local members = {}
+            for _, member in ipairs(data.members) do
+                members[member.recordId] = true
+            end
+            Editor.troupeMembers = members
+            Editor.troupeSize = #data.members
+        end,
+        BC_TPFadeOut = function()
+            tpFadeOutTimer = 0
+        end,
+        BC_TPFadeIn = function()
+            tpFadeOutTimer = nil
+            tpFadeInTimer = 0
+            ambient.playSoundFile('sound\\Bardcraft\\gohome.wav')
+        end,
         DM_TrackStarted = function()
             if Performer.playing or nearbyPlaying then
                 silenceAmbientMusic()
@@ -903,6 +1010,7 @@ return {
             verifyPerformInstrument()
             if data.newMode == nil then
                 Editor:onUINil()
+                core.sendGlobalEvent('BC_RecheckTroupe', { player = self, })
             elseif data.newMode == 'Scroll' or data.newMode == 'Book' then
                 local book = data.arg
                 local id = book.recordId

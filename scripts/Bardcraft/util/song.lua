@@ -213,7 +213,8 @@ function Song.new(title, desc, tempo, timeSig)
     self.noteIdCounter = 1
     self.tempoMod = 1
     self.loopTimes = 1
-    self.texture = "tavern"
+    self.texture = "generic"
+    self.difficulty = "custom"
     return self
 end
 
@@ -368,7 +369,8 @@ function Song.fromMidiParser(parser, metadata)
     self.loopBars = (metadata and metadata.loopBars) or {0, barCount}
     self.loopTimes = (metadata and metadata.loopCount) or 0
     self.tempoMod = (metadata and metadata.tempoMod) or 1
-    self.texture = (metadata and metadata.texture) or "tavern"
+    self.texture = (metadata and metadata.texture) or "generic"
+    self.difficulty = (metadata and metadata.difficulty) or "custom"
     self.notes = self:noteMapToNoteEvents(self:noteEventsToNoteMap(self.notes))
     return self
 end

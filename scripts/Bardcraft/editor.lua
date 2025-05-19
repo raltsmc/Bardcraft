@@ -1231,6 +1231,40 @@ uiTemplates = {
         return partDisplaySmall
     end,
     songDisplay = function(song, itemHeight, thickBorders, onClick)
+        local stars = {}
+        if song.difficulty == "starter" then
+            table.insert(stars, {
+                type = ui.TYPE.Image,
+                props = {
+                    resource = ui.texture { path = "textures/Bardcraft/ui/star-half.dds", size = util.vector2(26, 25) },
+                    size = util.vector2(26, 25),
+                }
+            })
+        elseif song.difficulty == "beginner" or song.difficulty == "intermediate" or song.difficulty == "advanced" then
+            local count = ({ beginner = 1, intermediate = 2, advanced = 3 })[song.difficulty] or 0
+            for i = 1, count do
+                table.insert(stars, {
+                    type = ui.TYPE.Image,
+                    props = {
+                        resource = ui.texture { path = "textures/Bardcraft/ui/star-full.dds", size = util.vector2(26, 25) },
+                        size = util.vector2(26, 25),
+                    }
+                })
+            end
+        end
+
+        local starRow = {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+                align = ui.ALIGNMENT.Center,
+                anchor = util.vector2(1, 0.5),
+                relativePosition = util.vector2(1, 0.5),
+                position = util.vector2(-8, 0),
+            },
+            content = ui.content(stars),
+        }
+
         return {
             template = (thickBorders and I.MWUI.templates.bordersThick or I.MWUI.templates.borders),
             props = {
@@ -1243,9 +1277,23 @@ uiTemplates = {
                 {
                     type = ui.TYPE.Image,
                     props = {
-                        resource = ui.texture { path = 'textures/Bardcraft/ui/songbgr/' .. song.texture .. '.dds' },
+                        resource = ui.texture { 
+                            path = 'textures/Bardcraft/ui/songbgr/' .. song.texture .. '.dds',
+                            offset = util.vector2(0, 32),
+                            size = util.vector2(0, 64),
+                        },
                         relativeSize = util.vector2(1, 1),
-                        color = Editor.uiColors.GRAY,
+                    },
+                },
+                {
+                    type = ui.TYPE.Image,
+                    props = {
+                        resource = ui.texture { 
+                            path = 'textures/Bardcraft/ui/songbgr-overlay.dds',
+                            offset = util.vector2(0, 32),
+                            size = util.vector2(0, 64),
+                        },
+                        relativeSize = util.vector2(1, 1),
                     },
                 },
                 {
@@ -1253,10 +1301,12 @@ uiTemplates = {
                     props = {
                         text = song.title,
                         textColor = thickBorders and Editor.uiColors.WHITE or Editor.uiColors.DEFAULT,
-                        anchor = util.vector2(0.5, 0.5),
-                        relativePosition = util.vector2(0.5, 0.5),
+                        anchor = util.vector2(0, 0.5),
+                        relativePosition = util.vector2(0, 0.5),
+                        position = util.vector2(8, 0),
                     },
                 },
+                starRow
             },
             events = {
                 mouseClick = async:callback(function()
@@ -2122,6 +2172,8 @@ Editor.performanceSelectedPerformer = nil
 Editor.performanceSelectedPart = nil
 Editor.performancePartAssignments = {}
 Editor.performersInfo = {}
+Editor.troupeMembers = {}
+Editor.troupeSize = 0
 Editor.canPerform = false
 
 local function startPerformance(type)
@@ -2205,7 +2257,7 @@ local function onFinalizeDraft(title, desc, cost)
     song.title = title
     song.desc = desc
     song.id = song.title .. '_' .. os.time() + math.random(10000)
-    song.texture = 'custom'
+    song.texture = 'generic'
 
     local songs = storage.playerSection('Bardcraft'):getCopy('songs/custom') or {}
     for i, cSong in ipairs(songs) do
@@ -2944,11 +2996,17 @@ getPerformanceTab = function()
     local performance = auxUi.deepLayoutCopy(uiTemplates.baseTab)
     local flexContent = performance.content[1].content[1].content
     
+    local doPerformers = Editor.troupeSize > 0
+    
     Editor.songs = getSongs()
     local scrollableSongContent = ui.content{}
-    local itemHeight = 48
+    local itemHeight = 40
     local scrollableHeight = 450 * screenSize.y / 1080
-    local scrollableWidth = 450 * screenSize.x / 1920 -- TODO change to 300
+    local scrollableWidth = 320 * screenSize.x / 1920 -- TODO change to 300
+
+    if not doPerformers then
+        scrollableWidth = scrollableWidth * 1.5
+    end
 
     if screenSize.y <= 720 then
         scrollableHeight = scrollableHeight / 2
@@ -2961,7 +3019,7 @@ getPerformanceTab = function()
         knownSongs = Editor.performersInfo[player.id] and Editor.performersInfo[player.id].knownSongs or {}
     end
 
-    Editor.performanceSelectedPerformer = player
+    if not doPerformers then Editor.performanceSelectedPerformer = player end
 
     for i, song in ipairs(Editor.songs) do
         if knownSongs[song.id] then
@@ -2980,17 +3038,18 @@ getPerformanceTab = function()
     local scrollableSong = uiTemplates.scrollable(util.vector2(scrollableWidth, scrollableHeight), scrollableSongContent, util.vector2(0, itemHeight * #scrollableSongContent + 4))
 
     local scrollablePerformersContent = ui.content{}
-    local performers = {}
-    for _, v in ipairs(nearby.actors) do
-        if --[[v.type == types.NPC or]] v.type == types.Player then
-            scrollablePerformersContent:add(uiTemplates.performerDisplay(v, itemHeight, Editor.performanceSelectedPerformer and (v.id == Editor.performanceSelectedPerformer.id), function()
-                if Editor.performanceSelectedPerformer and Editor.performanceSelectedPerformer.id == v.id then
-                    Editor.performanceSelectedPerformer = nil
-                else
-                    Editor.performanceSelectedPerformer = v
-                end
-                setMainContent(getPerformanceTab())
-            end))
+    if doPerformers then
+        for _, v in ipairs(nearby.actors) do
+            if (v.type == types.NPC and Editor.troupeMembers[v.recordId]) or v.type == types.Player then
+                scrollablePerformersContent:add(uiTemplates.performerDisplay(v, itemHeight, Editor.performanceSelectedPerformer and (v.id == Editor.performanceSelectedPerformer.id), function()
+                    if Editor.performanceSelectedPerformer and Editor.performanceSelectedPerformer.id == v.id then
+                        Editor.performanceSelectedPerformer = nil
+                    else
+                        Editor.performanceSelectedPerformer = v
+                    end
+                    setMainContent(getPerformanceTab())
+                end))
+            end
         end
     end
     local scrollablePerformers = uiTemplates.scrollable(util.vector2(scrollableWidth, scrollableHeight), scrollablePerformersContent, util.vector2(0, itemHeight * #scrollablePerformersContent + 4))
@@ -3134,10 +3193,10 @@ getPerformanceTab = function()
                             {
                                 template = I.MWUI.templates.interval
                             },
-                            --[[scrollablePerformers,
-                            {
+                            doPerformers and scrollablePerformers or {},
+                            doPerformers and {
                                 template = I.MWUI.templates.interval
-                            },]]
+                            } or {},
                             scrollableParts
                         }
                     },
@@ -4101,7 +4160,7 @@ function Editor:playerConfirmModal(player, onYes, onNo)
     ))
 end
 
-function Editor:playerChoiceModal(player, title, choices)
+function Editor:playerChoiceModal(player, title, choices, text)
     self:destroyUI()
     core.sendGlobalEvent('Pause', 'BO_Editor')
     I.UI.setMode(I.UI.MODE.Interface, {windows = {}})
@@ -4114,17 +4173,29 @@ function Editor:playerChoiceModal(player, title, choices)
                 arrange = ui.ALIGNMENT.Center,
             },
             content = ui.content {
-                createPaddingTemplate(16),
+                createPaddingTemplate(8),
+                text and {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = text,
+                        textAlignH = ui.ALIGNMENT.Center,
+                    },
+                } or {},
+                text and createPaddingTemplate(8) or {},
                 {
                     type = ui.TYPE.Flex,
                     props = {
                         horizontal = false,
                         autoSize = false,
-                        relativeSize = util.vector2(1, 1),
                         arrange = ui.ALIGNMENT.Center,
+                        align = ui.ALIGNMENT.Center,
+                    },
+                    external = {
+                        grow = 1,
+                        stretch = 1,
                     },
                     content = (function()
-                        local buttons = {}
+                        local buttons = {createPaddingTemplate(8)}
                         for _, choice in ipairs(choices) do
                             table.insert(buttons, uiTemplates.button(choice.text, util.vector2(200, 32), function()
                                 if choice.callback then
@@ -4137,10 +4208,10 @@ function Editor:playerChoiceModal(player, title, choices)
                         return ui.content(buttons)
                     end)(),
                 },
-                createPaddingTemplate(16),
+                createPaddingTemplate(8),
             },
         },
-        util.vector2(400, 160),
+        util.vector2(400, 180),
         title--"Choice"
     ))
 end

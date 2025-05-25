@@ -61,15 +61,6 @@ local function parseAllPreset()
     elseif feedback then
         bardData:set('feedback', feedback)
     end
-
-    local venuesPath = 'scripts/Bardcraft/venues.yaml'
-    exists = vfs.fileExists(venuesPath)
-    local venues = exists and markup.loadYaml(venuesPath) or {}
-    if not exists then
-        print("WARNING: venues.yaml missing")
-    elseif venues then
-        bardData:set('venues', venues)
-    end
 end
 
 local mwscriptQueue = {}

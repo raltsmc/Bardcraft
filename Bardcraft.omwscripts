@@ -6,4 +6,5 @@ GLOBAL: scripts/Bardcraft/globalevents.lua
 PLAYER: scripts/Bardcraft/player.lua
 PLAYER: scripts/Bardcraft/questrewards.lua
 NPC: scripts/Bardcraft/npc.lua
+NPC, CREATURE: scripts/Bardcraft/combat.lua
 MISC_ITEM, ACTIVATOR: scripts/Bardcraft/musicbox.lua

@@ -21,6 +21,7 @@ local Song = require('scripts.Bardcraft.util.song').Song
 local Data = require('scripts.Bardcraft.data')
 
 local configPlayer = require('scripts.Bardcraft.config.player')
+local configGlobal = require('scripts.Bardcraft.config.global')
 
 local performersInfo = {}
 
@@ -86,29 +87,28 @@ local performancePart = nil
 local queuedMilestone = nil
 local practiceSong = nil
 
-local practiceOverlayNoteMap = {}
-local practiceOverlayNoteIdToIndex = {}
-local practiceOverlayNoteIndexToContentId = {}
-local practiceOverlay = nil
-local practiceOverlayNotesWrapper = nil
-local practiceOverlayNoteFlashTimes = {}
-local practiceOverlayNoteSuccess = {}
-local practiceOverlayNoteFadeTimes = {}
-local practiceOverlayNoteFadeAlphaStart = {}
+local performOverlayNoteMap = {}
+local performOverlayNoteIdToIndex = {}
+local performOverlayNoteIndexToContentId = {}
+local performOverlay = nil
+local performOverlayNotesWrapper = nil
+local performOverlayNoteFlashTimes = {}
+local performOverlayNoteSuccess = {}
+local performOverlayNoteFadeTimes = {}
+local performOverlayNoteFadeAlphaStart = {}
+local performOverlayTargetOpacity = 0.4
+local performOverlayFadeInTimer = 0
+local performOverlayFadeInDuration = 0.3
+local performOverlayScaleX = 8 -- Every 8 ticks is 1 pixel
+local performOverlayScaleY = 0
+local performOverlayTick = 0
+local performOverlayNoteBounds = {129, 0}
+local performOverlayRepopulateTimeWindow = 2 -- seconds; only render notes within this time window to avoid crazy lag
+local performOverlayRepopulateTime = performOverlayRepopulateTimeWindow 
+local performOverlayNoteLayouts = {}
+local performOverlayLastShakeFactor = 0
 
-local practiceOverlayTargetOpacity = 0.4
-local practiceOverlayFadeInTimer = 0
-local practiceOverlayFadeInDuration = 0.3
-local practiceOverlayScaleX = 8 -- Every 8 ticks is 1 pixel
-local practiceOverlayScaleY = 0
-local practiceOverlayTick = 0
-local practiceOverlayNoteBounds = {129, 0}
-local practiceOverlayRepopulateTimeWindow = 2 -- seconds; only render notes within this time window to avoid crazy lag
-local practiceOverlayRepopulateTime = practiceOverlayRepopulateTimeWindow 
-local practiceOverlayNoteLayouts = {}
-local practiceOverlayLastShakeFactor = 0
-
-local practiceOverlayToggle = true
+local performOverlayToggle = true
 
 local tpFadeOverlay = ui.create {
     layer = 'Notification',
@@ -145,7 +145,7 @@ local function getPracticeNoteMap()
     if not practiceSong then return {} end
     local baseNoteMap = practiceSong:noteEventsToNoteMap(practiceSong.notes)
     local noteMap = {}
-    practiceOverlayNoteBounds = {129, 0}
+    performOverlayNoteBounds = {129, 0}
     for i, data in pairs(baseNoteMap) do
         if data.part == performancePart then
             table.insert(noteMap, {
@@ -154,12 +154,12 @@ local function getPracticeNoteMap()
                 duration = data.duration,
                 index = data.id,
             })
-            practiceOverlayNoteBounds[1] = math.min(practiceOverlayNoteBounds[1], data.note)
-            practiceOverlayNoteBounds[2] = math.max(practiceOverlayNoteBounds[2], data.note)
+            performOverlayNoteBounds[1] = math.min(performOverlayNoteBounds[1], data.note)
+            performOverlayNoteBounds[2] = math.max(performOverlayNoteBounds[2], data.note)
         end
     end
     table.sort(noteMap, function(a, b) return a.time < b.time end)
-    practiceOverlayScaleY = 128 / ((practiceOverlayNoteBounds[2] - practiceOverlayNoteBounds[1]) + 2)
+    performOverlayScaleY = 128 / ((performOverlayNoteBounds[2] - performOverlayNoteBounds[1]) + 2)
     return noteMap
 end
 
@@ -175,41 +175,41 @@ local function lerpColor(t, a, b)
     )
 end
 
-local function initPracticeOverlayNotes()
-    if not practiceOverlayNotesWrapper then return end
+local function initPerformOverlayNotes()
+    if not performOverlayNotesWrapper then return end
 
     local screenWidth = ui.screenSize().x
 
-    practiceOverlayNoteLayouts = {}
+    performOverlayNoteLayouts = {}
     local i = 1
-    for _, data in pairs(practiceOverlayNoteMap) do
-        practiceOverlayNoteIdToIndex[data.index] = i
+    for _, data in pairs(performOverlayNoteMap) do
+        performOverlayNoteIdToIndex[data.index] = i
         local note = {
             type = ui.TYPE.Image,
             props = {
                 index = data.index,
                 resource = ui.texture { path = 'textures/bardcraft/ui/pianoroll-note.dds' },
-                size = util.vector2(data.duration * practiceOverlayScaleX - practiceOverlayScaleX, practiceOverlayScaleY * 4),
+                size = util.vector2(data.duration * performOverlayScaleX - performOverlayScaleX, performOverlayScaleY * 4),
                 tileH = true,
                 tileV = false,
-                baseY = math.floor((practiceOverlayNoteBounds[2] - data.note) * practiceOverlayScaleY) * 2,
-                position = util.vector2(data.time * practiceOverlayScaleX + screenWidth / 2, math.floor((practiceOverlayNoteBounds[2] - data.note) * practiceOverlayScaleY) * 2),
+                baseY = math.floor((performOverlayNoteBounds[2] - data.note) * performOverlayScaleY) * 2,
+                position = util.vector2(data.time * performOverlayScaleX + screenWidth / 2, math.floor((performOverlayNoteBounds[2] - data.note) * performOverlayScaleY) * 2),
                 alpha = 0.2,
             },
         }
-        table.insert(practiceOverlayNoteLayouts, note)
+        table.insert(performOverlayNoteLayouts, note)
         i = i + 1
     end
 end
 
-local function populatePracticeOverlayNotes()
-    local windowXOffset = practiceOverlayTick * practiceOverlayScaleX - practiceOverlayScaleX
-    local windowXSize = ui.screenSize().x + practiceSong:secondsToTicks(practiceOverlayRepopulateTimeWindow) * practiceOverlayScaleX
+local function populatePerformOverlayNotes()
+    local windowXOffset = performOverlayTick * performOverlayScaleX - performOverlayScaleX
+    local windowXSize = ui.screenSize().x + practiceSong:secondsToTicks(performOverlayRepopulateTimeWindow) * performOverlayScaleX
     local content = ui.content {}
-    practiceOverlayNoteIndexToContentId = {}
+    performOverlayNoteIndexToContentId = {}
 
     local count = 0
-    for i, note in pairs(practiceOverlayNoteLayouts) do
+    for i, note in pairs(performOverlayNoteLayouts) do
         local notePos = note.props.position.x
         local noteSize = note.props.size.x
 
@@ -219,25 +219,25 @@ local function populatePracticeOverlayNotes()
         if notePos + noteSize >= windowXOffset then
             content:add(note)
             count = count + 1
-            practiceOverlayNoteIndexToContentId[i] = count
+            performOverlayNoteIndexToContentId[i] = count
         end
     end
 
-    practiceOverlayNotesWrapper.layout.content[1].content = content
-    practiceOverlayNotesWrapper:update()
+    performOverlayNotesWrapper.layout.content[1].content = content
+    performOverlayNotesWrapper:update()
 end
 
-local function createPracticeOverlay()
+local function createPerformOverlay()
     local alreadyShowing = false
     local alpha = 0
-    if practiceOverlay then
+    if performOverlay then
         alreadyShowing = true
-        alpha = practiceOverlay.layout.props.alpha
-        auxUi.deepDestroy(practiceOverlay)
+        alpha = performOverlay.layout.props.alpha
+        auxUi.deepDestroy(performOverlay)
     end
-    practiceOverlayNoteMap = getPracticeNoteMap()
+    performOverlayNoteMap = getPracticeNoteMap()
 
-    practiceOverlayNotesWrapper = ui.create {
+    performOverlayNotesWrapper = ui.create {
         type = ui.TYPE.Container,
         props = {
             relativeSize = util.vector2(1, 1),
@@ -254,7 +254,7 @@ local function createPracticeOverlay()
                 type = ui.TYPE.Image,
                 props = {
                     resource = ui.texture { path = 'textures/bardcraft/ui/practice-overlay-line.dds' },
-                    position = util.vector2(practiceSong:barToTick(practiceSong.loopBars[2]) * practiceOverlayScaleX + ui.screenSize().x / 2, 0),
+                    position = util.vector2(practiceSong:barToTick(practiceSong.loopBars[2]) * performOverlayScaleX + ui.screenSize().x / 2, 0),
                     size = util.vector2(8, 256),
                     color = Editor.uiColors.CYAN,
                 },
@@ -262,7 +262,7 @@ local function createPracticeOverlay()
         },
     }
 
-    practiceOverlay = ui.create {
+    performOverlay = ui.create {
         layer = 'HUD',
         type = ui.TYPE.Image,
         props = {
@@ -273,10 +273,10 @@ local function createPracticeOverlay()
             tileH = true,
             tileV = false,
             alpha = alpha,
-            visible = practiceOverlayToggle,
+            visible = performOverlayToggle,
         },
         content = ui.content {
-            practiceOverlayNotesWrapper,
+            performOverlayNotesWrapper,
             {
                 type = ui.TYPE.Image,
                 props = {
@@ -290,53 +290,53 @@ local function createPracticeOverlay()
         },
     }
     if not alreadyShowing then
-        practiceOverlayFadeInTimer = practiceOverlayFadeInDuration
+        performOverlayFadeInTimer = performOverlayFadeInDuration
     end
 
-    practiceOverlayScaleX = 6 * (practiceSong.tempo * practiceSong.tempoMod / 120)
-    practiceOverlayTick = 1
-    initPracticeOverlayNotes()
-    populatePracticeOverlayNotes()
-    practiceOverlayNoteFlashTimes = {}
-    practiceOverlayNoteFadeTimes = {}
-    practiceOverlayNoteFadeAlphaStart = {}
-    practiceOverlayNoteSuccess = {}
-    practiceOverlayRepopulateTime = practiceOverlayRepopulateTimeWindow 
-    practiceOverlayLastShakeFactor = -1
+    performOverlayScaleX = 6 * (practiceSong.tempo * practiceSong.tempoMod / 120)
+    performOverlayTick = 1
+    initPerformOverlayNotes()
+    populatePerformOverlayNotes()
+    performOverlayNoteFlashTimes = {}
+    performOverlayNoteFadeTimes = {}
+    performOverlayNoteFadeAlphaStart = {}
+    performOverlayNoteSuccess = {}
+    performOverlayRepopulateTime = performOverlayRepopulateTimeWindow 
+    performOverlayLastShakeFactor = -1
 end
 
-local function togglePracticeOverlay()
-    if practiceOverlay then
-        practiceOverlayToggle = not practiceOverlayToggle
-        practiceOverlay.layout.props.visible = practiceOverlayToggle
-        if not practiceOverlayToggle then
-            practiceOverlayFadeInTimer = 0
-            practiceOverlay.layout.props.alpha = 0
+local function togglePerformOverlay()
+    if performOverlay then
+        performOverlayToggle = not performOverlayToggle
+        performOverlay.layout.props.visible = performOverlayToggle
+        if not performOverlayToggle then
+            performOverlayFadeInTimer = 0
+            performOverlay.layout.props.alpha = 0
         else
-            practiceOverlayFadeInTimer = practiceOverlayFadeInDuration
-            practiceOverlay.layout.props.alpha = 0.4
+            performOverlayFadeInTimer = performOverlayFadeInDuration
+            performOverlay.layout.props.alpha = 0.4
         end
     end
 end
 
-local function destroyPracticeOverlay()
-    if practiceOverlay then
-        auxUi.deepDestroy(practiceOverlay)
-        practiceOverlay = nil
+local function destroyPerformOverlay()
+    if performOverlay then
+        auxUi.deepDestroy(performOverlay)
+        performOverlay = nil
     end
 end
 
-local function updatePracticeOverlay()
-    if not practiceOverlay or not practiceOverlayNotesWrapper then return end
-    practiceOverlayNotesWrapper.layout.props.position = util.vector2(-practiceOverlayTick * practiceOverlayScaleX, 0)
-    if practiceOverlayRepopulateTime > 0 then
-        practiceOverlayRepopulateTime = math.max(practiceOverlayRepopulateTime - core.getRealFrameDuration(), 0)
+local function updatePerformOverlay()
+    if not performOverlay or not performOverlayNotesWrapper then return end
+    performOverlayNotesWrapper.layout.props.position = util.vector2(-performOverlayTick * performOverlayScaleX, 0)
+    if performOverlayRepopulateTime > 0 then
+        performOverlayRepopulateTime = math.max(performOverlayRepopulateTime - core.getRealFrameDuration(), 0)
     else
-        practiceOverlayRepopulateTime = practiceOverlayRepopulateTimeWindow
-        populatePracticeOverlayNotes()
+        performOverlayRepopulateTime = performOverlayRepopulateTimeWindow
+        populatePerformOverlayNotes()
     end
-    practiceOverlayNotesWrapper:update()
-    practiceOverlay:update()
+    performOverlayNotesWrapper:update()
+    performOverlay:update()
 end
 
 local function doHurt(amount)
@@ -364,6 +364,9 @@ local function setSheathVfx()
     if backInstrument and camera.getMode() ~= camera.MODE.FirstPerson and (not performInstrument or backInstrument.id ~= performInstrument.id) then
         local modelName = backInstrument.model
         modelName = 'meshes/bardcraft/vfx/sheathe/' .. modelName:match("([^/]+)$")
+        if not anim.hasBone(self, 'Bip01 BOInstrumentBack') then 
+            return 
+        end
         anim.addVfx(self, modelName, {
             vfxId = 'BC_BackInstrument',
             boneName = 'Bip01 BOInstrumentBack',
@@ -412,11 +415,15 @@ local function onStanceChange(stance)
 end
 
 input.registerTriggerHandler('ToggleWeapon', async:callback(function()
-    onStanceChange(self.type.STANCE.Weapon)
+    if not core.isWorldPaused() then
+        onStanceChange(self.type.STANCE.Weapon)
+    end
 end))
 
 input.registerTriggerHandler('ToggleSpell', async:callback(function()
-    onStanceChange(self.type.STANCE.Spell)
+    if not core.isWorldPaused() then
+        onStanceChange(self.type.STANCE.Spell)
+    end
 end))
 
 input.registerActionHandler('Use', async:callback(function(e)
@@ -426,14 +433,15 @@ input.registerActionHandler('Use', async:callback(function(e)
 end))
 
 local function silenceAmbientMusic()
-    if configPlayer.options.silenceAmbientMusic == true then
+    if configPlayer.options.bSilenceAmbientMusic == true then
         ambient.streamMusic("sound\\Bardcraft\\silence.opus", { fadeOut = 0.5 })
     end
 end
 
 local function unsilenceAmbientMusic()
-    if configPlayer.options.silenceAmbientMusic == true then
+    if configPlayer.options.bSilenceAmbientMusic == true then
         ambient.stopMusic()
+        self:sendEvent('DM_ForceRestart')
     end
 end
 
@@ -584,9 +592,9 @@ return {
             end
         end,
         onKeyPress = function(e)
-            if e.symbol == 'b' then
+            if e.code == configPlayer.keybinds.kOpenInterface then
                 if input.isAltPressed() then
-                    togglePracticeOverlay()
+                    togglePerformOverlay()
                 elseif not Performer.playing then
                     setPerformerInfo()
                     Editor:onToggle()
@@ -595,8 +603,6 @@ return {
                         core.sendGlobalEvent('BO_StopPerformance')
                     end)
                 end
-            elseif e.symbol == 'n' then
-                Performer:addPerformanceXP(1000) -- debug
             elseif Editor.active and e.code == input.KEY.Space then
                 Editor:togglePlayback(input.isCtrlPressed())
             end
@@ -634,58 +640,58 @@ return {
             end
             Editor:onFrame()
             Performer:onFrame()
-            if practiceOverlay and practiceSong then
-                practiceOverlayTick = practiceSong:secondsToTicks(Performer.musicTime)
-                if practiceOverlayFadeInTimer > 0 then
-                    practiceOverlayFadeInTimer = practiceOverlayFadeInTimer - core.getRealFrameDuration()
-                    if practiceOverlayFadeInTimer <= 0 then
-                        practiceOverlayFadeInTimer = 0
+            if performOverlay and practiceSong then
+                performOverlayTick = practiceSong:secondsToTicks(Performer.musicTime)
+                if performOverlayFadeInTimer > 0 then
+                    performOverlayFadeInTimer = performOverlayFadeInTimer - core.getRealFrameDuration()
+                    if performOverlayFadeInTimer <= 0 then
+                        performOverlayFadeInTimer = 0
                     end
                 end
 
-                for id, time in pairs(practiceOverlayNoteFlashTimes) do
+                for id, time in pairs(performOverlayNoteFlashTimes) do
                     if time > 0 then
-                        practiceOverlayNoteFlashTimes[id] = math.max(time - dt, 0)
-                        local note = practiceOverlayNotesWrapper.layout.content[1].content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[id]]]
+                        performOverlayNoteFlashTimes[id] = math.max(time - dt, 0)
+                        local note = performOverlayNotesWrapper.layout.content[1].content[performOverlayNoteIndexToContentId[performOverlayNoteIdToIndex[id]]]
                         if note then
-                            note.props.alpha = lerp((1.5 - practiceOverlayNoteFlashTimes[id]) / 1.5, 1, 0.4)
-                            note.props.color = practiceOverlayNoteSuccess[id] and Editor.uiColors.DEFAULT or Editor.uiColors.DARK_RED
+                            note.props.alpha = lerp((1.5 - performOverlayNoteFlashTimes[id]) / 1.5, 1, 0.4)
+                            note.props.color = performOverlayNoteSuccess[id] and Editor.uiColors.DEFAULT or Editor.uiColors.DARK_RED
                         end
-                        if practiceOverlayNoteFlashTimes[id] <= 0 then
-                            practiceOverlayNoteFlashTimes[id] = nil
+                        if performOverlayNoteFlashTimes[id] <= 0 then
+                            performOverlayNoteFlashTimes[id] = nil
                         end
                     end
                 end
 
-                for id, time in pairs(practiceOverlayNoteFadeTimes) do
+                for id, time in pairs(performOverlayNoteFadeTimes) do
                     if time > 0 then
-                        practiceOverlayNoteFadeTimes[id] = math.max(time - dt, 0)
-                        local note = practiceOverlayNotesWrapper.layout.content[1].content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[id]]]
+                        performOverlayNoteFadeTimes[id] = math.max(time - dt, 0)
+                        local note = performOverlayNotesWrapper.layout.content[1].content[performOverlayNoteIndexToContentId[performOverlayNoteIdToIndex[id]]]
                         if note then
-                            note.props.alpha = lerp((0.5 - practiceOverlayNoteFadeTimes[id]) / 0.5, practiceOverlayNoteFadeAlphaStart[id], 0)
-                            local startColor = practiceOverlayNoteSuccess[id] and Editor.uiColors.DEFAULT or Editor.uiColors.DARK_RED
-                            local endColor = practiceOverlayNoteSuccess[id] and Editor.uiColors.GRAY or Editor.uiColors.DARK_RED_DESAT
-                            note.props.color = lerpColor((0.5 - practiceOverlayNoteFadeTimes[id]) / 0.5, startColor, endColor)
+                            note.props.alpha = lerp((0.5 - performOverlayNoteFadeTimes[id]) / 0.5, performOverlayNoteFadeAlphaStart[id], 0)
+                            local startColor = performOverlayNoteSuccess[id] and Editor.uiColors.DEFAULT or Editor.uiColors.DARK_RED
+                            local endColor = performOverlayNoteSuccess[id] and Editor.uiColors.GRAY or Editor.uiColors.DARK_RED_DESAT
+                            note.props.color = lerpColor((0.5 - performOverlayNoteFadeTimes[id]) / 0.5, startColor, endColor)
                         end
-                        if practiceOverlayNoteFadeTimes[id] <= 0 then
-                            practiceOverlayNoteFadeTimes[id] = nil
-                            practiceOverlayNoteFadeAlphaStart[id] = nil
-                            practiceOverlayNoteSuccess[id] = nil
+                        if performOverlayNoteFadeTimes[id] <= 0 then
+                            performOverlayNoteFadeTimes[id] = nil
+                            performOverlayNoteFadeAlphaStart[id] = nil
+                            performOverlayNoteSuccess[id] = nil
                         end
                     end
                 end
 
                 local currentShakeFactor = Performer.currentConfidence < 0.75 and (0.75 - Performer.currentConfidence) / 0.75 or 0
                 -- Smooth shake factor
-                if practiceOverlayLastShakeFactor == -1 then
-                    practiceOverlayLastShakeFactor = currentShakeFactor
+                if performOverlayLastShakeFactor == -1 then
+                    performOverlayLastShakeFactor = currentShakeFactor
                 end
-                local shakeFactor = practiceOverlayLastShakeFactor * 0.99 + currentShakeFactor * 0.01
-                practiceOverlayLastShakeFactor = shakeFactor
+                local shakeFactor = performOverlayLastShakeFactor * 0.99 + currentShakeFactor * 0.01
+                performOverlayLastShakeFactor = shakeFactor
 
-                for _, note in pairs(practiceOverlayNotesWrapper.layout.content[1].content) do
+                for _, note in pairs(performOverlayNotesWrapper.layout.content[1].content) do
                     if note and note.props then
-                        if not practiceOverlayNoteSuccess[note.props.index] then
+                        if not performOverlayNoteSuccess[note.props.index] then
                             note.props.position = util.vector2(note.props.position.x, note.props.baseY + shakeFactor * 5 * math.sin((core.getRealTime()) * 25 + note.props.index))
                         else
                             note.props.position = util.vector2(note.props.position.x, note.props.baseY)
@@ -693,9 +699,9 @@ return {
                     end
                 end
 
-                local opacity = lerp((practiceOverlayFadeInDuration - practiceOverlayFadeInTimer) / practiceOverlayFadeInDuration, 0, practiceOverlayTargetOpacity)
-                practiceOverlay.layout.props.alpha = opacity
-                updatePracticeOverlay()
+                local opacity = lerp((performOverlayFadeInDuration - performOverlayFadeInTimer) / performOverlayFadeInDuration, 0, performOverlayTargetOpacity)
+                performOverlay.layout.props.alpha = opacity
+                updatePerformOverlay()
             end
             if hurtAlpha > 0 then
                 hurtAlpha = math.max(hurtAlpha - core.getRealFrameDuration(), 0)
@@ -732,32 +738,34 @@ return {
                 practiceSong = data.song
                 performancePart = data.part.index
                 setmetatable(practiceSong, Song)
-                createPracticeOverlay()
+                createPerformOverlay()
                 performInstrument = types.Miscellaneous.record(data.item)
                 silenceAmbientMusic()
             elseif data.type == 'PerformStop' then
-                destroyPracticeOverlay()
+                destroyPerformOverlay()
                 performInstrument = nil
-                unsilenceAmbientMusic()
+                if not nearbyPlaying then
+                    unsilenceAmbientMusic()
+                end
             elseif data.type == 'NoteEvent' then
-                if practiceOverlay and practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]] then
-                    local content = practiceOverlayNotesWrapper.layout.content[1].content
-                    local note = content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]]]
+                if performOverlay and performOverlayNoteIndexToContentId[performOverlayNoteIdToIndex[data.id]] then
+                    local content = performOverlayNotesWrapper.layout.content[1].content
+                    local note = content[performOverlayNoteIndexToContentId[performOverlayNoteIdToIndex[data.id]]]
                     if note then
-                        practiceOverlayNoteFlashTimes[data.id] = 1.5
-                        practiceOverlayNoteSuccess[data.id] = success
+                        performOverlayNoteFlashTimes[data.id] = 1.5
+                        performOverlayNoteSuccess[data.id] = success
                         --note.props.alpha = 1
                     end
                 end
             elseif data.type == 'NoteEndEvent' then
-                if practiceOverlay and practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]] then
-                    local content = practiceOverlayNotesWrapper.layout.content[1].content
-                    local note = content[practiceOverlayNoteIndexToContentId[practiceOverlayNoteIdToIndex[data.id]]]
+                if performOverlay and performOverlayNoteIndexToContentId[performOverlayNoteIdToIndex[data.id]] then
+                    local content = performOverlayNotesWrapper.layout.content[1].content
+                    local note = content[performOverlayNoteIndexToContentId[performOverlayNoteIdToIndex[data.id]]]
                     if note then
-                        practiceOverlayNoteFadeTimes[data.id] = 0.5
-                        practiceOverlayNoteFadeAlphaStart[data.id] = note.props.alpha
-                        if practiceOverlayNoteFlashTimes[data.id] then
-                            practiceOverlayNoteFlashTimes[data.id] = nil
+                        performOverlayNoteFadeTimes[data.id] = 0.5
+                        performOverlayNoteFadeAlphaStart[data.id] = note.props.alpha
+                        if performOverlayNoteFlashTimes[data.id] then
+                            performOverlayNoteFlashTimes[data.id] = nil
                         end
                     end
                 end
@@ -785,6 +793,7 @@ return {
             ui.showMessage(message:gsub('%%{songTitle}', data.songTitle):gsub('%%{partTitle}', data.partTitle):gsub('%%{confidence}', string.format('%.2f', data.newConfidence * 100)))
         end,
         BC_PracticeEfficiency = function(data)
+            if configGlobal.options.bEnablePracticeEfficiency ~= true then return end
             local message = l10n('UI_Msg_PracticeEfficiency'):gsub('%%{efficiency}', string.format('%d', data.efficiency * 100))
             ui.showMessage(message)
         end,

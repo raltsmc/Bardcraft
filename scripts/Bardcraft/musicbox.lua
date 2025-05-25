@@ -80,7 +80,7 @@ local function pickRandomSong()
 end
 
 local function isValid()
-    return self.recordId:sub(1, 16) == '_rlts_bc_musbox_'
+    return self.recordId:sub(1, 12) == 'r_bc_musbox_'
 end
 
 local function calcAnimSpeed()

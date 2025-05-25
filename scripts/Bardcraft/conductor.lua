@@ -6,11 +6,11 @@ local util = require('openmw.util')
 local calendar = require('openmw_aux.calendar')
 local time = require('openmw_aux.time')
 
-local configGlobal = require('scripts.Bardcraft.config.global')
 local Song = require('scripts.Bardcraft.util.song').Song
 local Cell = require('scripts.Bardcraft.cell')
 local Feedback = require('scripts.Bardcraft.feedback')
 local instrumentItems = require('scripts.Bardcraft.data').InstrumentItems
+local configGlobal = require('scripts.Bardcraft.config.global')
 
 local l10n = core.l10n('Bardcraft')
 
@@ -53,7 +53,11 @@ local function start(data)
 
     partToPerformer = {}
     for _, performerData in ipairs(performers) do
-        partToPerformer[performerData.part.index] = performerData.actor
+        local partIndex = performerData.part.index
+        if not partToPerformer[partIndex] then
+            partToPerformer[partIndex] = {}
+        end
+        table.insert(partToPerformer[partIndex], performerData.actor)
     end
 
     song.loopCount = (data.type == Song.PerformanceType.Street or data.type == Song.PerformanceType.Ambient) and 1e10 or song.loopTimes
@@ -163,7 +167,7 @@ local function stop()
     end
     playing = false
     for _, performerData in ipairs(performers) do
-        performerData.actor:sendEvent('BO_ConductorEvent', { type = 'PerformStop', completion = song and (performance.time / song:lengthInSeconds()) or 0, cell = performance.streetName or performance.cell.name })
+        performerData.actor:sendEvent('BO_ConductorEvent', { type = 'PerformStop', completion = song and (performance.time / song:lengthInSeconds()) or 0, cell = performance.streetName or performance.cell.name, startTime = performance.startGameTime, })
     end
 
     if performance.type == Song.PerformanceType.Practice or performance.type == Song.PerformanceType.Ambient then
@@ -295,7 +299,7 @@ local function stop()
             -- Calculate how much the publican pays
             local payment = 0
             if not kickOut then
-                payment = getBasePayAmount()
+                payment = getBasePayAmount() * configGlobal.options.fOverallGoldMult * configGlobal.options.fTavernGoldMult
             end
 
             -- Calculate publican disposition change
@@ -376,16 +380,21 @@ local function tickPerformance(dt)
     function(filePath, velocity, instrument, note, part, id)
         local profile = Song.getInstrumentProfile(instrument)
         velocity = velocity * 2 * profile.volume / 127
-        local actor = partToPerformer[part]
-        if not actor then return end
-        if actor.type == types.Player then velocity = velocity / 2 end
-        actor:sendEvent('BO_ConductorEvent', { type = 'NoteEvent', time = performance.time, note = note, id = id, filePath = filePath, velocity = velocity })
+        local actors = partToPerformer[part]
+        if not actors then return end
+        for _, actor in ipairs(actors) do
+            local v = velocity
+            if actor.type == types.Player then v = v / 2 end
+            actor:sendEvent('BO_ConductorEvent', { type = 'NoteEvent', time = performance.time, note = note, id = id, filePath = filePath, velocity = v })
+        end
     end,
     function(filePath, instrument, note, part, id)
         local profile = Song.getInstrumentProfile(instrument)
-        local actor = partToPerformer[part]
-        if not actor then return end
-        actor:sendEvent('BO_ConductorEvent', { type = 'NoteEndEvent', note = note, id = id, filePath = filePath, stopSound = not profile.sustain })
+        local actors = partToPerformer[part]
+        if not actors then return end
+        for _, actor in ipairs(actors) do
+            actor:sendEvent('BO_ConductorEvent', { type = 'NoteEndEvent', note = note, id = id, filePath = filePath, stopSound = profile.sustain })
+        end
     end) then
         stop()
         return
@@ -531,7 +540,7 @@ local function doRandomEvent()
     end
     
     local tipChance = 0.5
-    local tipAmount = 1
+    local tipAmount = configGlobal.options.fOverallGoldMult
     local tipType = TipType.Normal
 
     local statFactor = getStatFactor()
@@ -637,7 +646,12 @@ local function doRandomEvent()
             sfx = 'sound\\Bardcraft\\crowd\\coin-one.wav'
             speechXp = 1
         end
-        local tipAmount = math.ceil(tipAmount)
+        if performance.type == Song.PerformanceType.Tavern then
+            tipAmount = tipAmount * configGlobal.options.fTavernGoldMult
+        elseif performance.type == Song.PerformanceType.Street then
+            tipAmount = tipAmount * configGlobal.options.fStreetGoldMult
+        end
+        tipAmount = math.ceil(tipAmount)
         if tipAmount > 0 then
             payPlayer(player, tipAmount, message, sfx)
             performance.tips = performance.tips + tipAmount
@@ -675,6 +689,15 @@ local function doCrowdNoise()
         local soundFile = 'sound/Bardcraft/crowd/clap' .. crowdNoiseNum .. '.wav'
         if not core.sound.isSoundFilePlaying(soundFile, world.players[1]) then
             core.sound.playSoundFile3d(soundFile, world.players[1], { volume = 0.1 + 0.4 * (performance.quality - 80) / 20 })
+        end
+    elseif performance.quality >= 85 and performance.density > 3 then
+        if math.random() < 0.5 then
+            local clapOptions = { "clap3", "clap4", "clap-polite" }
+            local idx = math.random(1, #clapOptions)
+            local soundFile = 'sound/Bardcraft/crowd/' .. clapOptions[idx] .. '.wav'
+            if not core.sound.isSoundFilePlaying(soundFile, world.players[1]) then
+                core.sound.playSoundFile3d(soundFile, world.players[1], { volume = 0.1 + 0.15 * (performance.quality - 85) / 15 })
+            end
         end
     end
 end
@@ -740,7 +763,7 @@ return {
                     -- Check if it's the evening (6PM - midnight)
                     local gameTime = core.getGameTime()
                     local timeOfDay = gameTime % time.day
-                    local isEvening = timeOfDay >= 18 * time.hour
+                    local isEvening = (timeOfDay >= 18 * time.hour) or (configGlobal.options.bEnableTimeRestriction == false)
                     if not isEvening then
                         player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_TooEarly') })
                         return
@@ -814,10 +837,10 @@ return {
             end
         end,
         BC_PerformerNoteHandled = function(data)
-            if not performance.noteEvents[data.part.index] then
-                performance.noteEvents[data.part.index] = {}
+            if not performance.noteEvents[data.performer.id] then
+                performance.noteEvents[data.performer.id] = {}
             end
-            table.insert(performance.noteEvents[data.part.index], { success = data.success, mod = data.mod })
+            table.insert(performance.noteEvents[data.performer.id], { success = data.success, mod = data.mod })
         end,
         BC_PlayerPerfSkillLog = function(data)
             if logAwait then

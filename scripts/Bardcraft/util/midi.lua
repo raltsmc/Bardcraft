@@ -54,28 +54,28 @@ MidiParser.instrumentProfiles = {
     [24] = {
         name = "Lute",
         loop = false,
-        sustain = true,
+        sustain = false,
         transpose = true,
         volume = 1.0,
     },
     [73] = {
         name = "BassFlute",
         loop = true,
-        sustain = false,
+        sustain = true,
         transpose = true,
         volume = 1,
     },
     [79] = {
         name = "Ocarina",
         loop = true,
-        sustain = false,
+        sustain = true,
         transpose = true,
         volume = 1,
     },
     [116] = {
         name = "Drum",
         loop = false,
-        sustain = true,
+        sustain = false,
         transpose = false,
         volume = 1,
     }

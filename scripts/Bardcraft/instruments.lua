@@ -4,7 +4,7 @@ local I = require('openmw.interfaces')
 
 local templates = {
     LeftArm = {
-        mask = anim.BLEND_MASK.LeftArm,
+        blendMask = anim.BLEND_MASK.LeftArm,
         priority = {
             [anim.BONE_GROUP.LeftArm] = anim.PRIORITY.Storm,
             [anim.BONE_GROUP.RightArm] = 0,
@@ -13,7 +13,7 @@ local templates = {
         }
     },
     RightArm = {
-        mask = anim.BLEND_MASK.RightArm,
+        blendMask = anim.BLEND_MASK.RightArm,
         priority = {
             [anim.BONE_GROUP.LeftArm] = 0,
             [anim.BONE_GROUP.RightArm] = anim.PRIORITY.Storm,
@@ -22,7 +22,7 @@ local templates = {
         }
     },
     BothArms = {
-        mask = anim.BLEND_MASK.LeftArm + anim.BLEND_MASK.RightArm,
+        blendMask = anim.BLEND_MASK.LeftArm + anim.BLEND_MASK.RightArm,
         priority = {
             [anim.BONE_GROUP.LeftArm] = anim.PRIORITY.Storm,
             [anim.BONE_GROUP.RightArm] = anim.PRIORITY.Storm,
@@ -31,7 +31,7 @@ local templates = {
         }
     },
     LeftArmLooping = {
-        mask = anim.BLEND_MASK.LeftArm,
+        blendMask = anim.BLEND_MASK.LeftArm,
         priority = {
             [anim.BONE_GROUP.LeftArm] = anim.PRIORITY.Storm,
             [anim.BONE_GROUP.RightArm] = 0,
@@ -42,8 +42,20 @@ local templates = {
         forceLoop = true,
         autoDisable = false
     },
+    RightArmLooping = {
+        blendMask = anim.BLEND_MASK.RightArm,
+        priority = {
+            [anim.BONE_GROUP.LeftArm] = 0,
+            [anim.BONE_GROUP.RightArm] = anim.PRIORITY.Storm,
+            [anim.BONE_GROUP.Torso] = 0,
+            [anim.BONE_GROUP.LowerBody] = 0
+        },
+        loops = 1000000,
+        forceLoop = true,
+        autoDisable = false
+    },
     BothArmsLooping = {
-        mask = anim.BLEND_MASK.LeftArm + anim.BLEND_MASK.RightArm,
+        blendMask = anim.BLEND_MASK.LeftArm + anim.BLEND_MASK.RightArm,
         priority = {
             [anim.BONE_GROUP.LeftArm] = anim.PRIORITY.Storm,
             [anim.BONE_GROUP.RightArm] = anim.PRIORITY.Storm,
@@ -69,6 +81,13 @@ local animData = {
         bodrum_hitl = templates.LeftArm,
         bodrum_hitr = templates.RightArm,
         bodrum_roll = templates.BothArms,
+    },
+    Fiddle = {
+        bcfiddle_bow = templates.RightArmLooping,
+        bcfiddle_bowalt = templates.RightArmLooping,
+        bcfiddle_fin1 = templates.LeftArmLooping,
+        bcfiddle_fin2 = templates.LeftArmLooping,
+        bcfiddle_fin3 = templates.LeftArmLooping,
     },
     Ocarina = {
         boocarina_note1 = templates.BothArmsLooping,
@@ -107,6 +126,7 @@ local lastPlayed = nil
 local lastTime = nil
 local lastNote = nil
 local playedThisBar = false
+local activeNoteCount = 0
 
 local Instruments = {
     Lute = {
@@ -180,6 +200,91 @@ local Instruments = {
             end
         end,
     },
+    Fiddle = {
+        icon = "icons/Bardcraft/tx_fiddle.dds",
+        anim = "bcfiddle",
+        boneName = "Bip01 BOInstrument",
+        attachExtra = {
+            { boneName = "Bip01 BOInstrumentHand", path = "meshes/bardcraft/vfx/play/rlts_bc_fiddle_bow.nif", },
+        },
+        eventHandler = function(data)
+            if data.type == 'NoteEvent' then
+                activeNoteCount = activeNoteCount + 1
+                local animName = "bcfiddle_bow"
+                local doubleNote = lastTime and data.time - lastTime < 0.1
+                if doubleNote then return end
+
+                -- Bow anim
+                local completion = 0
+                if anim.isPlaying(self, "bcfiddle_bowalt") then
+                    animName = "bcfiddle_bow"
+                    completion = 1 - anim.getCompletion(self, "bcfiddle_bowalt")
+                    anim.cancel(self, "bcfiddle_bowalt")
+                end
+                if anim.isPlaying(self, "bcfiddle_bow") then
+                    animName = "bcfiddle_bowalt"
+                    completion = 1 - anim.getCompletion(self, "bcfiddle_bow")
+                    anim.cancel(self, "bcfiddle_bow")
+                end
+                lastPlayed = animName
+                lastTime = data.time
+                local aData = animData.Fiddle[animName]
+                aData.startPoint = completion
+                aData.speed = 2
+                if aData then
+                    I.AnimationController.playBlendedAnimation(animName, aData)
+                end
+
+                -- Fingering anim
+                local curr
+                for i = 1, 3 do
+                    local animName = "bcfiddle_fin" .. i
+                    if anim.isPlaying(self, animName) then
+                        curr = i
+                        anim.cancel(self, animName)
+                    end
+                end
+                local num
+                repeat
+                    num = math.random(1, 3)
+                until num ~= curr
+                local animName = "bcfiddle_fin" .. num
+                local aData = animData.Fiddle[animName]
+                if aData then
+                    I.AnimationController.playBlendedAnimation(animName, aData)
+                end
+            elseif data.type == 'NoteEndEvent' then
+                activeNoteCount = activeNoteCount - 1
+                if activeNoteCount <= 0 then
+                    for i = 1, 2 do
+                        local animName = "bcfiddle_bow" .. (i == 1 and "" or "alt")
+                        if anim.isPlaying(self, animName) then
+                            --anim.cancel(self, animName)
+                            anim.setSpeed(self, animName, 0.1)
+                        end
+                    end
+                    for i = 1, 3 do
+                        local animName = "bcfiddle_fin" .. i
+                        if anim.isPlaying(self, animName) then
+                            anim.setSpeed(self, animName, 0)
+                        end
+                    end
+                    lastPlayed = nil
+                    lastTime = nil
+                end
+            elseif data.type == 'PerformStart' then
+                activeNoteCount = 0
+                for i = 1, 2 do
+                    local animName = "bcfiddle_bow" .. (i == 1 and "" or "alt")
+                    if anim.isPlaying(self, animName) then
+                        anim.cancel(self, animName)
+                    end
+                end
+                lastPlayed = nil
+                lastTime = nil
+            end
+        end, 
+    },
     Ocarina = {
         icon = "icons/Bardcraft/tx_ocarina.dds",
         anim = "boocarina",
@@ -212,9 +317,6 @@ local Instruments = {
         icon = "icons/Bardcraft/tx_flute.dds",
         anim = "boflute",
         boneName = "Bip01 BOInstrumentHand",
-        items = {
-            _rlts_bc_bassflute = true, -- Bardcraft
-        },
         eventHandler = function(data)
             if data.type ~= 'NoteEvent' then return end
             if data.note == lastNote then return end -- Only change fingering if the note changes

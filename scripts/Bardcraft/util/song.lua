@@ -27,7 +27,7 @@ local instrumentProfiles = {
     [24] = {
         name = "Lute",
         loop = false,
-        sustain = true,
+        sustain = false,
         transpose = true,
         polyphonic = true, 
         densityMod = 1.0,
@@ -36,7 +36,7 @@ local instrumentProfiles = {
     [73] = {
         name = "BassFlute",
         loop = true,
-        sustain = false,
+        sustain = true,
         transpose = true,
         polyphonic = false,
         densityMod = 1.2,
@@ -45,16 +45,25 @@ local instrumentProfiles = {
     [79] = {
         name = "Ocarina",
         loop = true,
-        sustain = false,
+        sustain = true,
         transpose = true,
         polyphonic = false,
         densityMod = 0.9,
+        volume = 1,
+    },
+    [110] = {
+        name = "Fiddle",
+        loop = true,
+        sustain = true,
+        transpose = true,
+        polyphonic = true,
+        densityMod = 1.0,
         volume = 2,
     },
     [116] = {
         name = "Drum",
         loop = false,
-        sustain = true,
+        sustain = false,
         transpose = false,
         polyphonic = true,
         densityMod = 0.5,
@@ -75,11 +84,14 @@ local instrumentMappings = {
     { instr = 24, low = 0, high = 15 }, -- Piano and Chromatic Percussion maps to Lute
     { instr = 79, low = 16, high = 23 }, -- Organ maps to Ocarina
     { instr = 24, low = 24, high = 39 }, -- Guitar and Bass maps to Lute
-    { instr = 73, low = 40, high = 45 }, -- Strings maps to BassFlute
+    { instr = 110, low = 40, high = 41 }, -- Violin and Viola maps to Fiddle
+    { instr = 73, low = 42, high = 43 }, -- Cello and Contrabass maps to BassFlute
+    { instr = 110, low = 44, high = 44 }, -- Tremolo Strings maps to Fiddle
+    { instr = 24, low = 45, high = 45 }, -- Pizzicatto Strings maps to Lute
     { instr = 24, low = 46, high = 46 }, -- Harp maps to Lute
     { instr = 116, low = 47, high = 47 }, -- Timpani maps to Drum
-    { instr = 73, low = 48, high = 51 }, -- Low Ensemble maps to BassFlute
-    { instr = 79, low = 52, high = 54 }, -- High Ensemble maps to Ocarina
+    { instr = 110, low = 48, high = 51 }, -- String Ensemble and Synth Strings maps to Fiddle
+    { instr = 79, low = 52, high = 54 }, -- Choir and Voice maps to Ocarina
     { instr = 24, low = 55, high = 55 }, -- Orchestra Hit maps to Lute
     { instr = 79, low = 56, high = 56 }, -- Trumpet maps to Ocarina
     { instr = 73, low = 57, high = 58 }, -- Trombone and Tuba maps to BassFlute
@@ -96,10 +108,11 @@ local instrumentMappings = {
     { instr = 24, low = 80, high = 87 }, -- Synth Lead maps to Lute
     { instr = 73, low = 88, high = 95 }, -- Synth Pad maps to BassFlute
     { instr = 0, low = 96, high = 103 }, -- Synth Effects maps to nothing (ignore them)
-    { instr = 24, low = 104, high = 111 }, -- Ethnic maps to Lute
-    { instr = 116, low = 112, high = 113 }, -- Tinkle Bell, Agogo to Drum
-    { instr = 24,  low = 114, high = 114 }, -- Steel Drums to Lute
-    { instr = 116, low = 115, high = 119 }, -- Rest of Percussion to Drum
+    { instr = 24, low = 104, high = 108 }, -- Ethnic Plucked maps to Lute
+    { instr = 110, low = 109, high = 110 }, -- Bagpipe and Fiddle maps to Fiddle
+    { instr = 79, low = 111, high = 111 }, -- Shanai maps to Ocarina
+    { instr = 24, low = 112, high = 114 }, -- Percussion Pitched maps to Drum
+    { instr = 116, low = 115, high = 119 }, -- Rest of Percussion maps to Drum
     { instr = 0, low = 120, high = 127 }, -- Sound Effects maps to nothing (ignore them)
 }
 
@@ -142,7 +155,7 @@ function Part.new(index, instrument, title)
     local self = setmetatable({}, Part)
     self.index = index
     self.instrument = instrument
-    self.title = title or (l10n('Instr_' .. instrumentProfiles[instrument].name) .. ' ' .. index)
+    self.title = title or (l10n('Instr_' .. instrumentProfiles[instrument].name) .. (index > 1 and (' ' .. index) or ''))
     return self
 end
 
@@ -346,8 +359,12 @@ function Song.fromMidiParser(parser, metadata)
                         countOfType = countOfType + 1
                     end
                 end
-                local title = l10n('Instr_' .. instrumentProfiles[instrument].name) .. ' ' .. (countOfType + 1)
-                table.insert(self.parts, Part.new(index, instrument, title))
+                local title = l10n('Instr_' .. instrumentProfiles[instrument].name) .. (countOfType > 0 and (' ' .. (countOfType + 1)) or '')
+                local part = Part.new(index, instrument, title)
+                if metadata and metadata.partOverrides and metadata.partOverrides[part.title] then
+                    part.title = metadata.partOverrides[part.title]
+                end
+                table.insert(self.parts, part)
                 partIndex[instrument][note.track] = index
             end
             local noteData = {
@@ -404,8 +421,10 @@ function Song.getInstrumentProfile(instrument)
         return {
             name = "Lute",
             loop = false,
-            sustain = true,
+            sustain = false,
             transpose = true,
+            polyphonic = true, 
+            densityMod = 1.0,
             volume = 1.0,
         }
     end

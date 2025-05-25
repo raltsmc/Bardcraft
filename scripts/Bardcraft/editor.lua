@@ -1173,6 +1173,15 @@ uiTemplates = {
                 stretch = 1,
             },
             content = ui.content {
+                thickBorders and {
+                    type = ui.TYPE.Image,
+                    props = {
+                        resource = ui.texture { path = 'white', },
+                        relativeSize = util.vector2(1, 1),
+                        color = Editor.uiColors.BLACK,
+                        alpha = 0.5,
+                    }
+                } or {},
                 {
                     type = ui.TYPE.Flex,
                     props = {
@@ -1318,6 +1327,10 @@ uiTemplates = {
         }
     end,
     performerDisplay = function(npc, itemHeight, thickBorders, onClick)
+        local name = types.NPC.record(npc).name
+        local performerInfo = Editor.performersInfo[npc.id]
+        local level = performerInfo and performerInfo.performanceSkill and performerInfo.performanceSkill.level or 1
+
         return {
             template = (thickBorders and I.MWUI.templates.bordersThick or I.MWUI.templates.borders),
             props = {
@@ -1327,13 +1340,36 @@ uiTemplates = {
                 stretch = 1,
             },
             content = ui.content {
+                thickBorders and {
+                    type = ui.TYPE.Image,
+                    props = {
+                        resource = ui.texture { path = 'white', },
+                        relativeSize = util.vector2(1, 1),
+                        color = Editor.uiColors.BLACK,
+                        alpha = 0.5,
+                    }
+                } or {},
                 {
                     template = I.MWUI.templates.textNormal,
                     props = {
-                        text = types.NPC.record(npc).name,
+                        text = name,
                         textColor = thickBorders and Editor.uiColors.WHITE or Editor.uiColors.DEFAULT,
-                        anchor = util.vector2(0.5, 0.5),
-                        relativePosition = util.vector2(0.5, 0.5),
+                        position = util.vector2(8, 0),
+                        anchor = util.vector2(0, 0.5),
+                        relativePosition = util.vector2(0, 0.5),
+                        size = util.vector2(0, itemHeight),
+                    },
+                },
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = "Lv. " .. tostring(level),
+                        textColor = thickBorders and Editor.uiColors.WHITE or Editor.uiColors.DEFAULT,
+                        textSize = 24,
+                        anchor = util.vector2(1, 0.5),
+                        relativePosition = util.vector2(1, 0.5),
+                        position = util.vector2(-8, 0),
+                        size = util.vector2(0, itemHeight),
                     },
                 },
             },
@@ -1439,7 +1475,7 @@ uiTemplates = {
                         local fileName = getNoteSoundPath(noteIndex)
                         if playingNoteSound ~= fileName then
                             ambient.playSoundFile(fileName)
-                            if playingNoteSound and not Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
+                            if playingNoteSound and Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
                                 ambient.stopSoundFile(playingNoteSound)
                             end
                             playingNoteSound = fileName
@@ -1460,7 +1496,7 @@ uiTemplates = {
                 end),
                 mouseRelease = async:callback(function(e)
                     if e.button == 1 and Editor.activePart then
-                        if playingNoteSound and not Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
+                        if playingNoteSound and Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
                             ambient.stopSoundFile(playingNoteSound)
                         end
                     end
@@ -1684,7 +1720,7 @@ uiTemplates = {
             end)
             noteLayout.events.mouseRelease = async:callback(function()
                 if not Editor.activePart then return end
-                if Song.getInstrumentProfile(Editor.activePart.instrument).sustain then return end
+                if not Song.getInstrumentProfile(Editor.activePart.instrument).sustain then return end
                 stopNoteSound(note)
             end)
         end
@@ -2239,12 +2275,12 @@ local function onFinalizeDraft(title, desc, cost)
     local player = nearby.players[1]
     if not player then return false end
     local inv = player.type.inventory(player)
-    if inv:countOf('_rlts_bc_sheetmusic_blank') < cost then
+    if inv:countOf('r_bc_sheetmusic_blank') < cost then
         ui.showMessage(l10n('UI_Msg_PRoll_InsufficientBlanks'))
         return false
     end
     local used = 0
-    for _, item in ipairs(inv:findAll('_rlts_bc_sheetmusic_blank')) do
+    for _, item in ipairs(inv:findAll('r_bc_sheetmusic_blank')) do
         local toRemove = math.min(item.count, cost - used)
         used = used + toRemove
         core.sendGlobalEvent('BC_ConsumeItem', { item = item, count = toRemove})
@@ -2877,7 +2913,7 @@ getSongTab = function()
                             if note ~= noteData.note then
                                 playNoteSound(note)
                                 playingNoteSound = note
-                                if not Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
+                                if Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
                                     stopNoteSound(noteData.note)
                                 end
                             end
@@ -2936,7 +2972,7 @@ getSongTab = function()
                         pianoRoll.lastNoteSize = Editor.noteMap[pianoRoll.activeNote].duration
                         pianoRoll.activeNote = nil
                         pianoRoll.activeNoteElement = nil
-                        if playingNoteSound and not Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
+                        if playingNoteSound and Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
                             stopNoteSound(playingNoteSound)
                             playingNoteSound = nil
                         end
@@ -3936,7 +3972,7 @@ local function tickPlayback(dt)
         end, 
         function(filePath, instrument)
             local profile = Song.getInstrumentProfile(instrument)
-            if not profile.sustain then
+            if profile.sustain then
                 ambient.stopSoundFile(filePath)
             end
         end) then

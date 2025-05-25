@@ -9,10 +9,10 @@ local nearby = require("openmw.nearby")
 local util = require("openmw.util")
 local time = require("openmw_aux.time")
 
-local configGlobal = require('scripts.Bardcraft.config.global')
 local instrumentData = require('scripts.Bardcraft.instruments').Instruments
 local animData = require('scripts.Bardcraft.instruments').AnimData
 local Song = require('scripts.Bardcraft.util.song').Song
+local configGlobal = require('scripts.Bardcraft.config.global')
 
 --[[========
 Performer Stats
@@ -110,6 +110,9 @@ function P:addPerformanceXP(xp)
         self.stats.performanceSkill.level = self.stats.performanceSkill.level + 1
         if self.stats.performanceSkill.level % 10 == 0 then
             milestone = self.stats.performanceSkill.level
+        end
+        if self.stats.performanceSkill.level == 100 then
+            break
         end
     end
     if omwself.type == types.Player then
@@ -230,11 +233,11 @@ P.overallNoteEvents = {}
 
 local function getXpMult(type)
     if type == Song.PerformanceType.Tavern then
-        return 1.5
+        return configGlobal.options.fTavernXpMult
     elseif type == Song.PerformanceType.Street then
-        return 0.2
+        return configGlobal.options.fStreetXpMult
     elseif type == Song.PerformanceType.Practice then
-        return 1.0 * P.stats.practiceEfficiency
+        return configGlobal.options.fPracticeXpMult * (configGlobal.options.bEnablePracticeEfficiency == true and P.stats.practiceEfficiency or 1)
     end
     return 0.0
 end
@@ -260,6 +263,8 @@ local function getAnimStartPoint(timeOffset)
 end
 
 function P.startAnim(animKey)
+    local enabled = configGlobal.options.bEnableAnimations
+
     local priority = {
         [anim.BONE_GROUP.LeftArm] = anim.PRIORITY.Hit,
         [anim.BONE_GROUP.RightArm] = anim.PRIORITY.Hit,
@@ -270,8 +275,9 @@ function P.startAnim(animKey)
     I.AnimationController.playBlendedAnimation(animKey, {
         loops = 100000000,
         priority = priority,
+        blendMask = enabled and anim.BLEND_MASK.All or anim.BLEND_MASK.UpperBody,
         startPoint = getAnimStartPoint(P.musicTime) % 1,
-        speed = getBpmConstant(),
+        speed = enabled and getBpmConstant() or 0,
     })
 end
 
@@ -323,12 +329,28 @@ function P.resetVfx()
     modelName = 'meshes/bardcraft/vfx/play/' .. modelName
     if instrumentData[P.instrument] then
         anim.removeVfx(omwself, 'BO_Instrument')
+        if not anim.hasBone(omwself, instrumentData[P.instrument].boneName) then
+            return
+        end
         anim.addVfx(omwself, modelName, {
             boneName = instrumentData[P.instrument].boneName,
             vfxId = 'BO_Instrument',
             loop = true,
             useAmbientLight = false
         })
+        -- Attach extra models if specified
+        if instrumentData[P.instrument].attachExtra then
+            for _, extra in ipairs(instrumentData[P.instrument].attachExtra) do
+                if anim.hasBone(omwself, extra.boneName) then
+                    anim.addVfx(omwself, extra.path, {
+                        boneName = extra.boneName,
+                        vfxId = 'BO_Instrument',
+                        loop = true,
+                        useAmbientLight = false
+                    })
+                end
+            end
+        end
     end
 end
 
@@ -336,6 +358,33 @@ function P.resetAnim()
     if instrumentData[P.instrument] then
         anim.cancel(omwself, instrumentData[P.instrument].anim)
         P.startAnim(instrumentData[P.instrument].anim)
+    end
+end
+
+function P.playNote(note, velocity)
+    local success = true
+    local pitch = 1.0
+    local volume = velocity * (1 + math.random() * 0.2 - 0.1)
+    if math.random() > P.getNoteAccuracy() then
+        pitch = 1.0 + (math.random() * 0.2 - 0.1) -- Random pitch shift between -10% and +10%
+        volume = volume * 0.5 + math.random() * (volume)
+        success = false
+    end
+    local noteName = Song.noteNumberToName(note)
+    local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
+    core.sound.playSoundFile3d(filePath, omwself, { volume = volume, pitch = pitch, })
+    return success
+end
+
+function P.stopNote(note)
+    local noteName = Song.noteNumberToName(note)
+    local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
+    core.sound.stopSoundFile3d(filePath, omwself)
+end
+
+function P.stopAllNotes()
+    for note = 0, 127 do
+        P.stopNote(note)
     end
 end
 
@@ -357,6 +406,9 @@ function P.handlePerformEvent(data)
     P.instrumentItem = types.Miscellaneous.record(data.item)
     P.resetVfx()
     P.resetAnim()
+    if P.instrumentProfile.sustain then
+        P.stopAllNotes()
+    end
 
     local songInfo = P.stats.knownSongs[song.id]
     if not songInfo then
@@ -382,33 +434,6 @@ function P.handlePerformEvent(data)
     P.playing = true
     P.currentSong = song
     P.currentPart = data.part
-end
-
-function P.playNote(note, velocity)
-    local success = true
-    local pitch = 1.0
-    local volume = velocity * (1 + math.random() * 0.2 - 0.1)
-    if math.random() > P.getNoteAccuracy() then
-        pitch = 1.0 + (math.random() * 0.2 - 0.1) -- Random pitch shift between -10% and +10%
-        volume = volume * 0.5 + math.random() * (volume)
-        success = false
-    end
-    local noteName = Song.noteNumberToName(note)
-    local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
-    core.sound.playSoundFile3d(filePath, omwself, { volume = volume, pitch = pitch })
-    return success
-end
-
-function P.stopNote(note)
-    local noteName = Song.noteNumberToName(note)
-    local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
-    core.sound.stopSoundFile3d(filePath, omwself)
-end
-
-function P.stopAllNotes()
-    for note = 0, 127 do
-        P.stopNote(note)
-    end
 end
 
 function P.handleStopEvent(data)
@@ -441,19 +466,16 @@ function P.handleStopEvent(data)
     local oldConfidence = P.maxConfidence
     local mod = util.clamp(diff, -maxGrowth, maxGrowth)
 
-    if omwself.type == types.Player then
-        if P.performanceType == Song.PerformanceType.Practice then
-            mod = mod * P.stats.practiceEfficiency
-            local practiceMod = math.pow(0.9, (#P.overallNoteEvents / 200))
-            P.stats.practiceEfficiency = util.clamp(P.stats.practiceEfficiency * practiceMod, 0.125, 1)
-            omwself:sendEvent('BC_PracticeEfficiency', { efficiency = P.stats.practiceEfficiency })
-        elseif P.performanceType == Song.PerformanceType.Tavern then
-            local gameTime = core.getGameTime()
-            local timeOfDay = gameTime % time.day
-            local isEvening = timeOfDay >= 18 * time.hour
-            if isEvening then
-                P.stats.performedVenuesToday[data.cell] = true
-            end
+    if P.performanceType == Song.PerformanceType.Practice then
+        mod = mod * (configGlobal.options.bEnablePracticeEfficiency == true and P.stats.practiceEfficiency or 1)
+        local practiceMod = math.pow(0.9, (#P.overallNoteEvents / 200))
+        P.stats.practiceEfficiency = util.clamp(P.stats.practiceEfficiency * practiceMod, 0.125, 1)
+        omwself:sendEvent('BC_PracticeEfficiency', { efficiency = P.stats.practiceEfficiency })
+    elseif P.performanceType == Song.PerformanceType.Tavern then
+        local currentDay = math.floor(core.getGameTime() / time.day)
+        local performanceDay = math.floor((data.startTime or 0) / time.day)
+        if currentDay == performanceDay then
+            P.stats.performedVenuesToday[data.cell] = true
         end
     end
     P.stats.performanceCount[P.performanceType] = P.stats.performanceCount[P.performanceType] + 1
@@ -508,7 +530,7 @@ function P.handleNoteEvent(data)
         if success then
             local gain = (P.maxConfidence - P.currentConfidence) / P.maxConfidence * 0.04
             P.currentConfidence = math.min(P.currentConfidence + gain, P.maxConfidence)
-            local xp = 1 * getXpMult(P.performanceType) / intervalBase
+            local xp = configGlobal.options.fBaseXpPerNote * getXpMult(P.performanceType) / intervalBase
             P.levelGain = P.levelGain + P:addPerformanceXP(xp)
             P.xpGain = P.xpGain + xp
         else
@@ -516,7 +538,7 @@ function P.handleNoteEvent(data)
             P.currentConfidence = math.max(P.currentConfidence - loss, 0)
         end
         table.insert(P.overallNoteEvents, success)
-        core.sendGlobalEvent('BC_PerformerNoteHandled', { success = success, part = P.currentPart, mod = 1 / intervalBase * weight })
+        core.sendGlobalEvent('BC_PerformerNoteHandled', { success = success, performer = omwself, mod = 1 / intervalBase * weight })
     else
         P.currentConfidence = P.maxConfidence
     end
@@ -529,16 +551,14 @@ function P.handleConductorEvent(data)
         P.handlePerformEvent(data)
     elseif data.type == 'PerformStop' and P.playing then
         P.handleStopEvent(data)
-    else
-        if data.type == 'NoteEvent' then
-            success = P.handleNoteEvent(data)
-        elseif data.type == 'NoteEndEvent' and data.stopSound then
-            P.stopNote(data.note)
-        end
-        if P.instrument and instrumentData[P.instrument] and instrumentData[P.instrument].eventHandler then
-            data.time = core.getRealTime()
-            instrumentData[P.instrument].eventHandler(data)
-        end
+    elseif data.type == 'NoteEvent' then
+        success = P.handleNoteEvent(data)
+    elseif data.type == 'NoteEndEvent' and data.stopSound then
+        P.stopNote(data.note)
+    end
+    if P.instrument and instrumentData[P.instrument] and instrumentData[P.instrument].eventHandler then
+        data.time = core.getRealTime()
+        instrumentData[P.instrument].eventHandler(data)
     end
     return success
 end

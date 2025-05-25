@@ -1,20 +1,42 @@
-ConfigCategoryKeybinds: "Keybinds"
-ConfigCategoryPlayerOptions: "Player Options"
-ConfigCategoryGlobalOptions: "Global Options"
 ConfigTitle: "Bardcraft"
 ConfigSummary: "Adds a deep musical performance system, with custom songwriting using a piano roll interface.\n--- v%{version} ---"
+ConfigCategoryKeybinds: "Keybinds"
+ConfigKeybindOpenInterface: "Open interface"
+ConfigCategoryPlayerOptions: "Player Options"
 ConfigAmbientMusic: "Silence ambient music"
 ConfigAmbientMusicDesc: "Background music will be silenced during a performance."
+ConfigCategoryGlobalOptions: "Global Options"
+ConfigOverallGoldMult: "Overall gold multiplier"
+ConfigTavernGoldMult: "Tavern gold multiplier"
+ConfigStreetGoldMult: "Street gold multiplier"
+ConfigBaseXpPerNote: "Base XP per note"
+ConfigTavernXpMult: "Tavern XP multiplier"
+ConfigStreetXpMult: "Street XP multiplier"
+ConfigPracticeXpMult: "Practice XP multiplier"
+ConfigEnablePracticeEfficiency: "Enable practice efficiency"
+ConfigEnablePracticeEfficiencyDesc: |
+  Multiple practice sessions will reduce further practice XP and confidence gain.
+  Efficiency will recover at the start of each day.
+ConfigEnableTimeRestriction: "Time-of-day restriction"
+ConfigEnableTimeRestrictionDesc: |
+  Restrict tavern performances to the evening
+  (6 p.m. - midnight).
+ConfigEnableAnimations: "Enable animations"
+ConfigEnableAnimationsDesc: |
+  Enable passive animations for performers.
+  Disabling will only play note animations (strumming, fretting, etc.)
 
 Instr_Lute: "Lute"
 Instr_Drum: "Drum"
 Instr_Ocarina: "Ocarina"
 Instr_BassFlute: "Flute"
+Instr_Fiddle: "Fiddle"
 
 UI_Lute: "Lute"
 UI_Drum: "Drum"
 UI_Ocarina: "Ocarina"
 UI_BassFlute: "Flute"
+UI_Fiddle: "Fiddle"
 
 UI_Msg_Lute_Indef: "a lute"
 UI_Msg_Lute_Def: "the lute"
@@ -24,6 +46,8 @@ UI_Msg_Ocarina_Indef: "an ocarina"
 UI_Msg_Ocarina_Def: "the ocarina"
 UI_Msg_BassFlute_Indef: "a flute"
 UI_Msg_BassFlute_Def: "the flute"
+UI_Msg_Fiddle_Indef: "a fiddle"
+UI_Msg_Fiddle_Def: "the fiddle"
 
 UI_Title: "Bardcraft"
 UI_Tab_Performance: "Performance"
@@ -441,9 +465,9 @@ UI_Msg_Warn_Trespass: "You have been temporarily banned from this venue!\nLeave 
 
 # Vanilla
 UI_Blurb_Ald-ruhn, Ald Skar Inn: "The largest tavern in Ald'ruhn, nestled snugly under the shadow of Skar's corpse. Perfect for a warm meal, a cold drink, and very loud arguments about Redoran politics."
-UI_Blurb_Balmora, Council Club: "A dim establishment known for its surly patrons and clandestine dealings, the Council Club serves as a stronghold for the Camonna Tong's influence in Balmora."
+UI_Blurb_Balmora, Council Club: "A dim establishment known for its grim clientele and illicit affairs, the Council Club serves as a stronghold for the Camonna Tong's influence in Balmora."
 UI_Blurb_Balmora, Eight Plates: "A favorite among House Hlaalu retainers, offering a modest yet lively atmosphere. A common starting point for aspiring entertainers of all kinds."
-UI_Blurb_Balmora, Lucky Lockup: "A quaint tavern that is often the first stop for new arrivals in the city. Much friendlier than the Council Club next door."
+UI_Blurb_Balmora, Lucky Lockup: "Often the first friendly face for Balmora's newcomers, this charming tavern provides a pleasant contrast to the grim Council Club nearby."
 UI_Blurb_Balmora, South Wall Cornerclub: "A discreet establishment where the Thieves Guild conducts \"business\" behind a facade of legitimate trade."
 UI_Blurb_Suran, Desele's House of Earthly Delights: "A cultured establishment where patrons come for the music, stay for the company, and inevitably forget what they were doing in the first place."
 UI_Blurb_Vivec, Black Shalk Cornerclub: "A cramped watering hole nestled in the Foreign Quarter where outlanders trade tales of their homelands over cheap mazte."
@@ -459,46 +483,49 @@ UI_Blurb_Anvil, The Abecette: "Anvil's most upscale hotel, renowned the world ov
 # Metropolises
 UI_Blurb_Vivec: "A city of cantons upon the water, ruled by the whims and presence of its living god."
 UI_Blurb_Old Ebonheart: "The Imperial jewel of Morrowind's mainland, its grand facades mask a strict colonial regime overseeing Dunmer affairs."
-UI_Blurb_Narsis: "A tangled Hlaalu trading hub where wealth is gained and backs are stabbed in shadowed alleys."
-UI_Blurb_Anvil: "A decadent Imperial port on Cyrodiil's Gold Coast, bustling with foreign ships and unfamiliar ways."
+UI_Blurb_Narsis: "A sprawling Hlaalu metropolis perched on a mesa atop the Thirr, where trade, politics, and crime blur beneath a polished facade."
+UI_Blurb_Anvil: "A decadent Colovian port city on Cyrodiil's Gold Coast, bustling with foreign ships and unfamiliar ways."
 UI_Blurb_Karthwasten: "The beating heart of Skyrim's Reach, Karthwasten is a wealthy and prosperous center of culture and commerce."
 
 # Cities
 UI_Blurb_Ald-ruhn: "A Redoran stronghold built within a colossal crab shell, embodying honor and defiance against the Blight."
-UI_Blurb_Balmora: "Bisected by the Odai River, this Hlaalu city thrives on shady deals, restless ambition, and the flow of smuggled goods."
+UI_Blurb_Balmora: "Split by the Odai River, Hlaalu's Balmora commands Vvardenfell's crossroads, its districts alive with bustling trade and the shadow of House ambition."
 UI_Blurb_Sadrith Mora: "A Telvanni enclave of twisting mushroom towers, accessible only to those favored by magic or the sea."
-UI_Blurb_Almas Thirr: "A sacred city bridging the Thirr River, where pilgrims and House political feuds converge under the watchful eyes of the Tribunal."
+UI_Blurb_Almas Thirr: "A sacred city bridging the Thirr River, where pilgrims and House political feuds converge under the watchful eyes of the Temple."
 UI_Blurb_Andothren: "A great Hlaalu port born from divine wrath, its autonomy rife with Camonna Tong corruption."
 UI_Blurb_Bal Foyen: "A great Hlaalu port born from divine wrath, its autonomy rife with Camonna Tong corruption."
-UI_Blurb_Firewatch: "An Imperial Legion fort projecting Cyrodilic authority in even the remotest corner of Tamriel."
+UI_Blurb_Firewatch: "An Imperial Legion fort projecting Cyrodiilic authority in even the remotest corner of Tamriel."
 UI_Blurb_Necrom: "The solemn City of the Dead, where the living pay homage to ancestors in towering white halls."
-UI_Blurb_Akamora: "A pious Indoril city clinging to canyon walls, echoing with fervent chants."
+UI_Blurb_Akamora: "A beautiful Indoril city clinging to canyon walls, surrounded by waterfalls."
 UI_Blurb_Hlan Oek: "A town of contrasts astride Veloth's Path, where solemn Temple rites coexist uneasily with a darker underbelly."
+UI_Blurb_Hlerynhul: "Founded to defend the Thirr, this Hlaalu town has traded its martial past for bustling commerce with Narsis."
 UI_Blurb_Port Telvannis: "The heart of Telvanni power; a maze of wizard towers and slave markets on the Padomaic."
 UI_Blurb_Dragonstar: "A border city cleaved by an Imperial wall and the bitter feuds of Nords and Redguards."
 
 # Towns
 UI_Blurb_Caldera: "An Imperial mining town built on volcanic wealth and the backs of ebony miners."
-UI_Blurb_Ebonheart: "The seat of Imperial authority in Vvardenfell."
+UI_Blurb_Ebonheart: "The heart of Imperial Vvardenfell, where Duke Dren wields combined Imperial and Hlaalu authority."
 UI_Blurb_Gnisis: "An old mining village where Dunmer traditions endure alongside watchful Imperial patrols."
-UI_Blurb_Maar Gan: "A devout Temple outpost huddled against the Ashlands and its daedric ruins."
+UI_Blurb_Maar Gan: "An austere Redoran outpost huddled against the Ghostfence."
 UI_Blurb_Molag Mar: "A stark pilgrimage waystation carved into volcanic rock in the desolate Molag Amur."
 UI_Blurb_Pelagiad: "A quiet Imperial farming village, a touch of Cyrodiil in the Ascadian Isles."
-UI_Blurb_Suran: "A lakeside town infamous for its pleasure house, blending Hlaalu coin and Temple oversight."
+UI_Blurb_Suran: "Hlaalu's Ascadian resort infamous for its pleasure house, its luxury bankrolled by the slave trade."
 UI_Blurb_Tel Aruhn: "Gothren's tower-village, center of Telvanni slave trading and volatile politics."
 UI_Blurb_Tel Branora: "Therana's remote mushroom tower, infamous for its eccentric and dangerous mistress."
 UI_Blurb_Tel Mora: "Telvanni tower ruled entirely by women, where men are unwelcome ashore."
-UI_Blurb_Darvonis: "A small fishing town in the Sundered Scar."
-UI_Blurb_Dondril: "A farming village surrounded by a palisade, south of Old Ebonheart."
-UI_Blurb_Helnim: "An important Imperial trading center between the Empire and House Telvanni."
-UI_Blurb_Llothanis: "A Telvanni town in eastern Sunad Mora spanning the Nebet Bay."
-UI_Blurb_Ranyon-ruhn: "A small Telvanni settlement with an ebony mine."
-UI_Blurb_Roa Dyr: "A chapel-city of Indoril located in east Aanthirin near the Thirr river."
+UI_Blurb_Darvonis: "A tiny Indoril fishing hamlet in the Sundered Scar, its existence a quiet claim on the shores of Azura's Bay."
+UI_Blurb_Dondril: "A humble Indoril farming village surrounded by a palisade, south of Old Ebonheart."
+UI_Blurb_Helnim: "An Imperial town serving as a vital trade conduit between the Empire and House Telvanni."
+UI_Blurb_Llothanis: "A bustling Telvanni port town in eastern Sunad Mora spanning the Nebet Bay."
+UI_Blurb_Omaynis: "A Hlaalu-run egg mining town within Roth Roryn."
+UI_Blurb_Othmura: "A bustling Hlaalu trading town perched above a Thirr River gorge, along the banks of the northern tongue of Lake Coronati."
+UI_Blurb_Ranyon-ruhn: "A modest Telvanni outpost sustained by its ebony mine, where Velothi workers find basic comforts and little else."
+UI_Blurb_Roa Dyr: "A chapel-port of Indoril exerting pious authority over its Thirr River vassals."
 UI_Blurb_Sailen: "A small farming settlement providing shelter to pilgrims passing through on the way to Necrom."
 UI_Blurb_Vhul: "An Indoril town known for its lucrative punavit industry."
 UI_Blurb_Brina Cross: "A prosperous settlement sitting astride a junction of Cyrodiil's Gold Road."
-UI_Blurb_Charach: "A temperate vacation town on the island of Stirk."
-UI_Blurb_Karthgad: "A small Reach town, home to the reclusive Bear Clan."
+UI_Blurb_Charach: "An Imperial island town on Stirk, offering a temperate retreat for wealthy mainlanders."
+UI_Blurb_Karthgad: "A secluded Bear Clan bastion on the cliffs of the Karth River."
 
 # --- Performance Quality ---
 UI_Quality_Terrible: "Terrible" # 0-15%
@@ -512,7 +539,7 @@ UI_Quality_Perfect: "Perfect!" # 100%
 UI_PerfLog_StreetsOf: "Streets of %{city}"
 
 # --- Performance Feedback ---
-# TO LOCALIZERS: You can add more to any existing category! Just use the same format and the Lua code will pick it up without needing to change feedback.yaml.
+# TO LOCALIZERS: You can add more to any existing category! Just use the same format, continuing the numbering, and the Lua code will pick it up without needing to change feedback.yaml.
 
 # Publican Comments
 Comments_Publican_Unimpressive_Terrible_1: "That sounded like a guar trying to sing! It's a simple song, how could you possibly mess it up that badly? Leave. Now."

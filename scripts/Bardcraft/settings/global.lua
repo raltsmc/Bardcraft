@@ -8,5 +8,89 @@ I.Settings.registerGroup {
     name = 'ConfigCategoryGlobalOptions',
     permanentStorage = true,
     settings = {
+        {
+            key = 'bEnablePracticeEfficiency',
+            renderer = 'checkbox',
+            name = 'ConfigEnablePracticeEfficiency',
+            description = 'ConfigEnablePracticeEfficiencyDesc',
+            default = true,
+        },
+        {
+            key = 'bEnableTimeRestriction',
+            renderer = 'checkbox',
+            name = 'ConfigEnableTimeRestriction',
+            description = 'ConfigEnableTimeRestrictionDesc',
+            default = true,
+        },
+        {
+            key = 'bEnableAnimations',
+            renderer = 'checkbox',
+            name = 'ConfigEnableAnimations',
+            description = 'ConfigEnableAnimationsDesc',
+            default = true,
+        },
+        {
+            key = 'fOverallGoldMult',
+            renderer = 'number',
+            name = 'ConfigOverallGoldMult',
+            default = 1.0,
+            argument = {
+                min = 0.0,
+            }
+        },
+        {
+            key = 'fTavernGoldMult',
+            renderer = 'number',
+            name = 'ConfigTavernGoldMult',
+            default = 1.0,
+            argument = {
+                min = 0.0,
+            }
+        },
+        {
+            key = 'fStreetGoldMult',
+            renderer = 'number',
+            name = 'ConfigStreetGoldMult',
+            default = 1.0,
+            argument = {
+                min = 0.0,
+            }
+        },
+        {
+            key = 'fBaseXpPerNote',
+            renderer = 'number',
+            name = 'ConfigBaseXpPerNote',
+            default = 1.0,
+            argument = {
+                min = 0.0,
+            }
+        },
+        {
+            key = 'fTavernXpMult',
+            renderer = 'number',
+            name = 'ConfigTavernXpMult',
+            default = 1.5,
+            argument = {
+                min = 0.0,
+            }
+        },
+        {
+            key = 'fStreetXpMult',
+            renderer = 'number',
+            name = 'ConfigStreetXpMult',
+            default = 0.2,
+            argument = {
+                min = 0.0,
+            }
+        },
+        {
+            key = 'fPracticeXpMult',
+            renderer = 'number',
+            name = 'ConfigPracticeXpMult',
+            default = 1.0,
+            argument = {
+                min = 0.0,
+            }
+        }
     },
 }

@@ -4,7 +4,7 @@ local INSTRUMENT_ITEMS = {
     Lute = {
         misc_de_lute_01 = true, -- Vanilla
         misc_de_lute_01_phat = true,
-        t_imp_lute_01 = true, -- Tamriel Data
+        t_imp_lute_01 = true,   -- Tamriel Data
         t_com_lute_01 = true,
         t_de_uni_renaldlute = true,
         t_imp_uni_goldenlute = true,
@@ -15,7 +15,7 @@ local INSTRUMENT_ITEMS = {
     Drum = {
         misc_de_drum_01 = true, -- Vanilla
         misc_de_drum_02 = true,
-        t_imp_drum_01 = true, -- Tamriel Data
+        t_imp_drum_01 = true,   -- Tamriel Data
         t_imp_drum_02 = true,
         t_imp_drum_03 = true,
         t_imp_drum_04 = true,
@@ -23,11 +23,14 @@ local INSTRUMENT_ITEMS = {
         t_orc_drum_01 = true,
         t_rga_drum_01 = true,
     },
+    Fiddle = {
+        r_bc_fiddle = true, -- Bardcraft
+    },
     Ocarina = {
-        _rlts_bc_ocarina = true, -- Bardcraft
+        r_bc_ocarina = true, -- Bardcraft
     },
     BassFlute = {
-        _rlts_bc_bassflute = true, -- Bardcraft
+        r_bc_bassflute = true, -- Bardcraft
     },
     PanFlute = {
         t_de_music_panflute_01 = true,
@@ -50,7 +53,117 @@ local INSTRUMENT_ITEMS = {
 
 local SHEATHABLE_INSTRUMENTS = { -- Instruments that can be displayed on the back
     Lute = true,
-    Drum = true
+    Drum = true,
+    Fiddle = true,
+}
+
+local VENUES = {
+    tavern = {
+        -- Base Game
+        ["ald-ruhn, ald skar inn"] = "boderi farano",
+        ["ald-ruhn, council club"] = "darvam hlaren",
+        ["ald-ruhn, the rat in the pot"] = "lirielle stoine",
+        ["balmora, council club"] = "banor seran",
+        ["balmora, eight plates"] = "dulnea ralaal",
+        ["balmora, lucky lockup"] = "benunius agrudilius",
+        ["balmora, south wall cornerclub"] = "bacola closcius",
+        ["caldera, shenk's shovel"] = "shenk",
+        ["dagon fel, the end of the world"] = "fryfnhild",
+        ["ebonheart, six fishes"] = "agning",
+        ["ghostgate, tower of dusk"] = "galore salvi",
+        ["gnisis, madach tradehouse"] = "fenas madach",
+        ["maar gan, andus tradehouse"] = "manse andus",
+        ["molag mar, the pilgrim's rest"] = "selkirnemus",
+        ["pelagiad, halfway tavern"] = "drelasa ramothran",
+        ["sadrith mora, fara's hole in the wall"] = "fara",
+        ["sadrith mora, gateway inn"] = "ery",
+        ["sadrith mora, dirty muriel's cornerclub"] = "muriel sette",
+        ["seyda neen, arrille's tradehouse"] = "elone",
+        ["suran, desele's house of earthly delights"] = "helviane desele",
+        ["suran, suran tradehouse"] = "ashumanu eraishah",
+        ["tel aruhn, plot and plaster"] = "drarayne girith",
+        ["tel branora, sethan's tradehouse"] = "llorayna sethan",
+        ["tel mora, the covenant"] = "thaeril",
+        ["vivec, black shalk cornerclub"] = "raril giral",
+        ["vivec, elven nations cornerclub"] = "gadela andus",
+        ["vivec, no name club"] = "brathus dals",
+        ["vivec, the flowers of gold"] = "sorosi radobar",
+        ["vivec, the lizard's head"] = "manara othan",
+        ["vos, varo tradehouse"] = "burcanius varo",
+        -- Tamriel Rebuilt (incomplete)
+        ["the grey lodge"] = "tr_m4_kraki the grey",
+        ["hunted hound inn"] = "tr_m3_ryamon sevenas",
+        ["the inn between"] = "tr_m2_audania ranius",
+        ["aimrah, the sailors' inn"] = "tr_m3_dilvene gilmanil",
+        ["akamora, the laughing goblin"] = "tr_m2_liuba onamas",
+        ["akamora, underground bazaar"] = "tr_m2_llania darvani",
+        ["almas thirr, hostel of the crossing"] = "tr_m3_doryn naves",
+        ["almas thirr, limping scrib"] = "tr_m3_hlireni hleran",
+        ["almas thirr, the pious pirate"] = "tr_m3_rothis thalur",
+        ["almas thirr, thirsty saint cornerclub"] = "tr_m3_yammu hainnadon",
+        ["bal foyen, cat-catchers' cornerclub"] = "tr_m4_llaynu_maanil",
+        ["andothren, council club"] = "tr_m4_darayne_llarem"
+    },
+    street = {
+        metropolises = {
+            -- Base Game
+            "Vivec",
+            -- Tamriel Rebuilt
+            "Old Ebonheart",
+            "Narsis",
+            -- Cyrodiil
+            "Anvil",
+            -- Skyrim
+            "Karthwasten"
+        },
+        cities = {
+            -- Base Game
+            "Ald-ruhn",
+            "Balmora",
+            "Sadrith Mora",
+            -- Tamriel Rebuilt
+            "Almas Thirr",
+            "Andothren",
+            "Bal Foyen",
+            "Firewatch",
+            "Necrom",
+            "Akamora",
+            "Hlan Oek",
+            "Hlerynhul",
+            "Port Telvannis",
+            -- Skyrim
+            "Dragonstar"
+        },
+        towns = {
+            -- Base Game
+            "Caldera",
+            "Ebonheart",
+            "Gnisis",
+            "Maar Gan",
+            "Molag Mar",
+            "Pelagiad",
+            "Suran",
+            "Tel Aruhn",
+            "Tel Branora",
+            "Tel Mora",
+            -- Tamriel Rebuilt
+            "Darvonis",
+            "Dondril",
+            "Helnim",
+            "Llothanis",
+            "Omaynis",
+            "Othmura",
+            "Ranyon-ruhn",
+            "Roa Dyr",
+            "Sailen",
+            "Vhul",
+            -- Cyrodiil
+            "Brina Cross",
+            "Charach",
+            -- Skyrim
+            "Karthgad"
+        }
+    }
 }
 
 local PUBLICAN_CLASSES = {
@@ -61,13 +174,13 @@ local PUBLICAN_CLASSES = {
 }
 
 local BARD_NPCS = {
-    _rlts_bc_bard_oc1 = { -- Sees-Silent-Reeds
+    r_bc_n_reeds = { -- Sees-Silent-Reeds
         home = {
             cell = "Seyda Neen, Arrille's Tradehouse",
             position = util.vector3(-586, -381, 385),
             rotation = util.transform.rotateZ(1.6),
         },
-        startingLevel = 25,
+        startingLevel = 30,
     }
 }
 
@@ -75,12 +188,12 @@ local QUEST_REWARDS = {
     B2_AhemmusaSafe = {
         stage = 50,
         msg = "UI_Msg_QuestReward_Ahemmusa",
-        item = "_rlts_bc_songscroll_ahemmusa",
+        item = "r_bc_songscroll_ahemmusa",
     },
     DA_Sheogorath = {
         stage = 70,
         msg = "UI_Msg_QuestReward_Sheogorath",
-        item = "_rlts_bc_musbox_sheo_a",
+        item = "r_bc_musbox_sheo",
     }
 }
 
@@ -104,6 +217,7 @@ local SONG_IDS = {
     [0x10100] = "bwv997.mid",
     -- Intermediate:    0x20000 - 0x2FFFF
     [0x20000] = "int1.mid",
+    [0x20001] = "int2.mid",
     [0x20100] = "greensleeves.mid",
     [0x20101] = "imp1.mid",
     [0x20102] = "reddiamond.mid",
@@ -132,107 +246,100 @@ local SONG_POOLS = {
     },
     intermediate = {
         0x20000, -- int1.mid
+        0x20001, -- int2.mid
         0x20100, -- greensleeves.mid
         0x20101, -- imp1.mid
         0x20102, -- reddiamond.mid
     },
     advanced = {
-        0x30000, -- adv1.mid
+        --0x30000, -- adv1.mid
         0x30100, -- bwv997-adv.mid
     },
 }
 
 local SONG_BOOKS = {
-    _rlts_bc_songbook_gen_beg = {
+    r_bc_songbook_beg = {
         pools = {
             "beginner",
         },
     },
-    _rlts_bc_songbook_gen_int = {
+    r_bc_songbook_int = {
         pools = {
             "intermediate",
         },
     },
-    _rlts_bc_songbook_gen_adv = {
+    r_bc_songbook_adv = {
         pools = {
             "advanced",
         },
     },
-    _rlts_bc_songscroll_ahemmusa = {
+    r_bc_songscroll_ahemmusa = {
         songs = {
             0xE0000, -- ahemmusa.mid
         }
     },
-    bk_battle_molag_beran = { -- Entertainers plug-in book
-        songs = {
-            0xE0001, -- molagberan.mid
-        }
-    },
-    bk_balladeers_fakebook = { -- Entertainers plug-in book
-        songs = {
-            0xE0002, -- rollbretonnia.mid
-        }
-    },
+    -- bk_battle_molag_beran = { -- Entertainers plug-in book
+    --     songs = {
+    --         0xE0001,          -- molagberan.mid
+    --     }
+    -- },
+    -- bk_balladeers_fakebook = { -- Entertainers plug-in book
+    --     songs = {
+    --         0xE0002,           -- rollbretonnia.mid
+    --     }
+    -- },
     bk_ashland_hymns = { -- Vanilla book
         songs = {
-            0xE0003, -- wondrouslove.mid
+            0xE0003,     -- wondrouslove.mid
         }
     },
-    bk_five_far_stars = { -- Vanilla book
-        songs = {
-            0xE0004, -- redmountain.mid
-        }
-    },
-    bk_words_of_the_wind = { -- Vanilla book
-        songs = {
-            0xE0005, -- shrinktodust.mid
-        }
-    },
-    bk_cantatasofvivec = { -- Vanilla book
-        songs = {
-            0xE0006, -- brooding.mid
-        }
-    },
-    bk_istunondescosmology = { -- Vanilla book
-        songs = {
-            0xE0007, -- lessrude.mid
-        }
-    },
-    ["bookskill_light armor3"] = { -- Vanilla book
-        songs = {
-            0xE0008, -- jornibret.mid
-        }
-    }
+    -- bk_five_far_stars = { -- Vanilla book
+    --     songs = {
+    --         0xE0004,      -- redmountain.mid
+    --     }
+    -- },
+    -- bk_words_of_the_wind = { -- Vanilla book
+    --     songs = {
+    --         0xE0005,         -- shrinktodust.mid
+    --     }
+    -- },
+    -- bk_cantatasofvivec = { -- Vanilla book
+    --     songs = {
+    --         0xE0006,       -- brooding.mid
+    --     }
+    -- },
+    -- bk_istunondescosmology = { -- Vanilla book
+    --     songs = {
+    --         0xE0007,           -- lessrude.mid
+    --     }
+    -- },
+    -- ["bookskill_light armor3"] = { -- Vanilla book
+    --     songs = {
+    --         0xE0008,               -- jornibret.mid
+    --     }
+    -- }
 }
 
 local MUSIC_BOXES = {
-    _rlts_bc_musbox_beg_a = {
+    r_bc_musbox_beg_a = {
         pools = {
             "beginner",
         },
         spawnChance = 0.5,
     },
-    _rlts_bc_musbox_int_a = {
+    r_bc_musbox_int_a = {
         pools = {
             "intermediate",
         },
         spawnChance = 0.3,
     },
-    _rlts_bc_musbox_adv_a = {
+    r_bc_musbox_adv_a = {
         pools = {
             "advanced",
         },
         spawnChance = 0.7,
     },
-    _rlts_bc_musbox_dwv_a = {
-        songs = {},
-        spawnChance = 0.5,
-    },
-    _rlts_bc_musbox_imp_a = {
-        songs = {},
-        spawnChance = 0.5,
-    },
-    _rlts_bc_musbox_sheo_a = { -- Sheogorath's Music Box; picks a random song from all music box pools
+    r_bc_musbox_sheo_a = { -- Sheogorath's Music Box; picks a random song from all music box pools
         pools = {
             "beginner",
             "intermediate",
@@ -244,21 +351,23 @@ local MUSIC_BOXES = {
 
 local STARTING_SONGS = {
     ["scales.mid"] = "any",
-    ["start-altmer.mid"] = "high elf",
-    ["start-argonian.mid"] = "argonian",
-    ["start-bosmer.mid"] = "wood elf",
-    ["start-breton.mid"] = "breton",
-    ["start-dunmer.mid"] = "dark elf",
-    ["start-imperial.mid"] = "imperial",
-    ["start-khajiit.mid"] = "khajiit",
-    ["start-nord.mid"] = "nord",
-    ["start-orc.mid"] = "orc",
-    ["start-redguard.mid"] = "redguard",
+    ["start-dunmer.mid"] = "any",
+    -- ["start-altmer.mid"] = "high elf",
+    -- ["start-argonian.mid"] = "argonian",
+    -- ["start-bosmer.mid"] = "wood elf",
+    -- ["start-breton.mid"] = "breton",
+    -- ["start-dunmer.mid"] = "dark elf",
+    -- ["start-imperial.mid"] = "imperial",
+    -- ["start-khajiit.mid"] = "khajiit",
+    -- ["start-nord.mid"] = "nord",
+    -- ["start-orc.mid"] = "orc",
+    -- ["start-redguard.mid"] = "redguard",
 }
 
 return {
     InstrumentItems = INSTRUMENT_ITEMS,
     SheathableInstruments = SHEATHABLE_INSTRUMENTS,
+    Venues = VENUES,
     PublicanClasses = PUBLICAN_CLASSES,
     BardNpcs = BARD_NPCS,
     QuestRewards = QUEST_REWARDS,

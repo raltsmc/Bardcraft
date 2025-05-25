@@ -148,6 +148,12 @@ I.Settings.registerGroup {
     name = 'ConfigCategoryKeybinds',
     permanentStorage = true,
     settings = {
+        {
+            key = 'kOpenInterface',
+            renderer = 'Bardcraft/inputKeySelection',
+            name = 'ConfigKeybindOpenInterface',
+            default = input.KEY.B
+        },
     },
 }
 I.Settings.registerGroup {
@@ -158,7 +164,7 @@ I.Settings.registerGroup {
 	permanentStorage = true,
 	settings = {
         {
-            key = 'silenceAmbientMusic',
+            key = 'bSilenceAmbientMusic',
             renderer = 'checkbox',
             name = 'ConfigAmbientMusic',
             description = 'ConfigAmbientMusicDesc',

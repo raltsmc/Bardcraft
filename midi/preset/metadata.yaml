@@ -115,6 +115,19 @@ midiData:
     texture: wayrest
     startUnlocked: false
     difficulty: intermediate
+  int2.mid:
+    title: Five-Legged Festus
+    description: A whimsical Dunmer number telling the curious tale of a silt strider with a missing leg. Its peculiar five-beat meter, said to mimic Festus' lurching gait, has made it something of a cult favorite in Vvardenfell's less discerning taverns.
+    scale:
+      root: D
+      mode: Yffreic
+    loopBars:
+      - 0
+      - 28
+    loopCount: 0
+    texture: westgash
+    startUnlocked: false
+    difficulty: intermediate
   bwv997.mid:
     title: The Guar and the Scrib
     description: A relaxed lute accompaniment supports a lively ocarina melody; perfect for confidence-building for aspiring lutists looking to move on from basic scales.
@@ -154,7 +167,7 @@ midiData:
     texture: tavern
     startUnlocked: false
     difficulty: intermediate
-  imp1.mid:
+  imp1.mid: 
     title: Courting the Alewife
     description: Not quite a waltz nor a jig, this spirited Imperial dance could equally satisfy a Nibenese court and a tavern full of drunken Dunmer. A favorite of the Minstrels' Guild of Cyrodiil, which uses it to train intermediate lutists and ocarinists in counterpoint.
     loopBars:
@@ -181,6 +194,9 @@ midiData:
     texture: imperial
     startUnlocked: false
     difficulty: intermediate
+    partOverrides:
+      Lute: Lute (Solo)
+      Lute 2: Lute (Accompaniment)
   moonsong.mid:
     title: Ja-Kha'jay's Moonsong
     description: A beloved Khajiiti folk tune, said to echo the laughter of Jone and Jode as they chase across the night sky. Commonly heard during celebrations such as the New Life Festival.
@@ -218,7 +234,7 @@ midiData:
   wondrouslove.mid:
     title: Wondrous Love
     description: A solemn Ashlander hymn from the Urshilaku, honoring the sacred bonds of love and truth shared through all trials, from first breath to final whisper.
-    texture: ashlander
+    texture: ahemmusa
     startUnlocked: false
     difficulty: beginner
   redmountain.mid:

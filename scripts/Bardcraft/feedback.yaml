@@ -174,7 +174,7 @@ patron:
   # --- Great and Modestly Impressive Performance ---
   - criteria:
       perfQualityMin: 85
-      perfDensityMin: 4
+      perfDensityMin: 3.25
     subcriteria:
       - criteria:
           race: dark elf

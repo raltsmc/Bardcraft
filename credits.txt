@@ -50,8 +50,11 @@ int1.mid: Modified from https://musescore.com/user/34711090/scores/22831834 (CC-
 int3.mid: Based on Turkish folk song "Ah Bir Ataş Ver", https://musescore.com/user/1185841/scores/5707125 (CC-BY)
 cadence1.mid: Based on "Jig 2" drum cadence by Oak Mountain High School drumline
 
-The following are my own MIDI arrangements based on Elder Scrolls Online bard/music box songs. All credit for the original compositions belongs to ZeniMax and their talented composers; they have been included out of love and homage to the worldbuilding of ESO, and I will readily oblige any request to remove them.
-reddiamond.mid: Chim-el Adabal / Diamond Melody
-
 The following are adaptations of urm's compositions from the mod "Songs of the Ashen Winds":
 wondrouslove.mid
+
+The following are my own MIDI arrangements based on Daggerfall OST songs. All credit for the original compositions belongs to Bethesda and Eric Heberling.
+
+
+The following are my own MIDI arrangements based on Elder Scrolls Online bard/music box songs. All credit for the original compositions belongs to ZeniMax and their talented composers; they have been included out of love and homage to the worldbuilding of ESO, and I will readily oblige any request to remove them.
+reddiamond.mid: Chim-el Adabal / Diamond Melody

@@ -238,6 +238,7 @@ midiData:
   wondrouslove.mid:
     title: Wondrous Love
     description: A solemn Ashlander hymn from the Urshilaku, honoring the sacred bonds of love and truth shared through all trials, from first breath to final whisper.
+    tempoMod: 0.5
     texture: ahemmusa
     difficulty: beginner
   redmountain.mid:

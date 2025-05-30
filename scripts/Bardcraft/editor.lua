@@ -336,8 +336,15 @@ local function getNoteSoundPath(note)
     return filePath
 end
 
+local function getNoteVolume()
+    if not Editor.activePart then return 0 end
+    local profile = Song.getInstrumentProfile(Editor.activePart.instrument)
+    if not profile or not profile.volume then return 0 end
+    return profile.volume
+end
+
 local function playNoteSound(note)
-    ambient.playSoundFile(getNoteSoundPath(note))
+    ambient.playSoundFile(getNoteSoundPath(note), { volume = getNoteVolume() })
 end
 
 local function stopNoteSound(note)
@@ -1073,11 +1080,10 @@ uiTemplates = {
                                     if Editor.deletePartClickCount >= 2 then
                                         Editor.deletePartClickCount = 0
                                         if part == Editor.activePart then
-                                            Editor.activePart = nil
+                                            Editor.activePart = Editor.song.parts[1]
                                         end
                                         if part then
                                             Editor.song:removePart(part.index)
-                                            saveDraft()
                                             Editor:destroyUI()
                                             Editor:createUI()
                                         end
@@ -1151,6 +1157,7 @@ uiTemplates = {
                 local instrumentNumber = Song.getInstrumentNumber(instrumentName)
                 if instrumentNumber ~= part.instrument then
                     part.instrument = instrumentNumber
+                    part.numOfType = #Editor.song:getPartsOfInstrument(instrumentNumber)
                     saveDraft()
                     partDisplay.layout.content[1].content[1].props.resource = ui.texture { path = Instruments[instrumentName].icon }
                     partDisplay:update()
@@ -1544,7 +1551,7 @@ uiTemplates = {
                         local fileName = 'sound\\Bardcraft\\samples\\Lute\\Lute_' .. noteName .. octave .. '.wav']]
                         local fileName = getNoteSoundPath(noteIndex)
                         if playingNoteSound ~= fileName then
-                            ambient.playSoundFile(fileName)
+                            ambient.playSoundFile(fileName, { volume = getNoteVolume()})
                             if playingNoteSound and Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
                                 ambient.stopSoundFile(playingNoteSound)
                             end
@@ -1560,7 +1567,7 @@ uiTemplates = {
                         local noteName = noteNames[(noteIndex % 12) + 1]
                         local fileName = 'sound\\Bardcraft\\samples\\Lute\\Lute_' .. noteName .. octave .. '.wav']]
                         local fileName = getNoteSoundPath(noteIndex)
-                        ambient.playSoundFile(fileName)
+                        ambient.playSoundFile(fileName, { volume = getNoteVolume() })
                         playingNoteSound = fileName
                     end
                 end),
@@ -1769,7 +1776,6 @@ uiTemplates = {
                 if not self.props.active then return end
                 if e.button == 3 then
                     removeNote(self)
-                    saveNotes()
                     return
                 end
                 if e.button == 1 then
@@ -2201,21 +2207,15 @@ local function stopPlayback()
 end
 
 setDraft = function(song)
+    if Editor.song then
+        saveNotes()
+    end
     if song then
         Editor.song = song
         setmetatable(Editor.song, Song)
         Editor.activePart = nil
         pianoRoll.scrollX = 0
-        local partKeys = {}
-        for i, _ in pairs(Editor.song.parts) do
-            if i ~= 0 then
-                table.insert(partKeys, i)
-            end
-        end
-        table.sort(partKeys, function(a, b)
-            return a < b
-        end)
-        Editor.activePart = partKeys[1] and Editor.song.parts[partKeys[1]][1] or nil
+        Editor.activePart = Editor.song.parts[1] or nil
         for _, part in pairs(Editor.song.parts) do
             Editor.partsPlaying[part.index] = true
         end
@@ -2780,9 +2780,9 @@ getSongTab = function()
                     },
                     events = {
                         mouseClick = async:callback(function()
-                            Editor.activePart = Editor.song:createNewPart()
-                            saveDraft()
                             Editor:destroyUI()
+                            Editor.activePart = Editor.song:createNewPart()
+                            Editor.partsPlaying[Editor.activePart.index] = true
                             Editor:createUI()
                         end),
                     }
@@ -3136,10 +3136,19 @@ getPerformanceTab = function()
         itemHeight = 40
     end
 
+    if Editor.performanceSelectedPerformer and Editor.performanceSelectedPerformer.id ~= self.id and not Editor.troupeMembers[Editor.performanceSelectedPerformer.id] then
+        Editor.performanceSelectedPerformer = nil
+    end
+    for id, _ in pairs(Editor.performancePartAssignments) do
+        if id ~= self.id and not Editor.troupeMembers[id] then
+            Editor.performancePartAssignments[id] = nil
+        end
+    end
+
     -- Combine known songs from all troupe members (including player)
     local knownSongs = {}
     for _, actor in ipairs(nearby.actors) do
-        if (actor.type == types.NPC and Editor.troupeMembers[actor.recordId]) or actor.type == types.Player then
+        if (actor.type == types.NPC and Editor.troupeMembers[actor.id]) or actor.type == types.Player then
             local performerInfo = Editor.performersInfo[actor.id]
             if performerInfo and performerInfo.knownSongs then
                 for songId, songData in pairs(performerInfo.knownSongs) do
@@ -3171,7 +3180,7 @@ getPerformanceTab = function()
     local scrollablePerformersContent = ui.content{}
     if doPerformers then
         for _, v in ipairs(nearby.actors) do
-            if (v.type == types.NPC and Editor.troupeMembers[v.recordId]) or v.type == types.Player then
+            if (v.type == types.NPC and Editor.troupeMembers[v.id]) or v.type == types.Player then
                 scrollablePerformersContent:add(uiTemplates.performerDisplay(v, itemHeight, Editor.performanceSelectedPerformer and (v.id == Editor.performanceSelectedPerformer.id), function()
                     if Editor.performanceSelectedPerformer and Editor.performanceSelectedPerformer.id == v.id then
                         Editor.performanceSelectedPerformer = nil
@@ -3212,7 +3221,7 @@ getPerformanceTab = function()
                 if Editor.performersInfo[Editor.performanceSelectedPerformer.id] then
                     local knownSong = Editor.performersInfo[Editor.performanceSelectedPerformer.id].knownSongs[Editor.performanceSelectedSong.id]
                     if knownSong then
-                        confidence = knownSong.partConfidences[part.index] or 0
+                        confidence = knownSong.partConfidences[part.instrument] and knownSong.partConfidences[part.instrument][part.numOfType] or 0
                     end
                 end
             end
@@ -4227,8 +4236,8 @@ local function tickPlayback(dt)
 end
 
 function Editor:setState(state)
-    self.state = state
     self:destroyUI()
+    self.state = state
     self:createUI()
 end
 
@@ -4254,6 +4263,9 @@ function Editor:createUI()
 end
 
 function Editor:destroyUI()
+    if self.state == self.STATE.SONG then
+        saveNotes()
+    end
     if wrapperElement then
         auxUi.deepDestroy(wrapperElement)
         wrapperElement = nil

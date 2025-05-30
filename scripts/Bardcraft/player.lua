@@ -12,6 +12,7 @@ local storage = require('openmw.storage')
 local async = require('openmw.async')
 local time = require('openmw_aux.time')
 local types = require('openmw.types')
+local nearby = require('openmw.nearby')
 
 local l10n = core.l10n('Bardcraft')
 
@@ -33,7 +34,6 @@ local function populateKnownSongs()
         local record = Data.StartingSongs[song.id]
         if record then
             local raceMatches = record == 'any' or record == race
-            print('Found record for ' .. song.id .. ': ' .. record .. ' race matches: ' .. tostring(raceMatches))
             if raceMatches and not Performer.stats.knownSongs[song.id] then
                 Performer:addKnownSong(song)
             end
@@ -487,7 +487,7 @@ local function precacheSongSamples(data)
     local samples = {}
     for _, event in ipairs(data.song.notes) do
         if event.type == 'noteOn' and data.playedParts[event.part] then
-            local part = data.song:getPart(event.part)
+            local part = data.song:getPartByIndex(event.part)
             if part then
                 local instrument = part.instrument
                 local profile = Song.getInstrumentProfile(instrument)
@@ -535,8 +535,8 @@ return {
             if Performer.playing then
                 if resetAnimNextTick then
                     resetAnimNextTick = false
-                    Performer:resetAnim()
-                    Performer:resetVfx()
+                    Performer.resetAnim()
+                    Performer.resetVfx()
                 end
                 local queuedMode = camera.getQueuedMode()
                 if queuedMode == camera.MODE.FirstPerson or queuedMode == camera.MODE.Preview then
@@ -614,6 +614,16 @@ return {
                 ui.showMessage('DEBUG: Set Bardcraft level to ' .. Performer.stats.performanceSkill.level)
             elseif string.lower(tokens[1]) == 'luabcreset' then
                 Performer:resetAllStats()
+
+                if tokens[2] and string.lower(tokens[2]) == '--all' then
+                    -- Send reset event to all troupe members
+                    for _, actor in pairs(nearby.actors) do
+                        if actor.type == types.NPC and Editor.troupeMembers[actor.id] then
+                            actor:sendEvent('BC_ResetPerformer')
+                        end
+                    end
+                end
+
                 populateKnownSongs()
                 ui.showMessage('DEBUG: Reset Bardcraft stats')
             elseif string.lower(tokens[1]) == 'luabcteachall' then
@@ -1005,7 +1015,7 @@ return {
         BC_TroupeStatus = function(data)
             local members = {}
             for _, member in ipairs(data.members) do
-                members[member.recordId] = true
+                members[member.id] = true
             end
             Editor.troupeMembers = members
             if Editor.troupeSize ~= #data.members and Performer.playing then

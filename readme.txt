@@ -109,6 +109,14 @@ Installation
 2. Enable "Bardcraft.omwscripts" and "Bardcraft.ESP" in your load order.
 3. In your OpenMW launcher, go to Settings > Visuals > Animations and make sure "Use Additional Animation Sources" is checked. "Smooth Animation Transitions" is also highly recommended but not required.
 
+=========
+Updating
+=========
+Updating between patches (e.g. 1.0.1 -> 1.0.2): 
+	Shouldn't cause any major problems as these updates will not modify the ESP in a breaking way.
+Updating between minor versions (e.g. 1.0.0 -> 1.1.0):
+	Generally, should NOT be done on an existing save file; you will risk disappearing followers, duplicate music boxes, etc.
+
 ========
 Removal
 ========

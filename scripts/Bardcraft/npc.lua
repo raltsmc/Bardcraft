@@ -68,5 +68,8 @@ return {
         BO_ConductorEvent = function(data)
             Performer.handleConductorEvent(data)
         end,
+        BC_ResetPerformer = function(data)
+            Performer:resetAllStats()
+        end,
     }
 }

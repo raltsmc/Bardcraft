@@ -155,7 +155,8 @@ function P:addKnownSong(song, confidences)
         partConfidences = {},
     }
     for _, part in ipairs(song.parts) do
-        self.stats.knownSongs[song.id].partConfidences[part.index] = (confidences and confidences[part.index]) or 0
+        self.stats.knownSongs[song.id].partConfidences[part.instrument] = self.stats.knownSongs[song.id].partConfidences[part.instrument] or {}
+        self.stats.knownSongs[song.id].partConfidences[part.instrument][part.numOfType] = (confidences and confidences[part.instrument] and confidences[part.instrument][part.numOfType]) or 0
     end
     self:sendPerformerInfo()
 end
@@ -166,7 +167,8 @@ function P:teachSong(song)
             partConfidences = {},
         }
         for _, part in ipairs(song.parts) do
-            self.stats.knownSongs[song.id].partConfidences[part.index] = 0
+            self.stats.knownSongs[song.id].partConfidences[part.instrument] = self.stats.knownSongs[song.id].partConfidences[part.instrument] or {}
+            self.stats.knownSongs[song.id].partConfidences[part.instrument][part.numOfType] = 0
         end
         self:sendPerformerInfo()
         return true
@@ -184,16 +186,13 @@ function P:teachAllSongs()
 end
 
 function P:modSongConfidence(songId, part, mod)
-    if not self.stats.knownSongs[songId] then
-        self.stats.knownSongs[songId] = {
-            partConfidences = {},
-        }
-    end
-    local confidence = self.stats.knownSongs[songId].partConfidences[part] or 0
+    self.stats.knownSongs[songId] = self.stats.knownSongs[songId] or { partConfidences = {} }
+    self.stats.knownSongs[songId].partConfidences[part.instrument] = self.stats.knownSongs[songId].partConfidences[part.instrument] or {}
+    local confidence = self.stats.knownSongs[songId].partConfidences[part.instrument][part.numOfType] or 0
     if confidence ~= confidence then confidence = 0 end
     if mod ~= mod then mod = 0 end
     confidence = util.clamp(confidence + mod, 0, 1)
-    self.stats.knownSongs[songId].partConfidences[part] = confidence
+    self.stats.knownSongs[songId].partConfidences[part.instrument][part.numOfType] = confidence
     self:sendPerformerInfo()
 end
 
@@ -213,6 +212,7 @@ function P:resetAllStats()
         notesPlayed = {},
     }
     self:sendPerformerInfo()
+    print('Reset performer stats for ' .. omwself.recordId)
 end
 
 --[[========
@@ -271,8 +271,9 @@ local function getAnimStartPoint(timeOffset)
         return 0
     end
     local songBeatLength = 1 / (P.bpm / 60)
-    local songTime = timeOffset % (songBeatLength * 16) -- in seconds
-    local animTime = songTime / (songBeatLength * 16) -- from 0 to 1
+    local animBeatLength = 1 / (24 / 20)
+    local adjustedTimeOffset = timeOffset / (animBeatLength / songBeatLength)
+    local animTime = adjustedTimeOffset / (animBeatLength * 16) -- from 0 to 1
     return animTime
 end
 
@@ -439,7 +440,7 @@ function P.handlePerformEvent(data)
         P:addKnownSong(song)
     end
 
-    P.maxConfidence = P.stats.knownSongs[song.id].partConfidences[data.part.index] or 0
+    P.maxConfidence = P.stats.knownSongs[song.id].partConfidences[data.part.instrument] and P.stats.knownSongs[song.id].partConfidences[data.part.instrument][data.part.numOfType] or 0
     if P.maxConfidence ~= P.maxConfidence then
         P.maxConfidence = 0 -- NaN check
     end
@@ -507,9 +508,9 @@ function P.handleStopEvent(data)
             P.stats.performedVenuesToday[data.cell] = true
         end
     end
-    P:modSongConfidence(P.currentSong.id, P.currentPart.index, mod)
+    P:modSongConfidence(P.currentSong.id, P.currentPart, mod)
     if omwself and omwself.type == types.Player then
-        omwself:sendEvent('BC_GainConfidence', { songTitle = P.currentSong.title, partTitle = P.currentPart.title, oldConfidence = oldConfidence, newConfidence = P.stats.knownSongs[P.currentSong.id].partConfidences[P.currentPart.index] })
+        omwself:sendEvent('BC_GainConfidence', { songTitle = P.currentSong.title, partTitle = P.currentPart.title, oldConfidence = oldConfidence, newConfidence = P.stats.knownSongs[P.currentSong.id].partConfidences[P.currentPart.instrument][P.currentPart.numOfType] })
         core.sendGlobalEvent('BC_PlayerPerfSkillLog', { xpGain = P.xpGain, levelGain = P.levelGain, level = P.stats.performanceSkill.level, xpCurr = P.stats.performanceSkill.xp, xpReq = P:getPerformanceXPRequired() })
     end
     
@@ -534,7 +535,7 @@ function P.handleNoteEvent(data)
     
     if P.lastNoteTime then
         interval = interval * (data.time - P.lastNoteTime)
-        if interval < 0.05 then
+        if interval < 0.075 then
             weight = weight * 0.25
         end
         table.insert(P.noteIntervals, { interval = interval, weight = weight })

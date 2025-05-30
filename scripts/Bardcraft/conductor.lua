@@ -800,7 +800,7 @@ return {
                             break
                         end
                     end
-                    perfList[i].part = song:getPart(performer.part)
+                    perfList[i].part = song:getPartByIndex(performer.part)
                     -- Make sure all the performers have their required instrument
                     local instrument = Song.getInstrumentProfile(perfList[i].part.instrument).name
                     local validItems = instrumentItems[instrument]

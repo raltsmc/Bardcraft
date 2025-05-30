@@ -49,7 +49,7 @@ local instrumentProfiles = {
         transpose = true,
         polyphonic = false,
         densityMod = 0.9,
-        volume = 1,
+        volume = 1.5,
     },
     [4] = {
         name = "Fiddle",
@@ -156,6 +156,7 @@ function Part.new(index, instrument, title)
     self.index = index
     self.instrument = instrument
     self.title = title or (l10n('Instr_' .. instrumentProfiles[instrument].name) .. (index > 1 and (' ' .. index) or ''))
+    self.numOfType = 1
     return self
 end
 
@@ -231,13 +232,32 @@ function Song.new(title, desc, tempo, timeSig)
     return self
 end
 
-function Song:getPart(index)
+function Song:getPartByIndex(index)
     for _, part in ipairs(self.parts) do
         if part.index == index then
             return part
         end
     end
     return nil
+end
+
+function Song:getPartByInstrument(instrument, numOfType)
+    for _, part in ipairs(self.parts) do
+        if part.instrument == instrument and part.numOfType == numOfType then
+            return part
+        end
+    end
+    return nil
+end
+
+function Song:getPartsOfInstrument(instrument)
+    local parts = {}
+    for _, part in ipairs(self.parts) do
+        if part.instrument == instrument then
+            table.insert(parts, part)
+        end
+    end
+    return parts
 end
 
 function Song:noteEventsToNoteMap(noteEvents)
@@ -353,14 +373,10 @@ function Song.fromMidiParser(parser, metadata)
             if not partIndex[instrument] or not partIndex[instrument][note.track] then
                 partIndex[instrument] = partIndex[instrument] or {}
                 local index = #self.parts + 1
-                local countOfType = 0
-                for _, part in ipairs(self.parts) do
-                    if part.instrument == instrument then
-                        countOfType = countOfType + 1
-                    end
-                end
+                local countOfType = #self:getPartsOfInstrument(instrument)
                 local title = l10n('Instr_' .. instrumentProfiles[instrument].name) .. (countOfType > 0 and (' ' .. (countOfType + 1)) or '')
                 local part = Part.new(index, instrument, title)
+                part.numOfType = countOfType + 1
                 if metadata and metadata.partOverrides and metadata.partOverrides[part.title] then
                     part.title = metadata.partOverrides[part.title]
                 end
@@ -452,14 +468,10 @@ function Song:createNewPart()
             highestIndex = part.index
         end
     end
-    local countOfType = 0
-    for _, part in ipairs(self.parts) do
-        if part.instrument == instrument then
-            countOfType = countOfType + 1
-        end
-    end
+    local countOfType = #self:getPartsOfInstrument(instrument)
     local title = l10n('Instr_' .. instrumentProfiles[instrument].name) .. ' ' .. (countOfType + 1)
     local part = Part.new(highestIndex + 1, instrument, title)
+    part.numOfType = countOfType + 1
     table.insert(self.parts, part)
     return part
 end
@@ -568,7 +580,7 @@ function Song:tickPlayback(dt, noteOnHandler, noteOffHandler)
         if event.time >= self.playbackTickPrev then
             local noteNumber = event.note + 1
             local noteName = self.noteNumberToName(noteNumber - 1)
-            local instrument = self:getPart(event.part).instrument
+            local instrument = self:getPartByIndex(event.part).instrument
             local profile = self.getInstrumentProfile(instrument)
             local filePath = 'sound\\Bardcraft\\samples\\' .. profile.name .. '\\' .. profile.name .. '_' .. noteName .. '.wav'
             if event.type == 'noteOn' and event.velocity > 0 and not restart then

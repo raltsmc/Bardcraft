@@ -1,3 +1,13 @@
+--[[
+-- editor.lua
+-- ATTENTION: This file, despite its name, contains all of the mod's GUI logic, not just the editor.
+-- Below lies code written by someone trying to meet a one-month deadline, not to ensure any semblance
+-- of readability, maintainability, organization, or even remotely idiomatic Lua.
+-- 
+-- Don't use this as a reference for anything UI-related you want to do in your own mods.
+-- You've been warned :)
+]]
+
 local ui = require('openmw.ui')
 local auxUi = require('openmw_aux.ui')
 local I = require('openmw.interfaces')
@@ -17,6 +27,9 @@ local l10n = core.l10n('Bardcraft')
 local luaxp = require('scripts.Bardcraft.util.luaxp')
 local Song = require('scripts.Bardcraft.util.song').Song
 local Instruments = require('scripts.Bardcraft.instruments').Instruments
+local Data = require('scripts.Bardcraft.data')
+
+local configPlayer = require('scripts.Bardcraft.config.player')
 
 local Editor = {}
 
@@ -66,6 +79,8 @@ Editor.snapLevel = 5
 Editor.zoomLevel = 4
 Editor.activePart = nil
 Editor.partsPlaying = {}
+
+Editor.hideSongInfo = false
 
 Editor.deletePartIndex = nil
 Editor.deletePartClickCount = 0
@@ -363,12 +378,18 @@ local function calcOuterWindowHeight()
     return math.max(availableHeight, 0)
 end
 
+local function calcContentWidth()
+    return calcOuterWindowWidth() - 16
+end
+
+local function calcContentHeight()
+    return calcOuterWindowHeight() - (Editor.windowCaptionHeight + Editor.windowTabsHeight) - 8
+end
+
 local function calcPianoRollWrapperSize()
     if not screenSize then return util.vector2(0, 0) end
-    local windowWidth = calcOuterWindowWidth()
-    local windowHeight = calcOuterWindowHeight()
-    local width = windowWidth - ((screenSize.x * Editor.windowLeftBoxXMult + Editor.windowLeftBoxXSize) + (screenSize.x * Editor.windowMiddleBoxXMult + Editor.windowMiddleBoxXSize)) - 8
-    local height = windowHeight - (Editor.windowCaptionHeight + Editor.windowTabsHeight) - 8
+    local width = calcOuterWindowWidth() - ((screenSize.x * Editor.windowLeftBoxXMult + Editor.windowLeftBoxXSize) + (screenSize.x * Editor.windowMiddleBoxXMult + Editor.windowMiddleBoxXSize)) - 8
+    local height = calcContentHeight()
     return util.vector2(width, height)
 end
 
@@ -552,7 +573,7 @@ uiTemplates = {
                                 {
                                     template = I.MWUI.templates.textNormal,
                                     props = {
-                                        text = '   ' .. l10n("UI_Title") .. '   ',
+                                        text = '   ' .. l10n('UI_Title') .. '   ',
                                     }
                                 },
                                 headerSection,
@@ -1363,7 +1384,7 @@ uiTemplates = {
                 {
                     template = I.MWUI.templates.textNormal,
                     props = {
-                        text = "Lv. " .. tostring(level),
+                        text = l10n('UI_Lvl'):gsub('%%{level}', tostring(level)),
                         textColor = thickBorders and Editor.uiColors.WHITE or Editor.uiColors.DEFAULT,
                         textSize = 24,
                         anchor = util.vector2(1, 0.5),
@@ -1378,6 +1399,55 @@ uiTemplates = {
                     if onClick then
                         onClick()
                     end
+                end),
+            }
+        }
+    end,
+    logDisplaySmall = function(log, itemHeight, onClick)
+        -- Determine venue name (cell)
+        local venue = log.cell or l10n('UI_PerfLog_UnknownVenue')
+        -- Calculate total gold gained
+        local gold = (log.payment or 0) + (log.tips or 0)
+        -- Format gold string
+        local goldStr = l10n('UI_PerfLog_Gold'):gsub('%%{amount}', tostring(gold))
+        -- Optionally, color gold text based on amount
+        local goldColor = gold > 0 and Editor.uiColors.DEFAULT or Editor.uiColors.GRAY
+
+        return {
+            template = I.MWUI.templates.borders,
+            props = {
+                size = util.vector2(0, itemHeight),
+            },
+            external = {
+                stretch = 1,
+            },
+            content = ui.content {
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = venue,
+                        textColor = Editor.uiColors.DEFAULT,
+                        position = util.vector2(8, 0),
+                        anchor = util.vector2(0, 0.5),
+                        relativePosition = util.vector2(0, 0.5),
+                        size = util.vector2(0, itemHeight),
+                    },
+                },
+                {
+                    template = I.MWUI.templates.textNormal,
+                    props = {
+                        text = goldStr,
+                        textColor = goldColor,
+                        anchor = util.vector2(1, 0.5),
+                        relativePosition = util.vector2(1, 0.5),
+                        position = util.vector2(-8, 0),
+                        size = util.vector2(0, itemHeight),
+                    },
+                },
+            },
+            events = {
+                mouseClick = async:callback(function()
+                    Editor:showPerformanceLog(log)
                 end),
             }
         }
@@ -1806,7 +1876,7 @@ uiTemplates = {
                     {
                         template = I.MWUI.templates.textNormal,
                         props = {
-                            text = "Are you sure?",
+                            text = l10n('UI_AreYouSure'),
                             textAlignH = ui.ALIGNMENT.Center,
                         },
                     },
@@ -1821,7 +1891,7 @@ uiTemplates = {
                             align = ui.ALIGNMENT.Center,
                         },
                         content = ui.content {
-                            uiTemplates.button("Yes", util.vector2(128, 32), function()
+                            uiTemplates.button(l10n('UI_Button_Yes'), util.vector2(128, 32), function()
                                 if onConfirm then
                                     onConfirm()
                                 end
@@ -1833,7 +1903,7 @@ uiTemplates = {
                             {
                                 template = I.MWUI.templates.interval,
                             },
-                            uiTemplates.button("No", util.vector2(128, 32), function()
+                            uiTemplates.button(l10n('UI_Button_No'), util.vector2(128, 32), function()
                                 if modalElement then
                                     modalElement:destroy()
                                     modalElement = nil
@@ -1845,7 +1915,7 @@ uiTemplates = {
                 },
             },
             util.vector2(300, 150),
-            "Confirmation"
+            l10n('UI_Confirmation')
         )
     end,
     choiceModal = function(title, choices)
@@ -1862,7 +1932,7 @@ uiTemplates = {
                     {
                         template = I.MWUI.templates.textNormal,
                         props = {
-                            text = title or "Choose an option:",
+                            text = title or l10n('UI_ChooseAnOption'),
                             textAlignH = ui.ALIGNMENT.Center,
                         },
                     },
@@ -1896,7 +1966,7 @@ uiTemplates = {
                 },
             },
             util.vector2(300, 200),
-            title or "Choice"
+            title or l10n('UI_Choice')
         )
     end,
 }
@@ -2490,15 +2560,22 @@ getSongTab = function()
         table.insert(middleBox, {
             template = I.MWUI.templates.textHeader,
             props = {
-                text = l10n('UI_PRoll_SongInfo'),
+                text = (Editor.hideSongInfo and "[+]" or "[-]") .. " " .. l10n('UI_PRoll_SongInfo'),
                 textAlignH = ui.ALIGNMENT.Center,
                 autoSize = false,
                 relativeSize = util.vector2(1, 0),
                 size = util.vector2(0, 32),
             },
+            events = {
+                mouseClick = async:callback(function()
+                    Editor.hideSongInfo = not Editor.hideSongInfo
+                    redrawPianoRollEditor()
+                end),
+            },
         })
 
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTitle'), Editor.song.title, 32, function(text, self)
+        local sizeY = Editor.hideSongInfo and 0 or 32
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTitle'), Editor.song.title, sizeY, function(text, self)
             if not tostring(text) then
                 self.props.text = Editor.song.title
             else
@@ -2507,7 +2584,7 @@ getSongTab = function()
                 redrawPianoRollEditor()
             end
         end))
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTempo'), tostring(Editor.song.tempo), 32, function(text, self)
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTempo'), tostring(Editor.song.tempo), sizeY, function(text, self)
             if not tonumber(text) then
                 self.props.text = tostring(Editor.song.tempo)
             else
@@ -2516,7 +2593,7 @@ getSongTab = function()
                 redrawPianoRollEditor()
             end
         end))
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTimeSig'), Editor.song.timeSig[1] .. '/' .. Editor.song.timeSig[2], 32, function(text, self)
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongTimeSig'), Editor.song.timeSig[1] .. '/' .. Editor.song.timeSig[2], sizeY, function(text, self)
             local timeSig = parseTimeSignature(text)
             if not timeSig then
                 self.props.text = Editor.song.timeSig[1] .. '/' .. Editor.song.timeSig[2]
@@ -2526,7 +2603,7 @@ getSongTab = function()
                 redrawPianoRollEditor()
             end
         end))
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongLoopStart'), tostring(Editor.song.loopBars[1]), 32, function(text, self)
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongLoopStart'), tostring(Editor.song.loopBars[1]), sizeY, function(text, self)
             local parsed = parseExp(text)
             if not parsed or parsed < 0 then
                 self.props.text = tostring(Editor.song.loopBars[1])
@@ -2536,7 +2613,7 @@ getSongTab = function()
                 redrawPianoRollEditor()
             end
         end))
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongLoopEnd'), tostring(Editor.song.loopBars[2]), 32, function(text, self)
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongLoopEnd'), tostring(Editor.song.loopBars[2]), sizeY, function(text, self)
             local parsed = parseExp(text)
             if not parsed or parsed > Editor.song.lengthBars then
                 self.props.text = tostring(Editor.song.loopBars[2])
@@ -2546,7 +2623,17 @@ getSongTab = function()
                 redrawPianoRollEditor()
             end
         end))
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongEnd'), tostring(Editor.song.lengthBars), 32, function(text, self)
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongLoopCount'), tostring(Editor.song.loopCount or 0), sizeY, function(text, self)
+            local parsed = parseExp(text)
+            if not parsed or parsed < 1 then
+                self.props.text = tostring(Editor.song.loopCount or 0)
+            elseif not numMatches(Editor.song.loopCount or 0, parsed) then
+                Editor.song.loopCount = parsed
+                saveDraft()
+                redrawPianoRollEditor()
+            end
+        end))
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongEnd'), tostring(Editor.song.lengthBars), sizeY, function(text, self)
             local parsed = parseExp(text)
             if not parsed or parsed < 1 then
                 self.props.text = tostring(Editor.song.lengthBars)
@@ -2573,7 +2660,7 @@ getSongTab = function()
                 horizontal = true,
                 autoSize = false,
                 relativeSize = util.vector2(1, 0),
-                size = util.vector2(0, 32),
+                size = util.vector2(0, sizeY),
                 arrange = ui.ALIGNMENT.Center,
                 grow = 1,
                 stretch = 1,
@@ -2587,14 +2674,14 @@ getSongTab = function()
                     },
                 },
                 {
-                    template = createPaddingTemplate(4),
+                    template = createPaddingTemplate(Editor.hideSongInfo and 0 or 4),
                 },
-                uiTemplates.select(Song.Note, Editor.song.scale.root, 0, false, 32, function(newVal)
+                uiTemplates.select(Song.Note, Editor.song.scale.root, 0, false, sizeY, function(newVal)
                     Editor.song.scale.root = newVal
                     updateEditorOverlayRows()
                     saveDraft()
                 end),
-                uiTemplates.select(Song.Mode, Editor.song.scale.mode, 75, true, 32, function(newVal)
+                uiTemplates.select(Song.Mode, Editor.song.scale.mode, 75, true, sizeY, function(newVal)
                     Editor.song.scale.mode = newVal
                     updateEditorOverlayRows()
                     saveDraft()
@@ -2609,7 +2696,7 @@ getSongTab = function()
                 horizontal = true,
                 autoSize = false,
                 relativeSize = util.vector2(1, 0),
-                size = util.vector2(0, 32),
+                size = util.vector2(0, sizeY),
                 arrange = ui.ALIGNMENT.Center,
                 grow = 1,
                 stretch = 1,
@@ -2623,16 +2710,16 @@ getSongTab = function()
                     },
                 },
                 {
-                    template = createPaddingTemplate(4),
+                    template = createPaddingTemplate(Editor.hideSongInfo and 0 or 4),
                 },
-                uiTemplates.select(Editor.SNAP_LEVELS, Editor.snapLevel, 0, true, 32, function(newVal)
+                uiTemplates.select(Editor.SNAP_LEVELS, Editor.snapLevel, 0, true, sizeY, function(newVal)
                     Editor.snapLevel = newVal
                     --pianoRollLastNoteSize = Editor.song.resolution * (4 / Editor.song.timeSig[2])
                     --updatePianoRollBarNumberLabels()
                     --updatePianoRoll()
                 end),
                 {
-                    template = createPaddingTemplate(4),
+                    template = createPaddingTemplate(Editor.hideSongInfo and 0 or 4),
                 },
                 uiTemplates.checkbox(Editor.snap, 'CheckboxOn', 'CheckboxOff', function(checked)
                     Editor.snap = checked
@@ -2640,8 +2727,8 @@ getSongTab = function()
             }
         }
         table.insert(middleBox, snapSelect)
+        table.insert(middleBox, createPaddingTemplate(Editor.hideSongInfo and 0 or 8))
 
-        table.insert(middleBox, createPaddingTemplate(8))
         table.insert(middleBox, {
             template = I.MWUI.templates.textHeader,
             props = {
@@ -3038,7 +3125,7 @@ getPerformanceTab = function()
     local scrollableSongContent = ui.content{}
     local itemHeight = 40
     local scrollableHeight = 450 * screenSize.y / 1080
-    local scrollableWidth = 320 * screenSize.x / 1920 -- TODO change to 300
+    local scrollableWidth = 320 * screenSize.x / 1920
 
     if not doPerformers then
         scrollableWidth = scrollableWidth * 1.5
@@ -3049,12 +3136,20 @@ getPerformanceTab = function()
         itemHeight = 40
     end
 
+    -- Combine known songs from all troupe members (including player)
     local knownSongs = {}
-    local player = nearby.players[1]
-    if player then
-        knownSongs = Editor.performersInfo[player.id] and Editor.performersInfo[player.id].knownSongs or {}
+    for _, actor in ipairs(nearby.actors) do
+        if (actor.type == types.NPC and Editor.troupeMembers[actor.recordId]) or actor.type == types.Player then
+            local performerInfo = Editor.performersInfo[actor.id]
+            if performerInfo and performerInfo.knownSongs then
+                for songId, songData in pairs(performerInfo.knownSongs) do
+                    knownSongs[songId] = true
+                end
+            end
+        end
     end
 
+    local player = nearby.players[1]
     if not doPerformers then Editor.performanceSelectedPerformer = player end
 
     for i, song in ipairs(Editor.songs) do
@@ -3101,8 +3196,18 @@ getPerformanceTab = function()
         end)
         for _, part in ipairs(parts) do
             local selected = false
+            local show = true
             local confidence = 0
             if Editor.performanceSelectedPerformer then
+                show = false
+                local inventory = types.Actor.inventory(Editor.performanceSelectedPerformer)
+                local partInstrument = Song.getInstrumentProfile(part.instrument).name
+                for item, _ in pairs(Data.InstrumentItems[partInstrument] or {}) do
+                    if inventory:find(item) then
+                        show = true
+                        break
+                    end
+                end
                 selected = part.index == Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id]
                 if Editor.performersInfo[Editor.performanceSelectedPerformer.id] then
                     local knownSong = Editor.performersInfo[Editor.performanceSelectedPerformer.id].knownSongs[Editor.performanceSelectedSong.id]
@@ -3111,15 +3216,17 @@ getPerformanceTab = function()
                     end
                 end
             end
-            scrollablePartsContent:add(uiTemplates.partDisplaySmall(part, itemHeight, selected, confidence * 100, function()
-                if not Editor.performanceSelectedPerformer then return end
-                if Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id] == part.index then
-                    Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id] = nil
-                else
-                    Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id] = part.index
-                end
-                setMainContent(getPerformanceTab())
-            end))
+            if show then
+                scrollablePartsContent:add(uiTemplates.partDisplaySmall(part, itemHeight, selected, confidence * 100, function()
+                    if not Editor.performanceSelectedPerformer then return end
+                    if Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id] == part.index then
+                        Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id] = nil
+                    else
+                        Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id] = part.index
+                    end
+                    setMainContent(getPerformanceTab())
+                end))
+            end
         end
     end
     local scrollableParts = uiTemplates.scrollable(util.vector2(scrollableWidth, scrollableHeight), scrollablePartsContent, util.vector2(0, itemHeight * #scrollablePartsContent + 4))
@@ -3165,7 +3272,7 @@ getPerformanceTab = function()
                 {
                     template = I.MWUI.templates.textParagraph,
                     props = {
-                        text = Editor.performanceSelectedSong.desc or 'No description',
+                        text = Editor.performanceSelectedSong.desc or l10n('UI_Song_NoDescription'),
                     },
                     external = {
                         grow = 1,
@@ -3258,8 +3365,10 @@ getPerformanceTab = function()
 end
 
 getStatsTab = function()
-    local playerInfo = Editor.performersInfo[nearby.players[1].id]
-    if not playerInfo then return end
+    local player = nearby.players[1]
+    if not player then return {} end
+    local playerInfo = Editor.performersInfo[player.id]
+    if not playerInfo then return {} end
 
     local level = playerInfo.performanceSkill.level or 1
     local maxLevel = level >= 100
@@ -3269,12 +3378,15 @@ getStatsTab = function()
     local rank = l10n('UI_Lvl_Performance_' .. math.floor(level / 10))
 
     local stats = auxUi.deepLayoutCopy(uiTemplates.baseTab)
-    local flexContent = stats.content[1].content[1].content
+    local flexContent = stats.content[1].content[1].content -- This is the main vertical flex for the tab
+
+    -- XP Bar Section
     table.insert(flexContent, {
         type = ui.TYPE.Flex,
         props = {
             autoSize = false,
-            relativeSize = util.vector2(1, 1),
+            relativeSize = util.vector2(1, 0), -- Takes full width, height is auto based on content
+            size = util.vector2(0, 128),      -- Fixed height for this section
             arrange = ui.ALIGNMENT.Center,
         },
         content = ui.content {
@@ -3313,92 +3425,222 @@ getStatsTab = function()
                 props = {
                     autoSize = false,
                     relativeSize = util.vector2(1, 0),
-                    size = util.vector2(0, 128),
+                    size = util.vector2(0, 32), -- Height of the XP bar row
+                    horizontal = true,
                     arrange = ui.ALIGNMENT.Center,
+                    align = ui.ALIGNMENT.Center,
                 },
                 content = ui.content {
                     {
-                        type = ui.TYPE.Flex,
+                        template = I.MWUI.templates.textNormal,
+                        props = {
+                            text = tostring(level),
+                            textSize = 16,
+                            textColor = Editor.uiColors.DEFAULT,
+                        }
+                    },
+                    createPaddingTemplate(8),
+                    {
+                        template = I.MWUI.templates.borders,
                         props = {
                             autoSize = false,
-                            relativeSize = util.vector2(1, 0),
-                            size = util.vector2(0, 32),
-                            horizontal = true,
-                            arrange = ui.ALIGNMENT.Center,
-                            align = ui.ALIGNMENT.Center,
+                            relativeSize = util.vector2(0.8, 1), -- 80% width of this row, full height
+                            size = util.vector2(0, 0), -- Actual size determined by relativeSize
                         },
                         content = ui.content {
                             {
-                                template = I.MWUI.templates.textNormal,
+                                type = ui.TYPE.Image,
                                 props = {
-                                    text = tostring(level),
-                                    textSize = 16,
-                                    textColor = Editor.uiColors.DEFAULT,
-                                }
-                            },
-                            createPaddingTemplate(8),
-                            {
-                                template = I.MWUI.templates.borders,
-                                props = {
-                                    autoSize = false,
-                                    relativeSize = util.vector2(0.8, 0),
-                                    size = util.vector2(0, 32),
-                                },
-                                content = ui.content {
-                                    {
-                                        type = ui.TYPE.Image,
-                                        props = {
-                                            resource = ui.texture {
-                                                path = 'textures/Bardcraft/ui/xpbar.dds',
-                                            },
-                                            tileH = true,
-                                            tileV = false,
-                                            relativeSize = util.vector2(progress, 1),
-                                        }
+                                    resource = ui.texture {
+                                        path = 'textures/Bardcraft/ui/xpbar.dds',
                                     },
-                                    maxLevel and {
-                                        template = I.MWUI.templates.textNormal,
-                                        props = {
-                                            text = 'Max Level!',
-                                            textColor = Editor.uiColors.DEFAULT_LIGHT,
-                                            anchor = util.vector2(0.5, 0.5),
-                                            relativePosition = util.vector2(0.5, 0.5),
-                                            relativeSize = util.vector2(0, 1),
-                                            textAlignV = ui.ALIGNMENT.Center,
-                                        }
-                                    } or {},
+                                    tileH = true,
+                                    tileV = false,
+                                    relativeSize = util.vector2(progress, 1),
                                 }
                             },
-                            createPaddingTemplate(8),
-                            {
+                            maxLevel and {
                                 template = I.MWUI.templates.textNormal,
                                 props = {
-                                    text = maxLevel and '--' or (tostring(level + 1)),
-                                    textColor = Editor.uiColors.DEFAULT,
+                                    text = l10n('UI_Lvl_Max'),
+                                    textSize = 16,
+                                    textColor = Editor.uiColors.DEFAULT_LIGHT,
+                                    anchor = util.vector2(0.5, 0.5),
+                                    relativePosition = util.vector2(0.5, 0.5),
+                                    relativeSize = util.vector2(0, 1),
+                                    textAlignV = ui.ALIGNMENT.Center,
                                 }
-                            },
+                            } or {},
                         }
                     },
-                    createPaddingTemplate(4),
-                    not maxLevel and {
+                    createPaddingTemplate(8),
+                    {
                         template = I.MWUI.templates.textNormal,
                         props = {
-                            text = (util.round(xp) .. '/' .. util.round(req) .. ' (' .. util.round(progress * 100) .. '%) to next level'),
+                            text = maxLevel and '--' or (tostring(level + 1)),
+                            textSize = 16,
                             textColor = Editor.uiColors.DEFAULT,
                         }
-                    } or {},
-                    createPaddingTemplate(4),
+                    },
                 }
             },
+            createPaddingTemplate(4),
+            not maxLevel and {
+                template = I.MWUI.templates.textNormal,
+                props = {
+                    text = l10n('UI_Lvl_Progress'):gsub('%%{xp}', tostring(util.round(xp))):gsub('%%{req}', tostring(util.round(req))):gsub('%%{progress}', tostring(util.round(progress * 100))),
+                    textSize = 16,
+                    textColor = Editor.uiColors.DEFAULT,
+                }
+            } or {},
+            createPaddingTemplate(4),
         }
     })
+
+    -- Data Aggregation
+    local reputation = playerInfo.reputation or 0
+    local performanceCounts = {
+        overall = 0,
+        [Song.PerformanceType.Tavern] = 0,
+        [Song.PerformanceType.Street] = 0,
+        -- Assuming Perform is covered by Tavern/Street for logs, or add if it's a distinct log type
+    }
+    local goldEarned = {
+        overall = 0,
+        tavern = 0,
+        street = 0,
+    }
+
+    local sortedPerformanceLogs = {}
+    if playerInfo.performanceLogs then
+        for _, log in ipairs(playerInfo.performanceLogs) do
+            table.insert(sortedPerformanceLogs, log) -- Create a copy
+        end
+        table.sort(sortedPerformanceLogs, function(a, b)
+            return (a.gameTime or 0) > (b.gameTime or 0) -- Most recent first
+        end)
+
+        for _, log in ipairs(sortedPerformanceLogs) do
+            if log.type == Song.PerformanceType.Tavern or log.type == Song.PerformanceType.Street then
+                performanceCounts.overall = performanceCounts.overall + 1
+                if performanceCounts[log.type] ~= nil then -- Check if type exists in our map
+                    performanceCounts[log.type] = performanceCounts[log.type] + 1
+                end
+
+                local goldThisPerformance = (log.payment or 0) + (log.tips or 0)
+                goldEarned.overall = goldEarned.overall + goldThisPerformance
+                if log.type == Song.PerformanceType.Tavern then
+                    goldEarned.tavern = goldEarned.tavern + goldThisPerformance
+                elseif log.type == Song.PerformanceType.Street then
+                    goldEarned.street = goldEarned.street + goldThisPerformance
+                end
+            end
+        end
+    end
+
+    -- Helper for Labeled Text
+    local function createLabeledText(label, value, valueColor)
+        return {
+            type = ui.TYPE.Flex,
+            props = {
+                horizontal = true,
+                autoSize = false,
+                relativeSize = util.vector2(1, 0),
+                size = util.vector2(0, 20), -- Fixed height for each label-value pair
+            },
+            content = ui.content {
+                { template = I.MWUI.templates.textNormal, props = { text = label .. ": ", textColor = Editor.uiColors.DEFAULT_LIGHT, textAlignV = ui.ALIGNMENT.Center } },
+                { template = I.MWUI.templates.textNormal, props = { text = tostring(value), textColor = valueColor or Editor.uiColors.DEFAULT, textAlignV = ui.ALIGNMENT.Center }, external = { grow = 1 } }
+            }
+        }
+    end
+
+    -- Left Section Content
+    local leftSectionContent = ui.content {
+        createPaddingTemplate(4),
+        createLabeledText(l10n('UI_Stats_Reputation'), reputation),
+        createPaddingTemplate(8),
+        { template = I.MWUI.templates.textHeader, props = { text = l10n('UI_Stats_Performances') } },
+        createLabeledText("  " .. l10n('UI_Stats_Overall'), performanceCounts.overall),
+        createLabeledText("  " .. l10n('UI_Type_Tavern'), performanceCounts[Song.PerformanceType.Tavern]),
+        createLabeledText("  " .. l10n('UI_Type_Street'), performanceCounts[Song.PerformanceType.Street]),
+        createPaddingTemplate(8),
+        { template = I.MWUI.templates.textHeader, props = { text = l10n('UI_Stats_GoldEarned') } },
+        createLabeledText("  " .. l10n('UI_Stats_Overall'), goldEarned.overall .. " " .. l10n('UI_Gold')),
+        createLabeledText("  " .. l10n('UI_Type_Tavern'), goldEarned.tavern .. " " .. l10n('UI_Gold')),
+        createLabeledText("  " .. l10n('UI_Type_Street'), goldEarned.street .. " " .. l10n('UI_Gold')),
+        createPaddingTemplate(4),
+    }
+
+    -- Right Section - Scrollable Logs
+    local scrollableLogContent = ui.content {}
+    local itemHeight = 20 -- Height of each log entry in the scrollable list
+    for _, log in ipairs(sortedPerformanceLogs) do
+        scrollableLogContent:add(uiTemplates.logDisplaySmall(log, itemHeight))
+    end
+
+    local scrollableWidth = calcContentWidth() * 0.5 - 24
+    local scrollableHeight = calcContentHeight() - 128 - 32
+
+    -- The scrollable widget for the right panel.
+    -- Viewport width will be determined by parent flex, height is relative to parent flex.
+    local scrollableLogsWidget = uiTemplates.scrollable(
+        util.vector2(scrollableWidth, scrollableHeight), -- Viewport size: width 0 (auto), height 0 (auto from relativeSize)
+        scrollableLogContent,
+        util.vector2(0, itemHeight * #scrollableLogContent + 4) -- Total content size
+    )
+
+    -- Bottom Section (Horizontal Flex for Left Info and Right Logs)
+    local bottomSection = {
+        type = ui.TYPE.Flex,
+        props = {
+            horizontal = true,
+            autoSize = false,
+            relativeSize = util.vector2(1, 1), -- Fill available space below XP bar
+            size = util.vector2(-32, -32),
+        },
+        content = ui.content {
+            { -- Left Panel (Info)
+                type = ui.TYPE.Flex,
+                props = {
+                    autoSize = false,
+                    relativeSize = util.vector2(0, 1), -- 40% width, full available height
+                    arrange = ui.ALIGNMENT.Start, -- Vertical arrangement from top
+                },
+                external = { grow = 1, stretch = 1 },
+                content = leftSectionContent,
+            },
+            { -- Spacer
+                template = I.MWUI.templates.interval,
+                props = { size = util.vector2(16, 0) } -- Fixed width spacer
+            },
+            { -- Right Panel (Scrollable Logs)
+                type = ui.TYPE.Flex, -- This flex container will hold the scrollable
+                props = {
+                    autoSize = false,
+                },
+                external = { grow = 1, stretch = 1 },
+                content = ui.content { scrollableLogsWidget }
+            }
+        }
+    }
+    table.insert(flexContent, createPaddingTemplate(8))
+    table.insert(flexContent, bottomSection)
+
     return stats
 end
 
 local logShowing = false
 
+local function setScreenSize()
+    local uiScaleX = configPlayer.options.fUiScaleX or 1
+    local uiScaleY = configPlayer.options.fUiScaleY or 1
+    screenSize = ui.layers[ui.layers.indexOf('Windows')].size or ui.screenSize()
+    screenSize = util.vector2(screenSize.x * uiScaleX, screenSize.y * uiScaleY)
+end
+
 function Editor:showPerformanceLog(log)
-    screenSize = ui.screenSize()
+    setScreenSize()
     local sizeX = math.min(1600, screenSize.x * 5/6)
     local sizeY = sizeX * 9/16
     local scaleMod = sizeX / 1600
@@ -3503,7 +3745,7 @@ function Editor:showPerformanceLog(log)
             {
                 template = I.MWUI.templates.textNormal,
                 props = {
-                    text = 'Notes from the Evening',
+                    text = l10n('UI_PerfLog_NotesFromTheEvening'),
                     textSize = headerSize,
                     textColor = Editor.uiColors.BOOK_HEADER
                 },
@@ -3514,14 +3756,14 @@ function Editor:showPerformanceLog(log)
             {
                 template = createPaddingTemplate(8 * scaleMod),
             },
-            textWithLabel('From the Publican', ''),
+            textWithLabel(l10n('UI_PerfLog_FromThePublican'), ''),
             {
                 template = createPaddingTemplate(4 * scaleMod),
             },
             {
                 template = I.MWUI.templates.textParagraph,
                 props = {
-                    text = log.publicanComment and ('"' .. l10n(log.publicanComment) .. '"') or 'No comment.',
+                    text = log.publicanComment and ('"' .. l10n(log.publicanComment) .. '"') or l10n('UI_PerfLog_NoComment'),
                     textSize = textSize,
                     textColor = Editor.uiColors.BOOK_TEXT,
                     relativeSize = util.vector2(1, 0),
@@ -3531,7 +3773,7 @@ function Editor:showPerformanceLog(log)
             {
                 template = createPaddingTemplate(8 * scaleMod),
             },
-            textWithLabel('From the Patrons', ''),
+            textWithLabel(l10n('UI_PerfLog_FromThePatrons'), ''),
             {
                 template = createPaddingTemplate(4 * scaleMod),
             },
@@ -3592,7 +3834,7 @@ function Editor:showPerformanceLog(log)
                             {
                                 template = I.MWUI.templates.textNormal,
                                 props = {
-                                    text = 'Performance Log',
+                                    text = l10n('UI_PerfLog'),
                                     textSize = headerSize,
                                     textColor = Editor.uiColors.BOOK_HEADER
                                 },
@@ -3611,7 +3853,7 @@ function Editor:showPerformanceLog(log)
                             {
                                 template = createPaddingTemplate(4 * scaleMod),
                             },
-                            textWithLabel('Venue', log.cell),
+                            textWithLabel(l10n('UI_PerfLog_Venue'), log.cell),
                             {
                                 template = createPaddingTemplate(4 * scaleMod),
                             },
@@ -3628,11 +3870,11 @@ function Editor:showPerformanceLog(log)
                             log.cellBlurb and {
                                 template = createPaddingTemplate(4 * scaleMod),
                             } or {},
-                            textWithLabel('Song', log.songName),
+                            textWithLabel(l10n('UI_PerfLog_Song'), log.songName),
                             {
                                 template = createPaddingTemplate(4 * scaleMod),
                             },
-                            textWithLabel('Performance Quality', qualityString),
+                            textWithLabel(l10n('UI_PerfLog_Quality'), qualityString),
                             {
                                 type = ui.TYPE.Image,
                                 props = {
@@ -3660,7 +3902,7 @@ function Editor:showPerformanceLog(log)
                             {
                                 template = I.MWUI.templates.textNormal,
                                 props = {
-                                    text = 'Rewards & Advancement',
+                                    text = l10n('UI_PerfLog_Rewards'),
                                     textSize = headerSize,
                                     textColor = Editor.uiColors.BOOK_HEADER
                                 },
@@ -3671,7 +3913,7 @@ function Editor:showPerformanceLog(log)
                             {
                                 template = createPaddingTemplate(4 * scaleMod),
                             },
-                            textWithLabel('Experience Gained', ''),
+                            textWithLabel(l10n('UI_PerfLog_ExpGained'), ''),
                             {
                                 template = createPaddingTemplate(8 * scaleMod),
                             },
@@ -3726,7 +3968,7 @@ function Editor:showPerformanceLog(log)
                                                     {
                                                         template = I.MWUI.templates.textNormal,
                                                         props = {
-                                                            text = notMaxLevel and ('+' .. log.xpGain .. ' XP') or 'Max Level!',
+                                                            text = notMaxLevel and ('+' .. log.xpGain .. ' XP') or l10n('UI_Lvl_Max'),
                                                             textSize = textSize,
                                                             textColor = xpProg < 0.5 and Editor.uiColors.BOOK_TEXT or Editor.uiColors.DEFAULT_LIGHT,
                                                             anchor = util.vector2(xpProg < 0.5 and 0 or (notMaxLevel and 1 or 0.5), 0),
@@ -3753,7 +3995,7 @@ function Editor:showPerformanceLog(log)
                                     {
                                         template = I.MWUI.templates.textNormal,
                                         props = {
-                                            text = log.levelGain > 0 and ('Leveled up! (x' .. log.levelGain .. ')') or '',
+                                            text = log.levelGain > 0 and l10n('UI_Lvl_Up'):gsub('%%{times}', tostring(log.levelGain)) or '',
                                             textSize = textSize,
                                             textColor = Editor.uiColors.BOOK_HEADER,
                                         }
@@ -3761,7 +4003,7 @@ function Editor:showPerformanceLog(log)
                                     {
                                         template = I.MWUI.templates.textNormal,
                                         props = {
-                                            text = notMaxLevel and (log.xpCurr .. '/' .. log.xpReq .. ' (' .. util.round(xpProg * 100) .. '%) to next level') or '',
+                                            text = notMaxLevel and l10n('UI_Lvl_Progress'):gsub('%%{xp}', tostring(log.xpCurr)):gsub('%%{req}', tostring(log.xpReq)):gsub('%%{progress}', tostring(util.round(xpProg * 100))) or '',
                                             textSize = textSize,
                                             textColor = Editor.uiColors.BOOK_TEXT,
                                         }
@@ -3771,7 +4013,7 @@ function Editor:showPerformanceLog(log)
                             {
                                 template = createPaddingTemplate(4 * scaleMod),
                             },
-                            textWithLabel('Outcome', ''),
+                            textWithLabel(l10n('UI_PerfLog_Outcome'), ''),
                             {
                                 template = createPaddingTemplate(4 * scaleMod),
                             },
@@ -3802,10 +4044,10 @@ function Editor:showPerformanceLog(log)
                                             align = ui.ALIGNMENT.Center,
                                         },
                                         content = ui.content {
-                                            textWithLabel('Gold Gained', tostring((log.payment or 0) + (log.tips or 0))),
+                                            textWithLabel(l10n('UI_PerfLog_GoldGained'), tostring((log.payment or 0) + (log.tips or 0))),
                                             log.payment and createPaddingTemplate(4 * scaleMod) or {},
-                                            log.payment and textWithLabel('From publican', tostring(log.payment or 0), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT) or {},
-                                            log.payment and textWithLabel('From tips', tostring(log.tips or 0), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT) or {},
+                                            log.payment and textWithLabel(l10n('UI_PerfLog_GoldGained_Publican'), tostring(log.payment or 0), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT) or {},
+                                            log.payment and textWithLabel(l10n('UI_PerfLog_GoldGained_Tips'), tostring(log.tips or 0), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT) or {},
                                         }
                                     }
                                 }
@@ -3837,11 +4079,11 @@ function Editor:showPerformanceLog(log)
                                             align = ui.ALIGNMENT.Center,
                                         },
                                         content = ui.content {
-                                            textWithLabel('Reputation', ((log.rep and log.rep > 0) and '+' or '') .. tostring(log.rep or 0)),
+                                            textWithLabel(l10n('UI_PerfLog_Reputation'), ((log.rep and log.rep > 0) and '+' or '') .. tostring(log.rep or 0)),
                                             {
                                                 template = createPaddingTemplate(4 * scaleMod),
                                             },
-                                            textWithLabel('From', tostring(log.oldRep) .. ' -> ' .. tostring(log.newRep), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT),
+                                            textWithLabel(l10n('UI_PerfLog_From'), tostring(log.oldRep) .. ' -> ' .. tostring(log.newRep), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT),
                                         }
                                     }
                                 }
@@ -3877,11 +4119,11 @@ function Editor:showPerformanceLog(log)
                                             align = ui.ALIGNMENT.Center,
                                         },
                                         content = ui.content {
-                                            textWithLabel('Publican Disposition', ((log.disp and log.disp > 0) and '+' or '') .. tostring(log.disp or 0)),
+                                            textWithLabel(l10n('UI_PerfLog_PubDisposition'), ((log.disp and log.disp > 0) and '+' or '') .. tostring(log.disp or 0)),
                                             {
                                                 template = createPaddingTemplate(4 * scaleMod),
                                             },
-                                            textWithLabel('From', tostring(log.oldDisp) .. ' -> ' .. tostring(log.newDisp), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT),
+                                            textWithLabel(l10n('UI_PerfLog_From'), tostring(log.oldDisp) .. ' -> ' .. tostring(log.newDisp), baseTextSize, Editor.uiColors.BOOK_TEXT_LIGHT, Editor.uiColors.BOOK_TEXT_LIGHT),
                                         }
                                     }
                                 } or ui.content {}
@@ -4004,7 +4246,7 @@ end
 function Editor:createUI()
     self:destroyUI()
     local wrapper = uiTemplates.wrapper()
-    screenSize = ui.screenSize()
+    setScreenSize()
     self.windowXOff = self.state == self.STATE.SONG and 20 or (screenSize.x * 1 / 3)
     wrapper.content[1].props.size = util.vector2(screenSize.x-Editor.windowXOff, screenSize.y - Editor.windowYOff)
     wrapperElement = ui.create(wrapper)
@@ -4160,7 +4402,7 @@ function Editor:playerConfirmModal(player, onYes, onNo)
                 {
                     template = I.MWUI.templates.textNormal,
                     props = {
-                        text = "Stop performing?",
+                        text = l10n('UI_StopPerforming'),
                         textAlignH = ui.ALIGNMENT.Center,
                     },
                 },
@@ -4175,14 +4417,14 @@ function Editor:playerConfirmModal(player, onYes, onNo)
                         align = ui.ALIGNMENT.Center,
                     },
                     content = ui.content {
-                        uiTemplates.button("Yes", util.vector2(128, 32), function()
+                        uiTemplates.button(l10n('UI_Button_Yes'), util.vector2(128, 32), function()
                             if onYes then onYes() end
                             self:closeUI()
                         end),
                         {
                             template = I.MWUI.templates.interval,
                         },
-                        uiTemplates.button("No", util.vector2(128, 32), function()
+                        uiTemplates.button(l10n('UI_Button_No'), util.vector2(128, 32), function()
                             if onNo then onNo() end
                             self:closeUI()
                         end),
@@ -4192,7 +4434,7 @@ function Editor:playerConfirmModal(player, onYes, onNo)
             },
         },
         util.vector2(300, 150),
-        "Confirmation"
+        l10n('UI_Confirmation')
     ))
 end
 

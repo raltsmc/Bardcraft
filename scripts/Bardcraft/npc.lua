@@ -2,6 +2,7 @@ local self = require('openmw.self')
 local AI = require('openmw.interfaces').AI
 local nearby = require('openmw.nearby')
 local util = require('openmw.util')
+local core = require('openmw.core')
 
 local Performer = require('scripts.Bardcraft.performer')
 local Data = require('scripts.Bardcraft.data')
@@ -18,11 +19,24 @@ return {
         end,
         onActive = function()
             local bardInfo = Data.BardNpcs[self.recordId]
-            local startingLevel = bardInfo and bardInfo.startingLevel
-            if not startingLevel then return end
-
-            if Performer.stats.performanceSkill.level < startingLevel then
-                Performer:setPerformanceLevel(startingLevel)
+            if not bardInfo then return end
+            if bardInfo.startingLevel and Performer.stats.performanceSkill.level < bardInfo.startingLevel then
+                Performer:setPerformanceLevel(bardInfo.startingLevel)
+            end
+            Performer:setSheathedInstrument(bardInfo.sheathedInstrument, true)
+            if bardInfo.knownSongs then
+                for _, info in ipairs(bardInfo.knownSongs) do
+                    local song = Performer.getSongBySourceFile(info.song)
+                    if song then
+                        Performer:addKnownSong(song, info.confidences)
+                    end
+                end
+            end
+            Performer:resetAnim()
+            Performer:resetVfx()
+            Performer:setSheatheVfx()
+            if bardInfo.home and self.cell.name == bardInfo.home.cell and #AI.getTargets('Follow') <= 0 then
+                core.sendGlobalEvent('BC_SendHome', { actor = self })
             end
         end,
         onUpdate = function(dt)

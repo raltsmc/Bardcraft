@@ -379,7 +379,7 @@ local function tickPerformance(dt)
     if not song:tickPlayback(dt,
     function(filePath, velocity, instrument, note, part, id)
         local profile = Song.getInstrumentProfile(instrument)
-        velocity = velocity * 2 * profile.volume / 127
+        velocity = velocity * profile.volume / 127
         local actors = partToPerformer[part]
         if not actors then return end
         for _, actor in ipairs(actors) do
@@ -732,13 +732,26 @@ return {
                     player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_NoPerformers') })
                     return 
                 end
-                
+
+                -- Require the player to be one of the performers
+                local playerIsPerformer = false
+                for _, performer in ipairs(data.performers) do
+                    if performer.actorId == player.id then
+                        playerIsPerformer = true
+                        break
+                    end
+                end
+                if not playerIsPerformer then
+                    player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_PlayerNotPerformer') })
+                    return
+                end
+
                 local type, streetName, streetType = Cell.canPerformHere(player.cell, data.type)
                 if not type then
                     if data.type == Song.PerformanceType.Practice then
                         player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_InvalidPracticeLocation') })
                     elseif data.type == Song.PerformanceType.Ambient then
-                        player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_InvalidAmbientLocation') })
+                        player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_InvalidPracticeLocation') })
                     else
                         player:sendEvent('BC_StartPerformanceFail', { reason = l10n('UI_Msg_PerfStartFail_InvalidLocation') })
                     end
@@ -779,6 +792,7 @@ return {
                 local perfList = data.performers
                 local activeActors = world.activeActors
                 local playerItem = nil
+                local playedParts = {}
                 for i, performer in ipairs(data.performers) do
                     for _, actor in ipairs(activeActors) do
                         if actor.id == performer.actorId then
@@ -807,12 +821,14 @@ return {
                     if performer.actorId == player.id then
                         playerItem = perfList[i].item
                     end
+                    -- Add part index to playedParts
+                    playedParts[perfList[i].part.index] = true
                 end
                 performers = perfList
                 song:resetPlayback()
                 start(data)
 
-                player:sendEvent('BC_StartPerformanceSuccess', { item = playerItem and playerItem.recordId or nil, })
+                player:sendEvent('BC_StartPerformanceSuccess', { item = playerItem and playerItem.recordId or nil, song = song, playedParts = playedParts })
             else
                 stop()
             end

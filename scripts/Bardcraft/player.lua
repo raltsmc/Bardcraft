@@ -25,18 +25,6 @@ local configGlobal = require('scripts.Bardcraft.config.global')
 
 local performersInfo = {}
 
-local function getSongBySourceFile(sourceFile)
-    -- Search songs/preset
-    local bardData = storage.globalSection('Bardcraft')
-    local storedSongs = bardData:get('songs/preset') or {}
-    for _, song in pairs(storedSongs) do
-        if song.sourceFile == sourceFile then
-            return song
-        end
-    end
-    return nil
-end
-
 local function populateKnownSongs()
     local bardData = storage.globalSection('Bardcraft')
     local storedSongs = bardData:getCopy('songs/preset') or {}
@@ -134,9 +122,9 @@ local hurtOverlay = ui.create {
 }
 local hurtAlpha = 0
 
-local backInstrument = nil
 local performInstrument = nil
 local lastCameraMode = nil
+local resetAnimNextTick = false
 local setVfxNextFrame = false
 local nearbyPlaying = false
 local nearbyPlayingTimer = 0
@@ -359,33 +347,6 @@ local function setPerformerInfo()
     Editor.performersInfo = performersInfo
 end
 
-local function setSheathVfx()
-    anim.removeVfx(self, 'BC_BackInstrument')
-    if backInstrument and camera.getMode() ~= camera.MODE.FirstPerson and (not performInstrument or backInstrument.id ~= performInstrument.id) then
-        local modelName = backInstrument.model
-        modelName = 'meshes/bardcraft/vfx/sheathe/' .. modelName:match("([^/]+)$")
-        if not anim.hasBone(self, 'Bip01 BOInstrumentBack') then 
-            return 
-        end
-        anim.addVfx(self, modelName, {
-            vfxId = 'BC_BackInstrument',
-            boneName = 'Bip01 BOInstrumentBack',
-            loop = true,
-            useAmbientLight = false,
-        })
-    end
-end
-
-local function verifySheathInstrument() -- Make sure the player still has the given item
-    if backInstrument then
-        local inventory = self.type.inventory(self)
-        if not inventory:find(backInstrument.id) then
-            backInstrument = nil
-        end
-    end
-    setSheathVfx()
-end
-
 local function verifyPerformInstrument()
     if performInstrument then
         local inventory = self.type.inventory(self)
@@ -432,6 +393,39 @@ input.registerActionHandler('Use', async:callback(function(e)
     end
 end))
 
+local previewHoldStart = nil
+local previewHoldStartMode = nil
+
+input.registerActionHandler('TogglePOV', async:callback(function(e)
+    if Performer.playing and not core.isWorldPaused() then
+        if e then
+            previewHoldStart = core.getRealTime()
+            previewHoldStartMode = camera.getMode()
+        end
+        if not e then
+            if camera.getMode() == camera.MODE.Preview and previewHoldStart and core.getRealTime() - previewHoldStart > 0.25 then
+                camera.setMode(previewHoldStartMode, true)
+                if previewHoldStartMode ~= camera.MODE.Preview then
+                    resetAnimNextTick = true
+                end
+                previewHoldStart = nil
+                previewHoldStartMode = nil
+                return false
+            end
+
+            if camera.getMode() ~= camera.MODE.FirstPerson then
+                camera.setMode(camera.MODE.FirstPerson, true)
+                resetAnimNextTick = true
+            else
+                camera.setMode(camera.MODE.ThirdPerson, true)
+                resetAnimNextTick = true
+            end
+            previewHoldStart = nil
+        end
+        return false
+    end
+end))
+
 local function silenceAmbientMusic()
     if configPlayer.options.bSilenceAmbientMusic == true then
         ambient.streamMusic("sound\\Bardcraft\\silence.opus", { fadeOut = 0.5 })
@@ -458,7 +452,7 @@ local function getRandomSong(pool)
     while #availableChoices > 0 do
         local index = math.random(1, #availableChoices)
         local sourceFile = availableChoices[index]
-        local candidateSong = getSongBySourceFile(sourceFile)
+        local candidateSong = Performer.getSongBySourceFile(sourceFile)
         
         if candidateSong and not Performer.stats.knownSongs[candidateSong.id] then
             -- Found a song the player doesn't know
@@ -482,9 +476,29 @@ local function getRandomSong(pool)
         end
         -- Pick the first valid song from the shuffled list
         for _, sourceFile in ipairs(shuffledChoices) do
-            local song = getSongBySourceFile(sourceFile)
+            local song = Performer.getSongBySourceFile(sourceFile)
             if song then return song end
         end
+    end
+end
+
+local function precacheSongSamples(data)
+    setmetatable(data.song, Song)
+    local samples = {}
+    for _, event in ipairs(data.song.notes) do
+        if event.type == 'noteOn' and data.playedParts[event.part] then
+            local part = data.song:getPart(event.part)
+            if part then
+                local instrument = part.instrument
+                local profile = Song.getInstrumentProfile(instrument)
+                local noteName = Song.noteNumberToName(event.note)
+                local filePath = 'sound\\Bardcraft\\samples\\' .. profile.name .. '\\' .. profile.name .. '_' .. noteName .. '.wav'
+                samples[filePath] = true
+            end
+        end
+    end
+    for filePath, _ in pairs(samples) do
+        ambient.playSoundFile(filePath, { volume = 0.0 })
     end
 end
 
@@ -506,35 +520,32 @@ return {
             if data.BC_PerformersInfo then
                 performersInfo = data.BC_PerformersInfo
             end
-            if data.BC_BackInstrument then
-                backInstrument = data.BC_BackInstrument
-            end
-            setSheathVfx()
             setPerformerInfo()
         end,
         onSave = function()
             local data = Performer:onSave()
             data.BC_PerformersInfo = performersInfo
-            data.BC_BackInstrument = backInstrument
             return data
         end,
+        onActive = function()
+            Performer:setSheatheVfx()
+            core.sendGlobalEvent('BC_RecheckTroupe', { player = self, })
+        end,
         onUpdate = function(dt)
-            -- Uncomment this once first-person animations are working
-            --[[if Performer.playing then
-                local reset = false
-                if camera.getQueuedMode() == camera.MODE.FirstPerson then
-                    camera.setMode(camera.MODE.FirstPerson, true)
-                    reset = true
-                elseif camera.getQueuedMode() == camera.MODE.ThirdPerson then
-                    camera.setMode(camera.MODE.ThirdPerson, true)
-                    reset = true
+            if Performer.playing then
+                if resetAnimNextTick then
+                    resetAnimNextTick = false
+                    Performer:resetAnim()
+                    Performer:resetVfx()
                 end
-                if reset then
-                    print('resetting anim')
-                    Performer.resetVfx()
-                    Performer.resetAnim()
+                local queuedMode = camera.getQueuedMode()
+                if queuedMode == camera.MODE.FirstPerson or queuedMode == camera.MODE.Preview then
+                    camera.setMode(queuedMode, true)
+                    resetAnimNextTick = true
+                else
+                    camera.setMode(camera.getMode(), false)
                 end
-            end]]
+            end
             Performer:onUpdate(dt)
             if self.cell then
                 if not currentCell or currentCell ~= self.cell then
@@ -572,24 +583,6 @@ return {
             else
                 nearbyPlaying = false
             end
-
-            if tpFadeInTimer then
-                tpFadeInTimer = math.min(tpFadeInTimer + dt, 3)
-                tpFadeOverlay.layout.props.alpha = 1 - (tpFadeInTimer / 3)
-                if tpFadeInTimer >= 3 then
-                    tpFadeInTimer = nil
-                    tpFadeOverlay.layout.props.alpha = 0
-                end
-                tpFadeOverlay:update()
-            elseif tpFadeOutTimer then
-                tpFadeOutTimer = math.min(tpFadeOutTimer + dt, 0.1)
-                tpFadeOverlay.layout.props.alpha = tpFadeOutTimer / 0.1
-                if tpFadeOutTimer >= 0.1 then
-                    tpFadeOutTimer = nil
-                    tpFadeOverlay.layout.props.alpha = 1
-                end
-                tpFadeOverlay:update()
-            end
         end,
         onKeyPress = function(e)
             if e.code == configPlayer.keybinds.kOpenInterface then
@@ -623,6 +616,9 @@ return {
                 Performer:resetAllStats()
                 populateKnownSongs()
                 ui.showMessage('DEBUG: Reset Bardcraft stats')
+            elseif string.lower(tokens[1]) == 'luabcteachall' then
+                Performer:teachAllSongs()
+                ui.showMessage('DEBUG: Taught all songs')
             end
         end,
         onMouseWheel = function(v, h)
@@ -631,7 +627,7 @@ return {
         onFrame = function(dt)
             if setVfxNextFrame then
                 setVfxNextFrame = false
-                setSheathVfx()
+                Performer:setSheatheVfx()
             end
             local camMode = camera.getMode()
             if camMode ~= lastCameraMode then
@@ -726,12 +722,30 @@ return {
                 ambient.playSoundFile('sound\\Bardcraft\\lvl_up1.wav')
                 queuedMilestone = nil
             end
+
+            if tpFadeInTimer then
+                tpFadeInTimer = math.min(tpFadeInTimer + core.getRealFrameDuration(), 3)
+                tpFadeOverlay.layout.props.alpha = 1 - (tpFadeInTimer / 3)
+                if tpFadeInTimer >= 3 then
+                    tpFadeInTimer = nil
+                    tpFadeOverlay.layout.props.alpha = 0
+                end
+                tpFadeOverlay:update()
+            elseif tpFadeOutTimer then
+                tpFadeOutTimer = math.min(tpFadeOutTimer + core.getRealFrameDuration(), 0.1)
+                tpFadeOverlay.layout.props.alpha = tpFadeOutTimer / 0.1
+                if tpFadeOutTimer >= 0.1 then
+                    tpFadeOutTimer = nil
+                    tpFadeOverlay.layout.props.alpha = 1
+                end
+                tpFadeOverlay:update()
+            end
         end,
     },
     eventHandlers = {
         BO_ConductorEvent = function(data)
             if data.type == 'PerformStart' then
-                camera.setMode(camera.MODE.ThirdPerson, true)
+                --camera.setMode(camera.MODE.ThirdPerson, true)
             end
             local success = Performer.handleConductorEvent(data)
             if data.type == 'PerformStart' then
@@ -770,7 +784,6 @@ return {
                     end
                 end
             end
-            verifySheathInstrument()
         end,
         BC_GainPerformanceXP = function(data)
             if data.leveledUp then
@@ -854,6 +867,9 @@ return {
         BC_StartPerformanceSuccess = function(data)
             Editor:onToggle()
             self.type.setStance(self, self.type.STANCE.Nothing)
+            if configPlayer.options.bPrecacheSamples then
+                precacheSongSamples(data)
+            end
         end,
         BC_StartPerformanceFail = function(data)
             ui.showMessage(data.reason)
@@ -864,15 +880,8 @@ return {
             ambient.playSoundFile('sound\\Bardcraft\\finalize_draft.wav')
         end,
         BC_SheatheInstrument = function(data)
-            if backInstrument and backInstrument.id == data.record.id then
-                -- Remove the instrument from the back
-                backInstrument = nil
-            else
-                -- Add the instrument to the back
-                backInstrument = data.record
-            end
             ambient.playSoundFile('sound\\Bardcraft\\equip.wav')
-            setSheathVfx()
+            Performer:setSheathedInstrument(data.recordId)
         end,
         BC_BookReadResult = function(data)
             if data.success then
@@ -924,9 +933,9 @@ return {
         end,
         BC_MusicBoxActivate = function(data)
             local object = data.object
-            Editor:playerChoiceModal(self, 'Music Box', {
+            Editor:playerChoiceModal(self, l10n('UI_MusicBox'), {
                 {
-                    text = 'Toggle Playing',
+                    text = l10n('UI_MusicBox_TogglePlaying'),
                     callback = function()
                         local musicBox = Data.MusicBoxes[object.recordId]
                         if not musicBox then return end
@@ -968,7 +977,7 @@ return {
                     end
                 },
                 {
-                    text = 'Pick Up',
+                    text = l10n('UI_MusicBox_PickUp'),
                     callback = function()
                         object:sendEvent('BC_MusicBoxPickup', { actor = self, })
                         ambient.playSoundFile('Sound\\fx\\item\\item.wav')
@@ -999,6 +1008,10 @@ return {
                 members[member.recordId] = true
             end
             Editor.troupeMembers = members
+            if Editor.troupeSize ~= #data.members and Performer.playing then
+                core.sendGlobalEvent('BO_StopPerformance')
+                Editor.performancePartAssignments = {}
+            end
             Editor.troupeSize = #data.members
         end,
         BC_TPFadeOut = function()
@@ -1015,7 +1028,7 @@ return {
             end
         end,
         UiModeChanged = function(data)
-            verifySheathInstrument()
+            Performer:verifySheathedInstrument()
             verifyPerformInstrument()
             if data.newMode == nil then
                 Editor:onUINil()

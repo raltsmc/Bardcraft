@@ -6,7 +6,7 @@ local ui = require('openmw.ui')
 local util = require('openmw.util')
 
 local l10n = core.l10n('Bardcraft')
-local versionString = "0.1-alpha"
+local versionString = "1.0-beta"
 
 local luaxp = require('scripts.Bardcraft.util.luaxp')
 
@@ -152,6 +152,7 @@ I.Settings.registerGroup {
             key = 'kOpenInterface',
             renderer = 'Bardcraft/inputKeySelection',
             name = 'ConfigKeybindOpenInterface',
+			description = 'ConfigKeybindOpenInterfaceDesc',
             default = input.KEY.B
         },
     },
@@ -170,5 +171,32 @@ I.Settings.registerGroup {
             description = 'ConfigAmbientMusicDesc',
             default = true,
         },
+		{
+			key = 'bPrecacheSamples',
+			renderer = 'checkbox',
+			name = 'ConfigPrecacheSamples',
+			description = 'ConfigPrecacheSamplesDesc',
+			default = true,
+		},
+		{
+			key = 'fUiScaleX',
+			renderer = 'number',
+			name = 'ConfigUiScaleX',
+			default = 1.0,
+			argument = {
+				min = 0.01,
+				max = 10.0,
+			},
+		},
+		{
+			key = 'fUiScaleY',
+			renderer = 'number',
+			name = 'ConfigUiScaleY',
+			default = 1.0,
+			argument = {
+				min = 0.01,
+				max = 10.0,
+			},
+		},
 	},
 }

@@ -559,53 +559,7 @@ function parseMidiFile(filename)
         print("Error parsing MIDI file: " .. errorMsg)
         return
     end
-
-    --[[print("MIDI Format: " .. parser.format)
-    print("Number of tracks: " .. parser.numTracks)
-    print("Time division: " .. parser.division .. " ticks per quarter note")
-
-    -- Display time signature information
-    local timeSignatureNum, timeSignatureDenom = parser:getInitialTimeSignature()
-    print(string.format("\nInitial Time Signature: %d/%d", timeSignatureNum, timeSignatureDenom))
-
-    local timeSignatures = parser:getTimeSignatureEvents()
-    if #timeSignatures > 0 then
-        print("\nTime Signature Events:")
-        for i, ts in ipairs(timeSignatures) do
-            print(string.format("Time: %d ticks, Time Signature: %d/%d",
-                ts.time, ts.numerator, ts.denominator))
-        end
-    end
-
-    -- Display tempo information
-    local tempoEvents = parser:getTempoEvents()
-    if #tempoEvents > 0 then
-        print("\nTempo Events:")
-        for i, tempo in ipairs(tempoEvents) do
-            print(string.format("Time: %d ticks, BPM: %.2f", tempo.time, tempo.bpm))
-        end
-        print("Initial Tempo: " .. parser:getInitialTempo() .. " BPM")
-    else
-        print("\nNo tempo events found. Using default 120 BPM.")
-    end
-
-    print("\nNotes:")
-    local notes = parser:getNotes()
-    for i, note in ipairs(notes) do
-        if i <= 20 then -- Show only first 20 notes
-            local noteName = MidiParser.noteNumberToName(note.note)
-            print(string.format("Time: %d, Track: %d, Channel: %d, %s: %s (vel: %d)",
-                note.time, note.track, note.channel, note.type, noteName, note.velocity))
-        end
-    end
-
-    print("\nInstrument Changes:")
-    local instruments = parser:getInstruments()
-    for _, instrument in ipairs(instruments) do
-        print(string.format("Time: %d, Track: %d, Channel: %d, Program: %d",
-            instrument.time, instrument.track, instrument.channel, instrument.program))
-    end]]
-
+    
     return parser
 end
 

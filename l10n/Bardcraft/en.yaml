@@ -1,11 +1,19 @@
 ConfigTitle: "Bardcraft"
-ConfigSummary: "Adds a deep musical performance system, with custom songwriting using a piano roll interface.\n--- v%{version} ---"
+ConfigSummary: "Adds a MIDI-based musical performance system, with custom songwriting, group performance, and skill progression mechanics.\n--- v%{version} ---"
 ConfigCategoryKeybinds: "Keybinds"
 ConfigKeybindOpenInterface: "Open interface"
+ConfigKeybindOpenInterfaceDesc: |
+  To toggle overlay, press Alt + this key.
 ConfigCategoryPlayerOptions: "Player Options"
 ConfigAmbientMusic: "Silence ambient music"
 ConfigAmbientMusicDesc: "Background music will be silenced during a performance."
+ConfigPrecacheSamples: "Precache song samples"
+ConfigPrecacheSamplesDesc: |
+  Eliminates stuttering during performances by preloading all samples, at the cost of an initial lag spike when starting a performance.
+ConfigUiScaleX: "UI scale X"
+ConfigUiScaleY: "UI scale Y"
 ConfigCategoryGlobalOptions: "Global Options"
+ConfigInstrumentVolume: "Instrument volume"
 ConfigOverallGoldMult: "Overall gold multiplier"
 ConfigTavernGoldMult: "Tavern gold multiplier"
 ConfigStreetGoldMult: "Street gold multiplier"
@@ -25,6 +33,10 @@ ConfigEnableAnimations: "Enable animations"
 ConfigEnableAnimationsDesc: |
   Enable passive animations for performers.
   Disabling will only play note animations (strumming, fretting, etc.)
+ConfigJamMode: "Jam mode"
+ConfigJamModeDesc: |
+  If enabled, notes will always sound correct, regardless of performer skill.
+  This will not affect gameplay or progression.
 
 Instr_Lute: "Lute"
 Instr_Drum: "Drum"
@@ -53,9 +65,20 @@ UI_Title: "Bardcraft"
 UI_Tab_Performance: "Performance"
 UI_Tab_Songwriting: "Songwriting"
 UI_Tab_Stats: "Stats"
+UI_Tab_Help: "?"
 
 UI_CheckboxOn: "On"
 UI_CheckboxOff: "Off"
+
+UI_AreYouSure: "Are you sure?"
+UI_ChooseAnOption: "Choose an option:"
+UI_Confirmation: "Confirmation"
+UI_Choice: "Choice"
+UI_StopPerforming: "Stop performing?"
+
+UI_MusicBox: "Music Box"
+UI_MusicBox_TogglePlaying: "Toggle Playing"
+UI_MusicBox_PickUp: "Pick Up"
 
 UI_PRoll: "Piano Roll"
 UI_PRoll_NewDraft: "+ New Draft"
@@ -73,6 +96,7 @@ UI_PRoll_SongTempo: "Tempo"
 UI_PRoll_SongTimeSig: "Time Signature"
 UI_PRoll_SongLoopStart: "Loop Start (bars)"
 UI_PRoll_SongLoopEnd: "Loop End (bars)"
+UI_PRoll_SongLoopCount: "Loop Count"
 UI_PRoll_SongEnd: "End (bars)"
 UI_PRoll_Track: "Track %{track}"
 UI_PRoll_Scale: "Scale"
@@ -117,6 +141,12 @@ UI_Button_PlayIdly: "Play Idly"
 UI_Button_Close: "Close"
 UI_Button_Confirm: "Confirm"
 UI_Button_Cancel: "Cancel"
+UI_Button_Yes: "Yes"
+UI_Button_No: "No"
+
+UI_Song_NewSong: "New Song"
+UI_Song_NoDescription: "No description"
+UI_Song_Imported: "Imported from MIDI file"
 
 UI_PartConfidence: "Confidence: %{confidence}%"
 
@@ -144,6 +174,11 @@ UI_Lvl_Performance_7: "Expert"
 UI_Lvl_Performance_8: "Virtuoso"
 UI_Lvl_Performance_9: "Luminary"
 UI_Lvl_Performance_10: "Master"
+
+UI_Lvl: "Lv. %{level}"
+UI_Lvl_Max: "Max Level!"
+UI_Lvl_Progress: "%{xp}/%{req} (%{progress}%) to next level"
+UI_Lvl_Up: "Leveled up! (x%{times})"
 
 UI_LvlUp_Performance: "Your Bardcraft skill increased to %{level}."
 # These are AI-generated. Replace them with actual writing before release.
@@ -179,6 +214,7 @@ UI_Msg_BookReadFail: "You have already learned all you can from this."
 UI_Msg_FinalizedDraft: "You wrote a new song:\n%{songTitle}"
 
 UI_Msg_PerfStartFail_NoPerformers: "You need at least one performer to start a performance."
+UI_Msg_PerfStartFail_PlayerNotPerformer: "You must be one of the performers to start a performance."
 UI_Msg_PerfStartFail_NoInstrument: "Performer %{performer} is missing %{instrument_indef}!"
 UI_Msg_PerfStartFail_InvalidLocation: "You need to be in a tavern, or outside in a city to perform."
 UI_Msg_PerfStartFail_InvalidPracticeLocation: "The publican says: \n\"Take that somewhere else. This is a tavern, not a practice room.\""
@@ -524,7 +560,7 @@ UI_Blurb_Roa Dyr: "A chapel-port of Indoril exerting pious authority over its Th
 UI_Blurb_Sailen: "A small farming settlement providing shelter to pilgrims passing through on the way to Necrom."
 UI_Blurb_Vhul: "An Indoril town known for its lucrative punavit industry."
 UI_Blurb_Brina Cross: "A prosperous settlement sitting astride a junction of Cyrodiil's Gold Road."
-UI_Blurb_Charach: "An Imperial island town on Stirk, offering a temperate retreat for wealthy mainlanders."
+UI_Blurb_Charach: "An sleepy island town on Stirk, offering a temperate respite for wealthy Cyrodiils fleeing the mainland's feverish swamps."
 UI_Blurb_Karthgad: "A secluded Bear Clan bastion on the cliffs of the Karth River."
 
 # --- Performance Quality ---
@@ -536,7 +572,26 @@ UI_Quality_Great: "Great" # 85-95%
 UI_Quality_Excellent: "Excellent" # 95-99%
 UI_Quality_Perfect: "Perfect!" # 100%
 
+UI_PerfLog: "Performance Log"
+UI_PerfLog_Venue: "Venue"
 UI_PerfLog_StreetsOf: "Streets of %{city}"
+UI_PerfLog_UnknownVenue: "Unknown Venue"
+UI_PerfLog_Song: "Song"
+UI_PerfLog_Quality: "Performance Quality"
+UI_PerfLog_NotesFromTheEvening: "Notes from the Evening"
+UI_PerfLog_FromThePublican: "From the Publican"
+UI_PerfLog_FromThePatrons: "From the Patrons"
+UI_PerfLog_NoComment: "No comment."
+UI_PerfLog_Rewards: "Rewards & Advancement"
+UI_PerfLog_ExpGained: "Experience Gained"
+UI_PerfLog_Outcome: "Outcome"
+UI_PerfLog_GoldGained: "Gold Gained"
+UI_PerfLog_GoldGained_Publican: "From publican"
+UI_PerfLog_GoldGained_Tips: "From tips"
+UI_PerfLog_Gold: "%{amount} gold"
+UI_PerfLog_Reputation: "Reputation"
+UI_PerfLog_PubDisposition: "Publican Disposition"
+UI_PerfLog_From: "From"
 
 # --- Performance Feedback ---
 # TO LOCALIZERS: You can add more to any existing category! Just use the same format, continuing the numbering, and the Lua code will pick it up without needing to change feedback.yaml.

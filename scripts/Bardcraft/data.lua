@@ -55,6 +55,7 @@ local SHEATHABLE_INSTRUMENTS = { -- Instruments that can be displayed on the bac
     Lute = true,
     Drum = true,
     Fiddle = true,
+    BassFlute = true,
 }
 
 local VENUES = {
@@ -156,6 +157,7 @@ local VENUES = {
             "Ranyon-ruhn",
             "Roa Dyr",
             "Sailen",
+            "Shipal-Sharai",
             "Vhul",
             -- Cyrodiil
             "Brina Cross",
@@ -174,13 +176,95 @@ local PUBLICAN_CLASSES = {
 }
 
 local BARD_NPCS = {
+    r_bc_n_camilla = { -- Camilla of Cheydinhal
+        home = {
+            cell = "Pelagiad, Halfway Tavern",
+            position = util.vector3(851, 501, 0),
+            rotation = util.transform.rotateZ(-math.pi / 2),
+        },
+        startingLevel = 50,
+        sheathedInstrument = "misc_de_lute_01",
+    },
+    r_bc_n_elara = { -- Elara Endre
+        home = {
+            cell = 'Ald-ruhn, Guild of Mages',
+            position = util.vector3(1992, 620, -640),
+            rotation = util.transform.rotateZ(math.pi),
+        },
+        startingLevel = 30,
+    },
+    r_bc_n_lucian = { -- Lucian Caro
+        home = {
+            cell = "Ebonheart, Six Fishes",
+            position = util.vector3(230, 593, 0),
+            rotation = util.transform.rotateZ(math.pi),
+        },
+        startingLevel = 60,
+        sheathedInstrument = "r_bc_fiddle",
+    },
+    r_bc_n_rajira = { -- Ra'jira "Quick-Paws"
+        home = {
+            cell = "Vivec, Black Shalk Cornerclub",
+            position = util.vector3(31, 311, -64),
+            rotation = util.transform.rotateZ(math.pi),
+        },
+        startingLevel = 20,
+        sheathedInstrument = "misc_de_drum_02",
+        knownSongs = {
+            {
+                song = "cadence1.mid",
+                confidences = {
+                    [1] = 0.7,
+                    [2] = 1.0,
+                    [3] = 0.8,
+                }
+            }
+        }
+    },
     r_bc_n_reeds = { -- Sees-Silent-Reeds
         home = {
             cell = "Seyda Neen, Arrille's Tradehouse",
             position = util.vector3(-586, -381, 385),
-            rotation = util.transform.rotateZ(1.6),
+            rotation = util.transform.rotateZ(math.pi / 2),
+        },
+        startingLevel = 15,
+    },
+    r_bc_n_rels = { -- Rels Llervu
+        home = {
+            cell = "Maar Gan, Andus Tradehouse",
+            position = util.vector3(-284, 545, 0),
+            rotation = util.transform.rotateZ(5 * math.pi / 6),
+        },
+        startingLevel = 40,
+        sheathedInstrument = "misc_de_drum_01",
+    },
+    r_bc_n_sargon = { -- Sargon Assinabi
+        home = {
+            cell = "Vos, Varo Tradehouse",
+            position = util.vector3(-104, 221, 130),
+            rotation = util.transform.rotateZ(math.pi),
+        },
+        startingLevel = 25,
+        sheathedInstrument = "r_bc_bassflute",
+    },
+    r_bc_n_strumak = { -- Strumak gro-Bol
+        home = {
+            cell = "Gnisis, Madach Tradehouse",
+            position = util.vector3(-396, 524, -129),
+            rotation = util.transform.rotateZ(math.pi / 2),
+        },
+        compat = {
+            {
+                files = {
+                    "hotv - gnisis",
+                    "concept art gnisis",
+                },
+                position = util.vector3(-712, -788, -1791),
+                rotation = util.transform.rotateZ(math.pi / 2),
+            }
         },
         startingLevel = 30,
+        sheathedInstrument = "misc_de_lute_01",
     }
 }
 
@@ -218,6 +302,7 @@ local SONG_IDS = {
     -- Intermediate:    0x20000 - 0x2FFFF
     [0x20000] = "int1.mid",
     [0x20001] = "int2.mid",
+    [0x20002] = "int3.mid",
     [0x20100] = "greensleeves.mid",
     [0x20101] = "imp1.mid",
     [0x20102] = "reddiamond.mid",
@@ -235,6 +320,8 @@ local SONG_IDS = {
     [0xE0007] = "lessrude.mid",
     [0xE0008] = "jornibret.mid",
     [0xE0009] = "moonsong.mid",
+    ---- Drum Cadences:     0xE1000 - 0xE1FFF
+    [0xE1000] = "cadence1.mid",
 }
 
 local SONG_POOLS = {
@@ -247,6 +334,7 @@ local SONG_POOLS = {
     intermediate = {
         0x20000, -- int1.mid
         0x20001, -- int2.mid
+        0x20002, -- int3.mid
         0x20100, -- greensleeves.mid
         0x20101, -- imp1.mid
         0x20102, -- reddiamond.mid

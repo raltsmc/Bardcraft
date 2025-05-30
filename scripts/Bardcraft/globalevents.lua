@@ -65,16 +65,45 @@ end
 
 local mwscriptQueue = {}
 
+local function sendHome(actor)
+    local bardInfo = Data.BardNpcs[actor.recordId]
+    local home = bardInfo and bardInfo.home
+    if home then
+        -- Check for compat overrides
+        local compatHome = nil
+        if bardInfo.compat then
+            local activeFiles = core.contentFiles.list
+            for _, compat in ipairs(bardInfo.compat) do
+                for _, fileStr in ipairs(compat.files or {}) do
+                    for _, activeFile in ipairs(activeFiles) do
+                        if string.find(string.lower(activeFile), string.lower(fileStr), 1, true) then
+                            compatHome = compat
+                            break
+                        end
+                    end
+                    if compatHome then break end
+                end
+                if compatHome then break end
+            end
+        end
+        if compatHome then
+            actor:teleport(home.cell, compatHome.position, compatHome.rotation)
+            return true
+        else
+            actor:teleport(home.cell, home.position, home.rotation)
+            return true
+        end
+    end
+    return false
+end
+
 I.ItemUsage.addHandlerForType(types.Miscellaneous, function(item, actor)
     if actor.type ~= types.Player then return true end
     local record = item.type.record(item)
     for instr, _ in pairs(Data.SheathableInstruments) do
         for recordId, _ in pairs(Data.InstrumentItems[instr]) do
             if record.id == recordId then
-                actor:sendEvent('BC_SheatheInstrument', { record = {
-                    id = record.id,
-                    model = record.model,
-                } })
+                actor:sendEvent('BC_SheatheInstrument', { recordId = recordId, })
                 return true
             end
         end
@@ -106,28 +135,31 @@ return {
 
             local troupeMembers = {}
             for _, actor in ipairs(world.activeActors) do
-                local mwscript = world.mwscript.getLocalScript(actor)
-                if mwscript and mwscript.recordId == "_bchireablebard" then
-                    if mwscript.variables.followplayer == 1 then
-                        table.insert(troupeMembers, actor)
-                    end
-                    if mwscript.variables.tphome == 1 then
-                        local bardInfo = Data.BardNpcs[actor.recordId]
-                        local home = bardInfo and bardInfo.home
-                        if home then
+                if not actor.type.isDead(actor) then
+                    local mwscript = world.mwscript.getLocalScript(actor)
+                    if mwscript and mwscript.recordId == "_bchireablebard" then
+                        if mwscript.variables.followplayer == 1 then
+                            table.insert(troupeMembers, actor)
+                        end
+                        if mwscript.variables.tphome == 1 then
                             mwscript.variables.tphome = 0
-                            actor:teleport(home.cell, home.position, home.rotation)
-                            player:sendEvent('BC_TPFadeIn')
-                            player:sendEvent('AttendMeFollowerStatus', { -- Attend Me compatibility
-                                actor = actor,
-                                status = false,
-                            }) 
+                            if sendHome(actor) then
+                                player:sendEvent('BC_TPFadeIn')
+                                player:sendEvent('AttendMeFollowerStatus', { -- Attend Me compatibility
+                                    actor = actor,
+                                    status = false,
+                                }) 
+                            end
                         end
                     end
                 end
             end
 
             player:sendEvent("BC_TroupeStatus", { members = troupeMembers })
+        end,
+        BC_SendHome = function(data)
+            if not data or not data.actor then return end
+            sendHome(data.actor)
         end,
         BC_GiveItem = function(data)
             if not data then return end

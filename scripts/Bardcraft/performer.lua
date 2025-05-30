@@ -8,6 +8,7 @@ local I = require("openmw.interfaces")
 local nearby = require("openmw.nearby")
 local util = require("openmw.util")
 local time = require("openmw_aux.time")
+local storage = require("openmw.storage")
 
 local instrumentData = require('scripts.Bardcraft.instruments').Instruments
 local animData = require('scripts.Bardcraft.instruments').AnimData
@@ -29,12 +30,9 @@ P.stats = {
     bannedVenues = {},
     performedVenuesToday = {},
     practiceEfficiency = 1.0,
-    performanceCount = {
-        [Song.PerformanceType.Tavern] = 0,
-        [Song.PerformanceType.Street] = 0,
-        [Song.PerformanceType.Practice] = 0,
-    },
     performanceLogs = {},
+    notesPlayed = {},
+    sheathedInstrument = nil,
 }
 
 function P:onSave()
@@ -139,12 +137,23 @@ function P:modReputation(mod)
     self:sendPerformerInfo()
 end
 
-function P:addKnownSong(song, confidences)
-    if not self.stats.knownSongs[song.id] then
-        self.stats.knownSongs[song.id] = {
-            partConfidences = {},
-        }
+function P.getSongBySourceFile(sourceFile)
+    -- Search songs/preset
+    local bardData = storage.globalSection('Bardcraft')
+    local storedSongs = bardData:get('songs/preset') or {}
+    for _, song in pairs(storedSongs) do
+        if song.sourceFile == sourceFile then
+            return song
+        end
     end
+    return nil
+end
+
+function P:addKnownSong(song, confidences)
+    if self.stats.knownSongs[song.id] then return end
+    self.stats.knownSongs[song.id] = {
+        partConfidences = {},
+    }
     for _, part in ipairs(song.parts) do
         self.stats.knownSongs[song.id].partConfidences[part.index] = (confidences and confidences[part.index]) or 0
     end
@@ -163,6 +172,15 @@ function P:teachSong(song)
         return true
     end
     return false
+end
+
+function P:teachAllSongs()
+    local bardData = storage.globalSection('Bardcraft')
+    local storedSongs = bardData:get('songs/preset') or {}
+    for _, song in pairs(storedSongs) do
+        self:addKnownSong(song)
+    end
+    self:sendPerformerInfo()
 end
 
 function P:modSongConfidence(songId, part, mod)
@@ -191,12 +209,8 @@ function P:resetAllStats()
         bannedVenues = {},
         performedVenuesToday = {},
         practiceEfficiency = 1.0,
-        performanceCount = {
-            [Song.PerformanceType.Tavern] = 0,
-            [Song.PerformanceType.Street] = 0,
-            [Song.PerformanceType.Practice] = 0,
-        },
         performanceLogs = {},
+        notesPlayed = {},
     }
     self:sendPerformerInfo()
 end
@@ -262,7 +276,12 @@ local function getAnimStartPoint(timeOffset)
     return animTime
 end
 
+function P.hasAnim()
+    return omwself and anim.hasAnimation(omwself)
+end
+
 function P.startAnim(animKey)
+    if not P.hasAnim() then return end
     local enabled = configGlobal.options.bEnableAnimations
 
     local priority = {
@@ -282,6 +301,7 @@ function P.startAnim(animKey)
 end
 
 function P.resyncAnim(animKey)
+    if not P.hasAnim() then return end
     if anim.isPlaying(omwself, animKey) then
         anim.cancel(omwself, animKey)
         P.startAnim(animKey)
@@ -319,6 +339,7 @@ function P.handleMovement(dt, idleAnim)
 end
 
 function P.resetVfx()
+    if not P.hasAnim() then return end
     if not P.instrumentItem then
         anim.removeVfx(omwself, 'BO_Instrument')
         return
@@ -355,6 +376,7 @@ function P.resetVfx()
 end
 
 function P.resetAnim()
+    if not P.hasAnim() then return end
     if instrumentData[P.instrument] then
         anim.cancel(omwself, instrumentData[P.instrument].anim)
         P.startAnim(instrumentData[P.instrument].anim)
@@ -366,13 +388,15 @@ function P.playNote(note, velocity)
     local pitch = 1.0
     local volume = velocity * (1 + math.random() * 0.2 - 0.1)
     if math.random() > P.getNoteAccuracy() then
-        pitch = 1.0 + (math.random() * 0.2 - 0.1) -- Random pitch shift between -10% and +10%
-        volume = volume * 0.5 + math.random() * (volume)
+        if not configGlobal.options.bJamMode then
+            pitch = 1.0 + (math.random() * 0.2 - 0.1) -- Random pitch shift between -10% and +10%
+            volume = volume * 0.5 + math.random() * (volume)
+        end
         success = false
     end
     local noteName = Song.noteNumberToName(note)
     local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
-    core.sound.playSoundFile3d(filePath, omwself, { volume = volume, pitch = pitch, })
+    core.sound.playSoundFile3d(filePath, omwself, { volume = volume * configGlobal.options.fInstrumentVolume, pitch = pitch, })
     return success
 end
 
@@ -438,15 +462,18 @@ end
 
 function P.handleStopEvent(data)
     P.stopAllNotes()
-    anim.removeVfx(omwself, 'BO_Instrument')
-    anim.cancel(omwself, instrumentData[P.instrument].anim)
-    if animData[P.instrument] then
-        for a, _ in pairs(animData[P.instrument]) do 
-            anim.cancel(omwself, a)
+    if P.hasAnim() then
+        anim.removeVfx(omwself, 'BO_Instrument')
+        anim.cancel(omwself, instrumentData[P.instrument].anim)
+        if animData[P.instrument] then
+            for a, _ in pairs(animData[P.instrument]) do 
+                anim.cancel(omwself, a)
+            end
         end
     end
     P.playing = false
     P.instrument = nil
+    P.instrumentItem = nil
 
     if P.performanceType == Song.PerformanceType.Ambient then 
         P.currentSong = nil
@@ -468,9 +495,11 @@ function P.handleStopEvent(data)
 
     if P.performanceType == Song.PerformanceType.Practice then
         mod = mod * (configGlobal.options.bEnablePracticeEfficiency == true and P.stats.practiceEfficiency or 1)
-        local practiceMod = math.pow(0.9, (#P.overallNoteEvents / 200))
+        local practiceMod = math.pow(0.9, (#P.overallNoteEvents / 300))
         P.stats.practiceEfficiency = util.clamp(P.stats.practiceEfficiency * practiceMod, 0.125, 1)
-        omwself:sendEvent('BC_PracticeEfficiency', { efficiency = P.stats.practiceEfficiency })
+        if omwself then
+            omwself:sendEvent('BC_PracticeEfficiency', { efficiency = P.stats.practiceEfficiency })
+        end
     elseif P.performanceType == Song.PerformanceType.Tavern then
         local currentDay = math.floor(core.getGameTime() / time.day)
         local performanceDay = math.floor((data.startTime or 0) / time.day)
@@ -478,9 +507,8 @@ function P.handleStopEvent(data)
             P.stats.performedVenuesToday[data.cell] = true
         end
     end
-    P.stats.performanceCount[P.performanceType] = P.stats.performanceCount[P.performanceType] + 1
     P:modSongConfidence(P.currentSong.id, P.currentPart.index, mod)
-    if omwself.type == types.Player then
+    if omwself and omwself.type == types.Player then
         omwself:sendEvent('BC_GainConfidence', { songTitle = P.currentSong.title, partTitle = P.currentPart.title, oldConfidence = oldConfidence, newConfidence = P.stats.knownSongs[P.currentSong.id].partConfidences[P.currentPart.index] })
         core.sendGlobalEvent('BC_PlayerPerfSkillLog', { xpGain = P.xpGain, levelGain = P.levelGain, level = P.stats.performanceSkill.level, xpCurr = P.stats.performanceSkill.xp, xpReq = P:getPerformanceXPRequired() })
     end
@@ -538,6 +566,8 @@ function P.handleNoteEvent(data)
             P.currentConfidence = math.max(P.currentConfidence - loss, 0)
         end
         table.insert(P.overallNoteEvents, success)
+        P.stats.notesPlayed = P.stats.notesPlayed or {}
+        P.stats.notesPlayed[P.instrument] = (P.stats.notesPlayed[P.instrument] or 0) + 1
         core.sendGlobalEvent('BC_PerformerNoteHandled', { success = success, performer = omwself, mod = 1 / intervalBase * weight })
     else
         P.currentConfidence = P.maxConfidence
@@ -560,10 +590,48 @@ function P.handleConductorEvent(data)
         data.time = core.getRealTime()
         instrumentData[P.instrument].eventHandler(data)
     end
+    P:setSheatheVfx()
     return success
 end
 
 function P:onFrame()
+end
+
+function P:setSheatheVfx()
+    if not P.hasAnim() then return end
+    anim.removeVfx(omwself, 'BC_BackInstrument')
+    if not self.stats.sheathedInstrument then return end
+    local record = types.Miscellaneous.record(self.stats.sheathedInstrument)
+    if record and self:verifySheathedInstrument() and (not self.instrumentItem or record.id ~= self.instrumentItem.id) then
+        local modelName = record.model
+        modelName = 'meshes/bardcraft/vfx/sheathe/' .. modelName:match("([^/]+)$")
+        if not anim.hasBone(omwself, 'Bip01 BOInstrumentBack') then 
+            return 
+        end
+        anim.addVfx(omwself, modelName, {
+            vfxId = 'BC_BackInstrument',
+            boneName = 'Bip01 BOInstrumentBack',
+            loop = true,
+            useAmbientLight = false,
+        })
+    end
+end
+
+function P:setSheathedInstrument(recordId, force)
+    if self.stats.sheathedInstrument == recordId and not force then
+        self.stats.sheathedInstrument = nil
+    else
+        self.stats.sheathedInstrument = recordId
+    end
+    self:setSheatheVfx()
+end
+
+function P:verifySheathedInstrument()
+    if self.stats.sheathedInstrument then
+        local inventory = omwself.type.inventory(omwself)
+        return inventory:find(self.stats.sheathedInstrument) ~= nil
+    end
+    return false
 end
 
 return P

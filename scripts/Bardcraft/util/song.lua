@@ -24,7 +24,7 @@ local drumChannelMappings = {
 }
 
 local instrumentProfiles = {
-    [24] = {
+    [1] = {
         name = "Lute",
         loop = false,
         sustain = false,
@@ -33,16 +33,16 @@ local instrumentProfiles = {
         densityMod = 1.0,
         volume = 1.0,
     },
-    [73] = {
+    [2] = {
         name = "BassFlute",
         loop = true,
         sustain = true,
         transpose = true,
         polyphonic = false,
         densityMod = 1.2,
-        volume = 1,
+        volume = 1.5,
     },
-    [79] = {
+    [3] = {
         name = "Ocarina",
         loop = true,
         sustain = true,
@@ -51,16 +51,16 @@ local instrumentProfiles = {
         densityMod = 0.9,
         volume = 1,
     },
-    [110] = {
+    [4] = {
         name = "Fiddle",
         loop = true,
         sustain = true,
         transpose = true,
         polyphonic = true,
         densityMod = 1.0,
-        volume = 2,
+        volume = 1,
     },
-    [116] = {
+    [5] = {
         name = "Drum",
         loop = false,
         sustain = false,
@@ -81,38 +81,38 @@ local instrumentProfiles = {
 }
 
 local instrumentMappings = {
-    { instr = 24, low = 0, high = 15 }, -- Piano and Chromatic Percussion maps to Lute
-    { instr = 79, low = 16, high = 23 }, -- Organ maps to Ocarina
-    { instr = 24, low = 24, high = 39 }, -- Guitar and Bass maps to Lute
-    { instr = 110, low = 40, high = 41 }, -- Violin and Viola maps to Fiddle
-    { instr = 73, low = 42, high = 43 }, -- Cello and Contrabass maps to BassFlute
-    { instr = 110, low = 44, high = 44 }, -- Tremolo Strings maps to Fiddle
-    { instr = 24, low = 45, high = 45 }, -- Pizzicatto Strings maps to Lute
-    { instr = 24, low = 46, high = 46 }, -- Harp maps to Lute
-    { instr = 116, low = 47, high = 47 }, -- Timpani maps to Drum
-    { instr = 110, low = 48, high = 51 }, -- String Ensemble and Synth Strings maps to Fiddle
-    { instr = 79, low = 52, high = 54 }, -- Choir and Voice maps to Ocarina
-    { instr = 24, low = 55, high = 55 }, -- Orchestra Hit maps to Lute
-    { instr = 79, low = 56, high = 56 }, -- Trumpet maps to Ocarina
-    { instr = 73, low = 57, high = 58 }, -- Trombone and Tuba maps to BassFlute
-    { instr = 79, low = 59, high = 63 }, -- Rest of Brass maps to Ocarina
-    { instr = 79, low = 64, high = 65 }, -- Soprano and Alto Sax maps to Ocarina
-    { instr = 73, low = 66, high = 67 }, -- Tenor and Bari Sax maps to BassFlute
-    { instr = 79, low = 68, high = 68 }, -- Oboe maps to Ocarina
-    { instr = 73, low = 69, high = 70 }, -- English Horn and Bassoon maps to BassFlute
-    { instr = 79, low = 71, high = 72 }, -- Clarinet and Piccolo maps to Ocarina
-    { instr = 73, low = 73, high = 73 }, -- Flute maps to BassFlute
-    { instr = 79, low = 74, high = 74 }, -- Recorder maps to Ocarina
-    { instr = 73, low = 75, high = 77 }, -- Pan Flute, Blown Bottle and Shakuhachi maps to BassFlute
-    { instr = 79, low = 78, high = 79 }, -- Whistle and Ocarina maps to Ocarina
-    { instr = 24, low = 80, high = 87 }, -- Synth Lead maps to Lute
-    { instr = 73, low = 88, high = 95 }, -- Synth Pad maps to BassFlute
+    { instr = 1, low = 0, high = 15 }, -- Piano and Chromatic Percussion maps to Lute
+    { instr = 3, low = 16, high = 23 }, -- Organ maps to Ocarina
+    { instr = 1, low = 24, high = 39 }, -- Guitar and Bass maps to Lute
+    { instr = 4, low = 40, high = 41 }, -- Violin and Viola maps to Fiddle
+    { instr = 2, low = 42, high = 43 }, -- Cello and Contrabass maps to BassFlute
+    { instr = 4, low = 44, high = 44 }, -- Tremolo Strings maps to Fiddle
+    { instr = 1, low = 45, high = 45 }, -- Pizzicatto Strings maps to Lute
+    { instr = 1, low = 46, high = 46 }, -- Harp maps to Lute
+    { instr = 5, low = 47, high = 47 }, -- Timpani maps to Drum
+    { instr = 4, low = 48, high = 51 }, -- String Ensemble and Synth Strings maps to Fiddle
+    { instr = 3, low = 52, high = 54 }, -- Choir and Voice maps to Ocarina
+    { instr = 1, low = 55, high = 55 }, -- Orchestra Hit maps to Lute
+    { instr = 3, low = 56, high = 56 }, -- Trumpet maps to Ocarina
+    { instr = 2, low = 57, high = 58 }, -- Trombone and Tuba maps to BassFlute
+    { instr = 3, low = 59, high = 63 }, -- Rest of Brass maps to Ocarina
+    { instr = 3, low = 64, high = 65 }, -- Soprano and Alto Sax maps to Ocarina
+    { instr = 2, low = 66, high = 67 }, -- Tenor and Bari Sax maps to BassFlute
+    { instr = 3, low = 68, high = 68 }, -- Oboe maps to Ocarina
+    { instr = 2, low = 69, high = 70 }, -- English Horn and Bassoon maps to BassFlute
+    { instr = 3, low = 71, high = 72 }, -- Clarinet and Piccolo maps to Ocarina
+    { instr = 2, low = 73, high = 73 }, -- Flute maps to BassFlute
+    { instr = 3, low = 74, high = 74 }, -- Recorder maps to Ocarina
+    { instr = 2, low = 75, high = 77 }, -- Pan Flute, Blown Bottle and Shakuhachi maps to BassFlute
+    { instr = 3, low = 78, high = 79 }, -- Whistle and Ocarina maps to Ocarina
+    { instr = 1, low = 80, high = 87 }, -- Synth Lead maps to Lute
+    { instr = 2, low = 88, high = 95 }, -- Synth Pad maps to BassFlute
     { instr = 0, low = 96, high = 103 }, -- Synth Effects maps to nothing (ignore them)
-    { instr = 24, low = 104, high = 108 }, -- Ethnic Plucked maps to Lute
-    { instr = 110, low = 109, high = 110 }, -- Bagpipe and Fiddle maps to Fiddle
-    { instr = 79, low = 111, high = 111 }, -- Shanai maps to Ocarina
-    { instr = 24, low = 112, high = 114 }, -- Percussion Pitched maps to Drum
-    { instr = 116, low = 115, high = 119 }, -- Rest of Percussion maps to Drum
+    { instr = 1, low = 104, high = 108 }, -- Ethnic Plucked maps to Lute
+    { instr = 4, low = 109, high = 110 }, -- Bagpipe and Fiddle maps to Fiddle
+    { instr = 3, low = 111, high = 111 }, -- Shanai maps to Ocarina
+    { instr = 1, low = 112, high = 114 }, -- Percussion Pitched maps to Lute
+    { instr = 5, low = 115, high = 119 }, -- Rest of Percussion maps to Drum
     { instr = 0, low = 120, high = 127 }, -- Sound Effects maps to nothing (ignore them)
 }
 
@@ -209,8 +209,8 @@ Song.loopCount = 0
 
 function Song.new(title, desc, tempo, timeSig)
     local self = setmetatable({}, Song)
-    self.title = title or 'New Song'
-    self.desc = desc or 'No description'
+    self.title = title or l10n('UI_Song_NewSong')
+    self.desc = desc or l10n('UI_Song_NoDescription')
     self.tempo = tempo or 120
     self.scale = {
         root = 1,
@@ -320,7 +320,7 @@ function Song.fromMidiParser(parser, metadata)
     parser.filename = string.match(parser.filename, "([^/]+)$")
     local fileName = string.match(parser.filename, "([^\\]+)%.mid$")
     local title = (metadata and metadata.title) or fileName:gsub("%f[%a].", string.upper)
-    local desc = (metadata and metadata.description) or 'Imported from MIDI file'
+    local desc = (metadata and metadata.description) or l10n('UI_Song_Imported')
     local self = Song.new(
         title,
         desc,
@@ -343,9 +343,9 @@ function Song.fromMidiParser(parser, metadata)
         end
 
         if not parser.instruments[note.channel] then
-            parser.instruments[note.channel] = 24
+            parser.instruments[note.channel] = 1
         end
-        local instrument = (note.channel == 9 and 116) or getInstrumentMapping(parser.instruments[note.channel])
+        local instrument = (note.channel == 9 and 5) or getInstrumentMapping(parser.instruments[note.channel])
         if not metadata then
             note.track = 1
         end
@@ -445,7 +445,7 @@ function Song.getInstrumentNumber(instrumentName)
 end
 
 function Song:createNewPart()
-    local instrument = 24
+    local instrument = 1
     local highestIndex = 0
     for _, part in ipairs(self.parts) do
         if part.index > highestIndex then

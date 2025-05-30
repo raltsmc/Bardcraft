@@ -30,6 +30,22 @@ I.Settings.registerGroup {
             default = true,
         },
         {
+            key = 'bJamMode',
+            renderer = 'checkbox',
+            name = 'ConfigJamMode',
+            description = 'ConfigJamModeDesc',
+            default = false,
+        },
+		{
+			key = 'fInstrumentVolume',
+			renderer = 'number',
+			name = 'ConfigInstrumentVolume',
+			default = 1.0,
+			argument = {
+				min = 0.0,
+			}
+		},
+        {
             key = 'fOverallGoldMult',
             renderer = 'number',
             name = 'ConfigOverallGoldMult',

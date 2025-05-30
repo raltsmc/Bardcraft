@@ -1,4 +1,5 @@
 midiData:
+  # === Starting Songs ===
   scales.mid:
     title: Scales
     description: A basic exercise for practicing ascending and descending scales. You could perform this... if you really wanted to?
@@ -60,9 +61,10 @@ midiData:
     title: Waves at Dawn
     description: TODO
     difficulty: starter
+  # === Beginner Songs ===
   beg1.mid:
     title: Guar Driver Song
-    description: A simple, cloying melody said to echo the pace of a guar's stride. While often attributed to caravan drivers, scholars note the tune's true origin is likely as meandering as the creatures themselves.
+    description: A simple, lilting melody said to echo the pace of a guar's stride. While often attributed to caravan drivers, scholars note the tune's true origin is likely as meandering as the creatures themselves.
     scale:
       root: F
       mode: Major
@@ -71,7 +73,6 @@ midiData:
       - 32
     loopCount: 0
     texture: westgash
-    startUnlocked: false
     difficulty: beginner
   beg2.mid:
     title: The Odai Trail
@@ -85,7 +86,6 @@ midiData:
     loopCount: 0
     tempoMod: 0.5
     texture: balmora2
-    startUnlocked: false
     difficulty: beginner
   beg3.mid:
     title: Eyes Like Smoke
@@ -99,10 +99,22 @@ midiData:
     loopCount: 0
     tempoMod: 0.5
     texture: temple1
-    startUnlocked: false
     difficulty: beginner
+  bwv997.mid:
+    title: The Guar and the Scrib
+    description: A relaxed lute accompaniment supports a lively ocarina melody; perfect for confidence-building for aspiring lutists looking to move on from basic scales.
+    scale:
+      root: A
+      mode: Minor
+    loopBars:
+      - 0 
+      - 20
+    loopCount: 0
+    texture: generic
+    difficulty: beginner
+  # === Intermediate Songs ===
   int1.mid:
-    title: Evening in Gwynnen
+    title: Evening in Dwynnen
     description: This dance, born in the courts of High Rock, found favor with Imperial statesmen and soon spread throughout the provinces. A testament to Wayrest's enduring cultural influence, now even Dunmer tap their feet to its rhythm.
     scale:
       root: E
@@ -113,7 +125,6 @@ midiData:
     loopCount: 0
     tempoMod: 0.5
     texture: wayrest
-    startUnlocked: false
     difficulty: intermediate
   int2.mid:
     title: Five-Legged Festus
@@ -126,34 +137,20 @@ midiData:
       - 28
     loopCount: 0
     texture: westgash
-    startUnlocked: false
     difficulty: intermediate
-  bwv997.mid:
-    title: The Guar and the Scrib
-    description: A relaxed lute accompaniment supports a lively ocarina melody; perfect for confidence-building for aspiring lutists looking to move on from basic scales.
-    scale:
-      root: A
-      mode: Minor
-    loopBars:
-      - 0 
-      - 20
-    loopCount: 0
-    texture: generic
-    startUnlocked: false
-    difficulty: beginner
-  bwv997-adv.mid:
-    title: The Guar - Adv.
-    description: The Guar and the Scrib's lute steals the show in this advanced solo arrangement, carrying both melody and chords at a quicker pace. A nostalgic romp for skilled lutists looking to return to their roots.
+  int3.mid:
+    title: Requiem for Lost Kin
+    description: The origins of this haunting melody are lost to time, but it resonates with the deep sorrow and unyielding spirit of the Dunmer people. A song for those who stand firm even as the shadows lengthen and the path ahead fades.
     scale:
       root: A
       mode: Minor
     loopBars:
       - 0
-      - 16
-    loopCount: 1
-    texture: generic
-    startUnlocked: false
-    difficulty: advanced
+      - 63
+    loopCount: 0
+    tempoMod: 0.5
+    texture: temple1
+    difficulty: intermediate
   greensleeves.mid:
     title: Greensleeves
     description: A traditional folk melody of uncertain origin, a staple in taverns throughout the provinces of the Empire.
@@ -165,7 +162,6 @@ midiData:
       root: C
       mode: Minor
     texture: tavern
-    startUnlocked: false
     difficulty: intermediate
   imp1.mid: 
     title: Courting the Alewife
@@ -179,7 +175,6 @@ midiData:
       mode: Major
     tempoMod: 0.5
     texture: tavern
-    startUnlocked: false
     difficulty: intermediate
   reddiamond.mid:
     title: Chim-el Adabal
@@ -192,11 +187,24 @@ midiData:
       mode: Minor
     tempoMod: 0.5
     texture: imperial
-    startUnlocked: false
     difficulty: intermediate
     partOverrides:
       Lute: Lute (Solo)
       Lute 2: Lute (Accompaniment)
+  # === Advanced Songs ===
+  bwv997-adv.mid:
+    title: The Guar - Adv.
+    description: The lute steals the show in this advanced solo arrangement of The Guar and the Scrib, carrying both melody and chords at a brisker pace. A nostalgic romp for skilled lutists looking to return to their roots.
+    scale:
+      root: A
+      mode: Minor
+    loopBars:
+      - 0
+      - 16
+    loopCount: 1
+    texture: generic
+    difficulty: advanced
+  # === Unique Songs ===
   moonsong.mid:
     title: Ja-Kha'jay's Moonsong
     description: A beloved Khajiiti folk tune, said to echo the laughter of Jone and Jode as they chase across the night sky. Commonly heard during celebrations such as the New Life Festival.
@@ -207,7 +215,6 @@ midiData:
       root: D
       mode: Rajhinic
     texture: elsweyr
-    startUnlocked: false
     difficulty: intermediate
   ahemmusa.mid:
     title: Ahemmusan Lament
@@ -221,35 +228,41 @@ midiData:
       mode: Velothi
     tempoMod: 0.5
     texture: ahemmusa
-    startUnlocked: false
     difficulty: intermediate
   molagberan.mid:
     title: The Battle of Molag Beran
     description: TODO
-    startUnlocked: false
   rollbretonnia.mid:
     title: Roll, Bretonnia, Roll
     description: TODO
-    startUnlocked: false
   wondrouslove.mid:
     title: Wondrous Love
     description: A solemn Ashlander hymn from the Urshilaku, honoring the sacred bonds of love and truth shared through all trials, from first breath to final whisper.
     texture: ahemmusa
-    startUnlocked: false
     difficulty: beginner
   redmountain.mid:
     title: Red Mountain
     description: TODO
-    startUnlocked: false
   shrinktodust.mid:
     title: May I Shrink to Dust
     description: TODO
-    startUnlocked: false
   brooding.mid:
     title: Brooding Beneath Red Mountain
     description: TODO
-    startUnlocked: false
   jornibret.mid:
     title: Jornibret's Last Dance
     description: TODO
-    startUnlocked: false
+  # === Drum Cadences ===
+  cadence1.mid:
+    title: Ra'jira's Cadence
+    description: Ra'jira claims this fast-paced drum cadence is her own invention. But she claims many things.
+    loopBars:
+      - 0
+      - 20
+    loopCount: 1
+    texture: elsweyr
+    difficulty: intermediate
+    partOverrides:
+      Drum: Drum (Middle)
+      Drum 2: Drum (Low)
+      Drum 3: Drum (High)

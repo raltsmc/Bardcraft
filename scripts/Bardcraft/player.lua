@@ -631,6 +631,63 @@ return {
             elseif string.lower(tokens[1]) == 'luabcteachall' then
                 Performer:teachAllSongs()
                 ui.showMessage('DEBUG: Taught all songs')
+            elseif string.lower(tokens[1]) == 'luabcdummylogs' then
+                -- Populate performance logs with 25 dummy logs
+                Performer.stats.performanceLogs = {}
+                for i = 1, 25 do
+                    local log = {}
+                    -- Randomly pick type
+                    if math.random() < 0.5 then
+                        log.type = Song.PerformanceType.Tavern
+                        -- Pick a tavern name
+                        local taverns = Data.Venues.tavern
+                        local tavernNames = {}
+                        for name, _ in pairs(taverns) do
+                            table.insert(tavernNames, name)
+                        end
+                        log.cell = tavernNames[math.random(1, #tavernNames)]
+                        log.payment = math.random(50, 300)
+                        log.tips = math.random(10, 100)
+                    else
+                        log.type = Song.PerformanceType.Street
+                        -- Pick a city/town/metropolis
+                        local streetTypes = { "metropolises", "cities", "towns" }
+                        local which = streetTypes[math.random(1, #streetTypes)]
+                        local list = Data.Venues.street[which]
+                        log.cell = list[math.random(1, #list)]
+                        log.payment = 0
+                        log.tips = math.random(2, 20)
+                    end
+                    log.quality = math.random(0, 100)
+                    log.disp = math.random(-25, 25)
+                    log.oldDisp = math.random(0, 100)
+                    log.newDisp = util.clamp(log.oldDisp + log.disp, 0, 100)
+                    log.level = 100
+                    log.levelGain = 0
+                    -- rep: -2 to 2, correlate to quality
+                    if log.quality >= 80 then
+                        log.rep = 2
+                    elseif log.quality >= 60 then
+                        log.rep = 1
+                    elseif log.quality >= 40 then
+                        log.rep = 0
+                    elseif log.quality >= 20 then
+                        log.rep = -1
+                    else
+                        log.rep = -2
+                    end
+                    log.publicanComment = "test comment"
+                    log.patronComments = {}
+                    local numComments = math.random(1, 3)
+                    for j = 1, numComments do
+                        table.insert(log.patronComments, {
+                            name = "Test NPC " .. j,
+                            comment = "test patron comment " .. j
+                        })
+                    end
+                    table.insert(Performer.stats.performanceLogs, log)
+                end
+                ui.showMessage('DEBUG: Populated 25 dummy logs')
             end
         end,
         onMouseWheel = function(v, h)

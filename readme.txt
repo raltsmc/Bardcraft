@@ -1,7 +1,7 @@
 				Bardcraft
 				By therealralts
 
-Version: 1.0-beta
+Version: 1.0.0
 
 =========
 Contents

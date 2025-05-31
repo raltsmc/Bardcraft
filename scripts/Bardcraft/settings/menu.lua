@@ -6,9 +6,9 @@ local ui = require('openmw.ui')
 local util = require('openmw.util')
 
 local l10n = core.l10n('Bardcraft')
-local versionString = "1.0-beta"
 
 local luaxp = require('scripts.Bardcraft.util.luaxp')
+local versionString = require('scripts.Bardcraft.data').Version
 
 -- inputKeySelection by Pharis
 I.Settings.registerRenderer('Bardcraft/inputKeySelection', function(value, set)

@@ -1,5 +1,7 @@
 local util = require('openmw.util')
 
+local VERSION = "1.0.0"
+
 local INSTRUMENT_ITEMS = {
     Lute = {
         misc_de_lute_01 = true, -- Vanilla
@@ -454,6 +456,7 @@ local STARTING_SONGS = {
 }
 
 return {
+    Version = VERSION,
     InstrumentItems = INSTRUMENT_ITEMS,
     SheathableInstruments = SHEATHABLE_INSTRUMENTS,
     Venues = VENUES,

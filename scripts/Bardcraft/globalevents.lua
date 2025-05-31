@@ -5,7 +5,6 @@ local storage = require('openmw.storage')
 local vfs = require('openmw.vfs')
 local markup = require('openmw.markup')
 local I = require('openmw.interfaces')
-local async = require('openmw.async')
 
 local MIDI = require('scripts.Bardcraft.util.midi')
 local Song = require('scripts.Bardcraft.util.song').Song
@@ -13,7 +12,7 @@ local Data = require('scripts.Bardcraft.data')
 local random = require('scripts.Bardcraft.util.random')
 
 local function parseAllPreset()
-    local metadataPath = 'midi/preset/metadata.yaml'
+    local metadataPath = 'midi/Bardcraft/preset/metadata.yaml'
     local exists = vfs.fileExists(metadataPath)
     local metadata = exists and markup.loadYaml(metadataPath) or {
         midiData = {}
@@ -23,7 +22,11 @@ local function parseAllPreset()
     end
 
     local bardData = storage.globalSection('Bardcraft')
-    bardData:set('songs/preset', nil) -- Clear the old data TODO remove
+    if bardData:get('version') ~= Data.Version then
+        print("Bardcraft version mismatch: " .. tostring(bardData:get('version')) .. " => " .. tostring(Data.Version) .. ". Re-parsing preset songs.")
+        bardData:set('version', Data.Version)
+        bardData:set('songs/preset', nil) -- Clear the old data
+    end
     local storedSongs = bardData:getCopy('songs/preset') or {}
 
     local midiSongs = {}
@@ -40,7 +43,7 @@ local function parseAllPreset()
             end
 
             if not alreadyParsed then
-                local parser = MIDI.parseMidiFile(filePath)
+                local parser = MIDI.ParseMidiFile(filePath)
                 if parser then
                     local song = Song.fromMidiParser(parser, metadata.midiData[fileName])
                     midiSongs[fileName] = song

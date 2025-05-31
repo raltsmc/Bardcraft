@@ -2522,13 +2522,19 @@ local function createFinalizeDraftModal()
     }, util.vector2(450, 400), l10n('UI_PRoll_FinalizeDraft')))
 end
 
+local draftsScrollable = nil
+local partsScrollable = nil
+
 getSongTab = function()
     local manager = auxUi.deepLayoutCopy(uiTemplates.songManager)
     local leftBox = manager.content[1].content[1].content
+
+    local draftScrollableHeight = calcContentHeight() - 32
     Editor.songs = getDrafts()
+    local draftListContent = ui.content{}
     for i, song in ipairs(Editor.songs) do
         local selected = Editor.song and (song.id == Editor.song.id)
-        leftBox[i] = {
+        draftListContent:add({
             template = selected and I.MWUI.templates.bordersThick or I.MWUI.templates.borders,
             props = {
                 size = util.vector2(0, 32),
@@ -2550,8 +2556,20 @@ getSongTab = function()
                     setDraft(song)
                 end),
             }
-        }
+        })
     end
+
+    local oldDraftsY = 0
+    if draftsScrollable and draftsScrollable.layout and draftsScrollable.layout.content[1] and draftsScrollable.layout.content[1].props then
+        oldDraftsY = draftsScrollable.layout.content[1].props.position.y
+    end
+    draftsScrollable = uiTemplates.scrollable(
+        util.vector2(ui.screenSize().x * Editor.windowLeftBoxXMult + Editor.windowLeftBoxXSize, draftScrollableHeight),
+        draftListContent,
+        util.vector2(0, 32 * #Editor.songs)
+    )
+    draftsScrollable.layout.content[1].props.position = util.vector2(0, oldDraftsY)
+    leftBox[1] = draftsScrollable
     table.insert(manager.content[1].content, {
         type = ui.TYPE.Flex,
         props = {
@@ -2868,6 +2886,29 @@ getSongTab = function()
                 size = util.vector2(0, 32),
             },
         })
+        -- Calculate the height for the parts scrollable.
+        -- Subtract heights of all visible song info boxes, headers, new part button, song actions, and paddings.
+        local partsScrollableHeight = calcContentHeight()
+        -- Subtract "Song Info" header
+        partsScrollableHeight = partsScrollableHeight - 32
+        -- Subtract all song info boxes (each is sizeY, which is 0 if hidden, 32 if shown, 8 boxes)
+        local songInfoBoxCount = 7
+        local sizeY = Editor.hideSongInfo and 0 or 32
+        partsScrollableHeight = partsScrollableHeight - (songInfoBoxCount * sizeY)
+        -- Subtract scale and snap selects (each is sizeY)
+        partsScrollableHeight = partsScrollableHeight - (2 * sizeY)
+        -- Subtract padding after song info (8 if shown, 0 if hidden)
+        partsScrollableHeight = partsScrollableHeight - (Editor.hideSongInfo and 0 or 16)
+        -- Subtract "Parts" header
+        partsScrollableHeight = partsScrollableHeight - 32
+        -- Subtract new part button (32)
+        partsScrollableHeight = partsScrollableHeight - 32
+        -- Subtract "Finalize Draft" and "Delete Draft" buttons (each 32)
+        partsScrollableHeight = partsScrollableHeight - 64
+        -- Subtract all paddings between elements
+        partsScrollableHeight = partsScrollableHeight - 32
+
+        -- Prepare the parts list content
         local parts = {}
         for _, v in ipairs(Editor.song.parts) do
             table.insert(parts, v)
@@ -2875,9 +2916,25 @@ getSongTab = function()
         table.sort(parts, function(a, b)
             return a.instrument < b.instrument
         end)
+        local partsListContent = ui.content{}
         for _, part in ipairs(parts) do
-            table.insert(middleBox, uiTemplates.partDisplay(part))
+            partsListContent:add(uiTemplates.partDisplay(part))
         end
+
+        -- Save scroll position if possible
+        local oldPartsY = 0
+        if partsScrollable and partsScrollable.layout and partsScrollable.layout.content[1] and partsScrollable.layout.content[1].props then
+            oldPartsY = partsScrollable.layout.content[1].props.position.y
+        end
+
+        -- Create the scrollable for parts
+        partsScrollable = uiTemplates.scrollable(
+            util.vector2(ui.screenSize().x * Editor.windowMiddleBoxXMult + Editor.windowMiddleBoxXSize - 20, partsScrollableHeight),
+            partsListContent,
+            util.vector2(0, 48 * #parts) -- 48 is the height of each partDisplay
+        )
+        partsScrollable.layout.content[1].props.position = util.vector2(0, oldPartsY)
+        table.insert(middleBox, partsScrollable)
 
         table.insert(middleBox, {
             type = ui.TYPE.Flex,
@@ -4499,7 +4556,7 @@ function Editor:onMouseWheel(vertical, horizontal)
     if scrollableFocused and scrollableFocused.layout then
         if not scrollableFocused.layout.props.canScroll then return end
         local pos = scrollableFocused.layout.content[1].props.position
-        scrollableFocused.layout.content[1].props.position = util.vector2(pos.x, util.clamp(pos.y + vertical * 32, -scrollableFocused.layout.props.scrollLimit, 0))
+        scrollableFocused.layout.content[1].props.position = util.vector2(pos.x, util.clamp(pos.y + vertical * 24, -scrollableFocused.layout.props.scrollLimit, 0))
         scrollableFocused:update()
     elseif pianoRoll.focused then
         if input.isCtrlPressed() then

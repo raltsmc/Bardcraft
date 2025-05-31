@@ -47,43 +47,8 @@ local MidiParser = {}
 MidiParser.__index = MidiParser
 
 MidiParser.sampleFolder = 'sound\\Bardcraft\\samples\\'
-MidiParser.presetFolder = 'midi\\preset\\'
-MidiParser.customFolder = 'midi\\custom\\'
-
-MidiParser.instrumentProfiles = {
-    [24] = {
-        name = "Lute",
-        loop = false,
-        sustain = false,
-        transpose = true,
-        volume = 1.0,
-    },
-    [73] = {
-        name = "BassFlute",
-        loop = true,
-        sustain = true,
-        transpose = true,
-        volume = 1,
-    },
-    [79] = {
-        name = "Ocarina",
-        loop = true,
-        sustain = true,
-        transpose = true,
-        volume = 1,
-    },
-    [116] = {
-        name = "Drum",
-        loop = false,
-        sustain = false,
-        transpose = false,
-        volume = 1,
-    }
-}
-
-function MidiParser.getInstrumentProfile(id)
-    return MidiParser.instrumentProfiles[id] or MidiParser.instrumentProfiles[24]
-end
+MidiParser.presetFolder = 'midi\\Bardcraft\\preset\\'
+MidiParser.customFolder = 'midi\\Bardcraft\\custom\\'
 
 function MidiParser.new(filename)
     local self = setmetatable({}, MidiParser)
@@ -405,103 +370,6 @@ function MidiParser:getInitialTimeSignature()
     end
 end
 
--- Convert ticks to seconds at a given tempo
-function MidiParser:ticksToSeconds(ticks, bpm)
-    -- Calculate microseconds per tick
-    local microsecondsPerQuarterNote = 60000000 / bpm
-    local microsecondsPerTick = microsecondsPerQuarterNote / self.division
-
-    -- Convert to seconds
-    return (ticks * microsecondsPerTick) / 1000000
-end
-
--- Convert seconds to ticks at a given tempo
-function MidiParser:secondsToTicks(seconds, bpm)
-    -- Calculate ticks per microsecond
-    local microsecondsPerQuarterNote = 60000000 / bpm
-    local ticksPerMicrosecond = self.division / microsecondsPerQuarterNote
-
-    -- Convert seconds to ticks
-    return seconds * 1000000 * ticksPerMicrosecond
-end
-
--- Get BPM at a specific tick position, considering tempo changes
-function MidiParser:getTempoAtTime(tickPosition)
-    if #self.tempoEvents == 0 then
-        return 120 -- Default 120 BPM if no tempo events
-    end
-
-    -- Find the latest tempo change before or at the current position
-    local currentTempo = self.tempoEvents[1].bpm -- Start with first tempo
-
-    for _, tempoEvent in ipairs(self.tempoEvents) do
-        if tempoEvent.time <= tickPosition then
-            currentTempo = tempoEvent.bpm
-        else
-            break -- Stop when we reach future tempo events
-        end
-    end
-
-    return currentTempo
-end
-
--- Get time signature at a specific tick position
-function MidiParser:getTimeSignatureAtTime(tickPosition)
-    if #self.timeSignatureEvents == 0 then
-        return 4, 4 -- Default 4/4 if no time signature events
-    end
-
-    -- Find the latest time signature change before or at the current position
-    local currentNum = self.timeSignatureEvents[1].numerator
-    local currentDenom = self.timeSignatureEvents[1].denominator
-
-    for _, tsEvent in ipairs(self.timeSignatureEvents) do
-        if tsEvent.time <= tickPosition then
-            currentNum = tsEvent.numerator
-            currentDenom = tsEvent.denominator
-        else
-            break -- Stop when we reach future time signature events
-        end
-    end
-
-    return currentNum, currentDenom
-end
-
--- Calculate the tick position of a specific bar/beat
-function MidiParser:getTicksAtPosition(bar, beat)
-    -- Get initial time signature
-    local numerator, denominator = self:getInitialTimeSignature()
-
-    -- Calculate ticks per bar based on time signature and division
-    local ticksPerQuarterNote = self.division
-    local ticksPerWholeNote = ticksPerQuarterNote * 4
-    local ticksPerBar = (ticksPerWholeNote * numerator) / denominator
-
-    -- Calculate ticks per beat
-    local ticksPerBeat = ticksPerBar / numerator
-
-    -- Calculate position (adjust for 1-based indexing)
-    local barTicks = (bar - 1) * ticksPerBar
-    local beatTicks = (beat - 1) * ticksPerBeat
-
-    return barTicks + beatTicks
-end
-
--- Convert a MIDI note number to note name (C4, D#5, etc.)
-function MidiParser.noteNumberToName(noteNumber)
-    local noteNames = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
-    local octave = math.floor(noteNumber / 12) - 1
-    local noteName = noteNames[(noteNumber % 12) + 1]
-    return noteName .. octave
-end
-
-function MidiParser.noteNumberToFile(noteNumber, instrument)
-    local noteName = MidiParser.noteNumberToName(noteNumber)
-    local instrumentName = MidiParser.getInstrumentProfile(instrument).name
-    local filePath = MidiParser.sampleFolder .. instrumentName .. "\\" .. instrumentName .. '_' .. noteName
-    return filePath
-end
-
 function MidiParser:printEverything()
     print("MIDI Format: " .. self.format)
     print("Number of tracks: " .. self.numTracks)
@@ -532,16 +400,6 @@ function MidiParser:printEverything()
         print("\nNo tempo events found. Using default 120 BPM.")
     end
 
-    print("\nNotes:")
-    local notes = self:getNotes()
-    for i, note in ipairs(notes) do
-        if i <= 20 then -- Show only first 20 notes
-            local noteName = MidiParser.noteNumberToName(note.note)
-            print(string.format("Time: %d, Track: %d, Channel: %d, %s: %s (vel: %d)",
-                note.time, note.track, note.channel, note.type, noteName, note.velocity))
-        end
-    end
-
     print("\nInstrument Changes:")
     local instruments = self:getInstruments()
     for _, instrument in ipairs(instruments) do
@@ -551,7 +409,7 @@ function MidiParser:printEverything()
 end
 
 -- Usage example
-function parseMidiFile(filename)
+function ParseMidiFile(filename)
     local parser = MidiParser.new(filename)
     local success, errorMsg = parser:parse()
 
@@ -566,6 +424,5 @@ end
 -- Return the module
 return {
     MidiParser = MidiParser,
-    parseMidiFile = parseMidiFile,
-    parseAll = parseAll,
+    ParseMidiFile = ParseMidiFile,
 }

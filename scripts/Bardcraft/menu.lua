@@ -8,7 +8,6 @@ local Song = require('scripts.Bardcraft.util.song').Song
 
 local function parseAllCustom()
     local bardData = storage.playerSection('Bardcraft')
-    --bardData:set('songs/drafts', nil) -- Clear the old data TODO remove
     local storedSongs = bardData:getCopy('songs/drafts') or {}
 
     local midiSongs = {}
@@ -25,7 +24,7 @@ local function parseAllCustom()
             end
 
             if not alreadyParsed then
-                local parser = MIDI.parseMidiFile(filePath)
+                local parser = MIDI.ParseMidiFile(filePath)
                 if parser then
                     local song = Song.fromMidiParser(parser)
                     midiSongs[fileName] = song

@@ -282,7 +282,7 @@ local function createPerformOverlay()
         performOverlayFadeInTimer = performOverlayFadeInDuration
     end
 
-    performOverlayScaleX = 6 * (practiceSong.tempo * practiceSong.tempoMod / 120)
+    performOverlayScaleX = 6 * (practiceSong.tempo * practiceSong.tempoMod / 120) / (practiceSong.resolution / 96)
     performOverlayTick = 1
     initPerformOverlayNotes()
     populatePerformOverlayNotes()

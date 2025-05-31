@@ -355,6 +355,7 @@ function Song.fromMidiParser(parser, metadata)
         self.scale.mode = Song.ModeIndex[metadata.scale.mode] or 1
     end
     --self.timeSig[1], self.timeSig[2] = parser:getInitialTimeSignature()
+    self.resolution = parser.division or 96
     self.sourceFile = string.match(parser.filename, "([^\\]+)$")
     self.id = self.sourceFile
     local id = 1
@@ -392,13 +393,13 @@ function Song.fromMidiParser(parser, metadata)
                 note = note.note,
                 velocity = note.velocity,
                 part = partIndex[instrument][note.track],
-                time = math.floor(note.time * self.resolution / parser.division),
+                time = note.time,
             }
             id = id + 1
             table.insert(self.notes, noteData)
         end
     end
-    local lastNoteTime = (#self.notes > 0) and self.notes[#self.notes].time / 96 or 0
+    local lastNoteTime = (#self.notes > 0) and self.notes[#self.notes].time / self.resolution or 0
     local quarterNotesPerBar = self.timeSig[1] * (4 / self.timeSig[2])
     local barCount = math.ceil(lastNoteTime / quarterNotesPerBar)
     self.lengthBars = barCount
@@ -559,6 +560,14 @@ function Song:dtToTicks(start, dt)
     while timePassed < dt do
         local bpm = events[i].bpm
         local nextTick = (events[i + 1] and events[i + 1].time) or math.huge
+        
+        -- Handle multiple tempo events on the same tick
+        while events[i + 1] and events[i + 1].time == events[i].time do
+            i = i + 1
+            bpm = events[i].bpm
+            nextTick = (events[i + 1] and events[i + 1].time) or math.huge
+        end
+        
         local ticksPerSecond = (self.resolution * bpm) / 60
 
         local ticksToNextEvent = nextTick - tickPos
@@ -679,18 +688,22 @@ function Song:tickPlayback(dt, noteOnHandler, noteOffHandler, tempoChangeHandler
         restart = true
     end
 
+    local lastTempoEvent = nil
     while self.tempoChangeIndex <= #self.tempoEvents do
         local tempoEvent = self.tempoEvents[self.tempoChangeIndex]
         if tempoEvent.time > self.playbackTickCurr then
             break
         end
-        if tempoEvent.time > self.playbackTickPrev and tempoEvent.time <= self.playbackTickCurr then
-            if tempoChangeHandler then
-                tempoChangeHandler(tempoEvent.bpm)
-            end
-            self.currentBPM = tempoEvent.bpm
+        if tempoEvent.time >= self.playbackTickPrev then
+            lastTempoEvent = tempoEvent
         end
         self.tempoChangeIndex = self.tempoChangeIndex + 1
+    end
+    if lastTempoEvent then
+        if tempoChangeHandler then
+            tempoChangeHandler(lastTempoEvent.bpm)
+        end
+        self.currentBPM = lastTempoEvent.bpm
     end
 
     local noteEvents = self.notes

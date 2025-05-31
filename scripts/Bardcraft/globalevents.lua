@@ -234,10 +234,6 @@ return {
             local record = Data.MusicBoxes[object.recordId]
             local spawnChance = record and record.spawnChance or 0.5
 
-            -- print("Hash input: " .. hashInput)
-            -- print("Random value: " .. randomValue)
-            -- print("Spawn chance: " .. spawnChance)
-
             if randomValue > spawnChance then
                 object:remove()
             end

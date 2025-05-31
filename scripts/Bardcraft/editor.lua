@@ -2146,26 +2146,6 @@ local function exportSong()
     end
 end
 
---[[local function setTextBoxesEnabledInLayout(layout, enabled)
-    print("Recursing on: " .. ((layout.type and ("type: " .. layout.type) or "") .. (layout.name and (" name: " .. layout.name) or "")))
-    for _, box in ipairs(layout.content) do
-        if box.template == I.MWUI.templates.textEditLine or box.type == ui.TYPE.TextEdit then
-            box.props.readOnly = not enabled
-            box.props.textColor = enabled and util.color.rgb(1, 1, 1) or util.color.rgb(0.5, 0.5, 0.5)
-        elseif box.content then
-            setTextBoxesEnabledInLayout(box, enabled)
-        end
-    end
-end
-
-local function setTextBoxesEnabled(enabled)
-    local manager = wrapperElement.layout.content[1].content[2].content.mainContent.content[2]
-    if manager then
-        setTextBoxesEnabledInLayout(manager, enabled)
-        wrapperElement:update()
-    end
-end]]
-
 local function updateSongManager()
     setMainContent(getSongTab())
 end
@@ -4513,21 +4493,6 @@ function Editor:onUINil()
     end
 end
 
-local cacheCoroutine = nil
-local cacheTicker = 0
-
-local function cacheAllSoundsCoroutine()
-    local profiles = Song.getInstrumentProfiles()
-    for _, profile in pairs(profiles) do
-        for j = 0, 127 do
-            local filePath = 'sound\\Bardcraft\\samples\\' .. profile.name .. '\\' .. profile.name .. '_' .. Song.noteNumberToName(j) .. '.wav'
-            ambient.playSoundFile(filePath, { volume = 0 })
-            print("Caching sound file: " .. filePath)
-            coroutine.yield()
-        end
-    end
-end
-
 function Editor:onFrame()
     alreadyRedrewThisFrame = false
     if self.deletePartConfirmTimer > 0 then
@@ -4538,17 +4503,6 @@ function Editor:onFrame()
     end
     if self.active and playback and self.state == self.STATE.SONG then
         tickPlayback(core.getRealFrameDuration())
-    end
-    if cacheCoroutine and coroutine.status(cacheCoroutine) ~= 'dead' then
-        cacheTicker = cacheTicker + core.getRealFrameDuration()
-        if cacheTicker > 0.1 then
-            local status, err = coroutine.resume(cacheCoroutine)
-            if not status then
-                print("Error in cache coroutine: " .. err)
-                cacheCoroutine = nil
-            end
-            cacheTicker = 0
-        end
     end
 end
 
@@ -4588,7 +4542,6 @@ function Editor:onMouseWheel(vertical, horizontal)
 end
 
 function Editor:init()
-    --cacheCoroutine = coroutine.create(cacheAllSoundsCoroutine)
     self.state = self.STATE.PERFORMANCE
     self.song = nil
     self.noteMap = nil

@@ -1,5 +1,4 @@
 local types = require('openmw.types')
-local storage = require('openmw.storage')
 
 local Song = require('scripts.Bardcraft.util.song').Song
 local Data = require('scripts.Bardcraft.data')

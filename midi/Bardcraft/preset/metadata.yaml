@@ -234,7 +234,7 @@ midiData:
     difficulty: intermediate
   ahemmusa.mid:
     title: Ahemmusan Lament
-    description: A contemplative elegy of the Ahemmusa tribe of Azura's Coast, often played in remembrance of lost loved ones.
+    description: A powerful elegy of the Ahemmusa tribe of Azura's Coast, often played in remembrance of lost loved ones.
     loopBars:
       - 0
       - 32

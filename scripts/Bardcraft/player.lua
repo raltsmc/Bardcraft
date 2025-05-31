@@ -877,9 +877,11 @@ return {
             ui.showMessage(message:gsub('%%{songTitle}', data.songTitle):gsub('%%{partTitle}', data.partTitle):gsub('%%{confidence}', string.format('%.2f', data.newConfidence * 100)))
         end,
         BC_PracticeEfficiency = function(data)
-            if configGlobal.options.bEnablePracticeEfficiency ~= true then return end
-            local message = l10n('UI_Msg_PracticeEfficiency'):gsub('%%{efficiency}', string.format('%d', data.efficiency * 100))
-            ui.showMessage(message)
+            if configGlobal.options.bEnablePracticeEfficiency == true then
+                local message = l10n('UI_Msg_PracticeEfficiency'):gsub('%%{efficiency}', string.format('%d', data.efficiency * 100))
+                ui.showMessage(message)
+            end
+            setPerformerInfo()
         end,
         BC_PerformerInfo = function(data)
             performersInfo[data.actor.id] = data.stats

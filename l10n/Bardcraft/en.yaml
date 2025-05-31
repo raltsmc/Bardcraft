@@ -86,6 +86,8 @@ UI_EditorControls_Text: |
   - Space:      Playback
   - Ctrl + Space:      Playback from start
 
+UI_PracticeEfficiency: "Current practice efficiency: %{efficiency}%"
+
 UI_MusicBox: "Music Box"
 UI_MusicBox_TogglePlaying: "Toggle Playing"
 UI_MusicBox_PickUp: "Pick Up"

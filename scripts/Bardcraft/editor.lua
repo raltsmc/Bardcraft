@@ -30,6 +30,7 @@ local Instruments = require('scripts.Bardcraft.instruments').Instruments
 local Data = require('scripts.Bardcraft.data')
 
 local configPlayer = require('scripts.Bardcraft.config.player')
+local configGlobal = require('scripts.Bardcraft.config.global')
 
 local Editor = {}
 
@@ -3414,7 +3415,7 @@ getPerformanceTab = function()
     end
     local scrollableParts = uiTemplates.scrollable(util.vector2(scrollableWidth, scrollableHeight), scrollablePartsContent, util.vector2(0, itemHeight * #scrollablePartsContent + 4))
 
-    local selectedSongInfoTitle, selectedSongInfoDescription, selectedSongPerformButtons = {}, {}, {}
+    local selectedSongInfoTitle, selectedSongInfoDescription, selectedSongPerformButtons, practiceEfficiency = {}, {}, {}, {}
     if Editor.performanceSelectedSong then
         selectedSongInfoTitle = {
             type = ui.TYPE.Flex,
@@ -3494,6 +3495,16 @@ getPerformanceTab = function()
                 end),
             }
         }
+        practiceEfficiency = configGlobal.options.bEnablePracticeEfficiency and {
+            template = I.MWUI.templates.textNormal,
+            props = {
+                text = l10n('UI_PracticeEfficiency'):gsub('%%{efficiency}', tostring(util.round((Editor.performersInfo[self.id] and Editor.performersInfo[self.id].practiceEfficiency or 0)* 100))),
+                align = ui.ALIGNMENT.Center,
+                relativePosition = util.vector2(0.5, 1),
+                anchor = util.vector2(0.5, 1),
+                position = util.vector2(0, -64),
+            }
+        } or {}
     end
 
     table.insert(flexContent, {
@@ -3544,6 +3555,7 @@ getPerformanceTab = function()
         }
     })
     table.insert(performance.content[1].content, selectedSongPerformButtons)
+    table.insert(performance.content[1].content, practiceEfficiency)
     return performance
 end
 

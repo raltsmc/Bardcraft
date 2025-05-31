@@ -49,7 +49,7 @@ local instrumentProfiles = {
         transpose = true,
         polyphonic = false,
         densityMod = 0.9,
-        volume = 1.25,
+        volume = 1.5,
     },
     [4] = {
         name = "Fiddle",

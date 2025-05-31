@@ -383,9 +383,7 @@ local function tickPerformance(dt)
         local actors = partToPerformer[part]
         if not actors then return end
         for _, actor in ipairs(actors) do
-            local v = velocity
-            if actor.type == types.Player then v = v / 2 end
-            actor:sendEvent('BO_ConductorEvent', { type = 'NoteEvent', time = performance.time, note = note, id = id, filePath = filePath, velocity = v })
+            actor:sendEvent('BO_ConductorEvent', { type = 'NoteEvent', time = performance.time, note = note, id = id, filePath = filePath, velocity = velocity })
         end
     end,
     function(filePath, instrument, note, part, id)
@@ -394,6 +392,11 @@ local function tickPerformance(dt)
         if not actors then return end
         for _, actor in ipairs(actors) do
             actor:sendEvent('BO_ConductorEvent', { type = 'NoteEndEvent', note = note, id = id, filePath = filePath, stopSound = profile.sustain })
+        end
+    end,
+    function(bpm)
+        for _, performerData in ipairs(performers) do
+            performerData.actor:sendEvent('BO_ConductorEvent', { type = 'TempoEvent', bpm = bpm })
         end
     end) then
         stop()

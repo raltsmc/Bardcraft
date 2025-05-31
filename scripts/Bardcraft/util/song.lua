@@ -40,7 +40,7 @@ local instrumentProfiles = {
         transpose = true,
         polyphonic = false,
         densityMod = 1.2,
-        volume = 1.5,
+        volume = 1,
     },
     [3] = {
         name = "Ocarina",
@@ -49,7 +49,7 @@ local instrumentProfiles = {
         transpose = true,
         polyphonic = false,
         densityMod = 0.9,
-        volume = 1.5,
+        volume = 1.25,
     },
     [4] = {
         name = "Fiddle",
@@ -206,6 +206,8 @@ Song.PerformanceType = {
 Song.playbackTickPrev = 0
 Song.playbackTickCurr = 0
 Song.playbackNoteIndex = 1
+Song.tempoChangeIndex = 1
+Song.currentBPM = Song.tempo
 Song.loopCount = 0
 
 function Song.new(title, desc, tempo, timeSig)
@@ -213,6 +215,7 @@ function Song.new(title, desc, tempo, timeSig)
     self.title = title or l10n('UI_Song_NewSong')
     self.desc = desc or l10n('UI_Song_NoDescription')
     self.tempo = tempo or 120
+    self.tempoEvents = {}
     self.scale = {
         root = 1,
         mode = 1,
@@ -404,6 +407,7 @@ function Song.fromMidiParser(parser, metadata)
     self.tempoMod = (metadata and metadata.tempoMod) or 1
     self.texture = (metadata and metadata.texture) or "generic"
     self.difficulty = (metadata and metadata.difficulty) or "custom"
+    self.tempoEvents = parser:getTempoEvents()
     self.notes = self:noteMapToNoteEvents(self:noteEventsToNoteMap(self.notes))
     return self
 end
@@ -427,6 +431,8 @@ function Song:resetPlayback()
     self.playbackTickPrev = 0
     self.playbackTickCurr = 0
     self.playbackNoteIndex = 1
+    self.tempoChangeIndex = 1
+    self.currentBPM = self.tempo
     self.loopCount = self.loopTimes
     restart = false
 end
@@ -496,13 +502,111 @@ function Song:removePart(index)
 end
 
 function Song:secondsToTicks(seconds)
-    local ticksPerSecond = (self.resolution * self.tempo) / 60
-    return seconds * ticksPerSecond
+    -- Converts seconds to ticks, accounting for variable tempo
+    if not self.tempoEvents or #self.tempoEvents == 0 then
+        local ticksPerSecond = (self.resolution * self.tempo) / 60
+        return seconds * ticksPerSecond
+    end
+
+    local ticks = 0
+    local timePassed = 0
+    local events = self.tempoEvents
+    local i = 1
+
+    while i <= #events do
+        local bpm = events[i].bpm
+        local nextTick = (events[i + 1] and events[i + 1].time) or math.huge
+        local ticksPerSecond = (self.resolution * bpm) / 60
+        local ticksInSegment = nextTick - events[i].time
+        local secondsInSegment = ticksInSegment / ticksPerSecond
+
+        if timePassed + secondsInSegment >= seconds then
+            -- Only need part of this segment
+            local remaining = seconds - timePassed
+            ticks = ticks + remaining * ticksPerSecond
+            break
+        else
+            ticks = ticks + ticksInSegment
+            timePassed = timePassed + secondsInSegment
+        end
+        i = i + 1
+    end
+
+    return ticks
+end
+
+function Song:dtToTicks(start, dt)
+    -- Returns the number of ticks that would elapse over dt seconds, starting at tick 'start',
+    -- accounting for tempo changes that may occur during the interval.
+    if not self.tempoEvents or #self.tempoEvents == 0 then
+        local ticksPerSecond = (self.resolution * self.tempo) / 60
+        return dt * ticksPerSecond
+    end
+
+    local ticks = 0
+    local timePassed = 0
+    local events = self.tempoEvents
+    local i = 1
+
+    -- Find the first tempo event at or before 'start'
+    while i <= #events and events[i].time <= start do
+        i = i + 1
+    end
+    i = i - 1
+    if i < 1 then i = 1 end
+
+    local tickPos = start
+    while timePassed < dt do
+        local bpm = events[i].bpm
+        local nextTick = (events[i + 1] and events[i + 1].time) or math.huge
+        local ticksPerSecond = (self.resolution * bpm) / 60
+
+        local ticksToNextEvent = nextTick - tickPos
+        local secondsToNextEvent = ticksToNextEvent / ticksPerSecond
+        local remainingDt = dt - timePassed
+
+        if secondsToNextEvent >= remainingDt then
+            -- All remaining dt fits in this tempo segment
+            ticks = ticks + remainingDt * ticksPerSecond
+            break
+        else
+            -- Only part of dt fits before next tempo event
+            ticks = ticks + ticksToNextEvent
+            timePassed = timePassed + secondsToNextEvent
+            tickPos = nextTick
+            i = i + 1
+            if not events[i] then break end
+        end
+    end
+
+    return ticks
 end
 
 function Song:ticksToSeconds(ticks)
-    local ticksPerSecond = (self.resolution * self.tempo) / 60
-    return ticks / ticksPerSecond
+    -- Converts ticks to seconds, accounting for variable tempo
+    if not self.tempoEvents or #self.tempoEvents == 0 then
+        local ticksPerSecond = (self.resolution * self.tempo) / 60
+        return ticks / ticksPerSecond
+    end
+
+    local seconds = 0
+    local tickPassed = 0
+    local events = self.tempoEvents
+    local i = 1
+
+    while i <= #events do
+        local bpm = events[i].bpm
+        local nextTick = (events[i + 1] and events[i + 1].time) or math.huge
+        local ticksInSegment = math.min(ticks - tickPassed, nextTick - events[i].time)
+        if ticksInSegment <= 0 then break end
+        local ticksPerSecond = (self.resolution * bpm) / 60
+        seconds = seconds + (ticksInSegment / ticksPerSecond)
+        tickPassed = tickPassed + ticksInSegment
+        if tickPassed >= ticks then break end
+        i = i + 1
+    end
+
+    return seconds
 end
 
 function Song:tickToBeat(tick)
@@ -545,9 +649,11 @@ function Song.noteNumberToName(noteNumber)
     return noteName .. octave
 end
 
-function Song:tickPlayback(dt, noteOnHandler, noteOffHandler)
+function Song:tickPlayback(dt, noteOnHandler, noteOffHandler, tempoChangeHandler)
     self.playbackTickPrev = self.playbackTickCurr
-    self.playbackTickCurr = self.playbackTickCurr + self:secondsToTicks(dt)
+    local bpm = self.currentBPM or self.tempo
+    local ticksPerSecond = (self.resolution * bpm) / 60
+    self.playbackTickCurr = self.playbackTickCurr + dt * ticksPerSecond
 
     local bars = self.lengthBars
     local lengthInTicks = self:barToTick(bars)
@@ -559,8 +665,10 @@ function Song:tickPlayback(dt, noteOnHandler, noteOffHandler)
             self.loopCount = self.loopCount - 1
             local loopStart = self.loopBars[1] * self.resolution * 4 * (self.timeSig[1] / self.timeSig[2])
             self.playbackNoteIndex = 1
+            self.tempoChangeIndex = 1
             self.playbackTickCurr = loopStart
             self.playbackTickPrev = self.playbackTickCurr
+            self.currentBPM = self.tempo
             return true
         else
             return false
@@ -569,6 +677,20 @@ function Song:tickPlayback(dt, noteOnHandler, noteOffHandler)
 
     if (self.playbackTickCurr > loopEnd and self.loopCount > 0) or self.playbackTickCurr > lengthInTicks then
         restart = true
+    end
+
+    while self.tempoChangeIndex <= #self.tempoEvents do
+        local tempoEvent = self.tempoEvents[self.tempoChangeIndex]
+        if tempoEvent.time > self.playbackTickCurr then
+            break
+        end
+        if tempoEvent.time > self.playbackTickPrev and tempoEvent.time <= self.playbackTickCurr then
+            if tempoChangeHandler then
+                tempoChangeHandler(tempoEvent.bpm)
+            end
+            self.currentBPM = tempoEvent.bpm
+        end
+        self.tempoChangeIndex = self.tempoChangeIndex + 1
     end
 
     local noteEvents = self.notes

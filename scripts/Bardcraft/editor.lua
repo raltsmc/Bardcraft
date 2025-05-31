@@ -1413,12 +1413,37 @@ uiTemplates = {
     logDisplaySmall = function(log, itemHeight, onClick)
         -- Determine venue name (cell)
         local venue = log.cell or l10n('UI_PerfLog_UnknownVenue')
+        if log.type == Song.PerformanceType.Street then
+            venue = l10n('UI_PerfLog_StreetsOf'):gsub('%%{city}', venue)
+        end
         -- Calculate total gold gained
         local gold = (log.payment or 0) + (log.tips or 0)
         -- Format gold string
         local goldStr = l10n('UI_PerfLog_Gold'):gsub('%%{amount}', tostring(gold))
         -- Optionally, color gold text based on amount
         local goldColor = gold > 0 and Editor.uiColors.DEFAULT or Editor.uiColors.GRAY
+
+        local qualityString
+        if log.quality == 100 then
+            qualityString = 'Perfect'
+        elseif log.quality >= 95 then
+            qualityString = 'Excellent'
+        elseif log.quality >= 85 then
+            qualityString = 'Great'
+        elseif log.quality >= 70 then
+            qualityString = 'Good'
+        elseif log.quality >= 40 then
+            qualityString = 'Mediocre'
+        elseif log.quality >= 15 then
+            qualityString = 'Bad'
+        else
+            qualityString = 'Terrible'
+        end
+        
+        local starsTexture = ui.texture {
+            path = 'textures/Bardcraft/ui/stars-' .. qualityString .. '.dds',
+            size = util.vector2(500, 96),
+        }
 
         return {
             template = I.MWUI.templates.borders,
@@ -1441,15 +1466,31 @@ uiTemplates = {
                     },
                 },
                 {
-                    template = I.MWUI.templates.textNormal,
+                    type = ui.TYPE.Flex,
                     props = {
-                        text = goldStr,
-                        textColor = goldColor,
-                        anchor = util.vector2(1, 0.5),
-                        relativePosition = util.vector2(1, 0.5),
-                        position = util.vector2(-8, 0),
-                        size = util.vector2(0, itemHeight),
+                        horizontal = true,
+                        autoSize = false,
+                        relativeSize = util.vector2(1, 1),
+                        align = ui.ALIGNMENT.End,
+                        arrange = ui.ALIGNMENT.Center,
                     },
+                    content = ui.content {
+                        {
+                            template = I.MWUI.templates.textNormal,
+                            props = {
+                                text = goldStr .. ' | ',
+                                textColor = goldColor,
+                            },
+                        },
+                        {
+                            type = ui.TYPE.Image,
+                            props = {
+                                resource = starsTexture,
+                                size = util.vector2(itemHeight / 2 * (500/96), itemHeight / 2),
+                            }
+                        },
+                        createPaddingTemplate(4)
+                    }
                 },
             },
             events = {
@@ -2066,6 +2107,13 @@ local function setMainContent(content)
         mainContent[2] = content
         wrapperElement:update()
     end
+end
+
+local function getMainContent()
+    if wrapperElement then
+        return wrapperElement.layout.content[1].content[2].content.mainContent.content[2]
+    end
+    return nil
 end
 
 local function importSong()
@@ -3115,6 +3163,8 @@ getSongTab = function()
     return manager
 end
 
+local scrollableSong = nil
+
 getPerformanceTab = function()
     local performance = auxUi.deepLayoutCopy(uiTemplates.baseTab)
     local flexContent = performance.content[1].content[1].content
@@ -3175,7 +3225,13 @@ getPerformanceTab = function()
             end))
         end
     end
-    local scrollableSong = uiTemplates.scrollable(util.vector2(scrollableWidth, scrollableHeight), scrollableSongContent, util.vector2(0, itemHeight * #scrollableSongContent + 4))
+
+    local oldScrollableSongY = 0
+    if scrollableSong and scrollableSong.layout and scrollableSong.layout.content[1] and scrollableSong.layout.content[1].props then
+        oldScrollableSongY = scrollableSong.layout.content[1].props.position.y
+    end
+    scrollableSong = uiTemplates.scrollable(util.vector2(scrollableWidth, scrollableHeight), scrollableSongContent, util.vector2(0, itemHeight * #scrollableSongContent + 4))
+    scrollableSong.layout.content[1].props.position = util.vector2(0, oldScrollableSongY)
 
     local scrollablePerformersContent = ui.content{}
     if doPerformers then
@@ -3548,18 +3604,18 @@ getStatsTab = function()
     end
 
     -- Helper for Labeled Text
-    local function createLabeledText(label, value, valueColor)
+    local function createLabeledText(label, value, textSize)
         return {
             type = ui.TYPE.Flex,
             props = {
                 horizontal = true,
                 autoSize = false,
                 relativeSize = util.vector2(1, 0),
-                size = util.vector2(0, 20), -- Fixed height for each label-value pair
+                size = util.vector2(0, textSize + 4), -- Fixed height for each label-value pair
             },
             content = ui.content {
-                { template = I.MWUI.templates.textNormal, props = { text = label .. ": ", textColor = Editor.uiColors.DEFAULT_LIGHT, textAlignV = ui.ALIGNMENT.Center } },
-                { template = I.MWUI.templates.textNormal, props = { text = tostring(value), textColor = valueColor or Editor.uiColors.DEFAULT, textAlignV = ui.ALIGNMENT.Center }, external = { grow = 1 } }
+                { template = I.MWUI.templates.textNormal, props = { text = label .. ": ", textSize = textSize, textColor = Editor.uiColors.DEFAULT_LIGHT, textAlignV = ui.ALIGNMENT.Center } },
+                { template = I.MWUI.templates.textNormal, props = { text = tostring(value), textSize = textSize, textColor = Editor.uiColors.DEFAULT, textAlignV = ui.ALIGNMENT.Center }, external = { grow = 1 } }
             }
         }
     end
@@ -3567,29 +3623,30 @@ getStatsTab = function()
     -- Left Section Content
     local leftSectionContent = ui.content {
         createPaddingTemplate(4),
-        createLabeledText(l10n('UI_Stats_Reputation'), reputation),
+        createLabeledText(l10n('UI_Stats_Reputation'), reputation, 24),
         createPaddingTemplate(8),
-        { template = I.MWUI.templates.textHeader, props = { text = l10n('UI_Stats_Performances') } },
-        createLabeledText("  " .. l10n('UI_Stats_Overall'), performanceCounts.overall),
-        createLabeledText("  " .. l10n('UI_Type_Tavern'), performanceCounts[Song.PerformanceType.Tavern]),
-        createLabeledText("  " .. l10n('UI_Type_Street'), performanceCounts[Song.PerformanceType.Street]),
+        { template = I.MWUI.templates.textHeader, props = { text = l10n('UI_Stats_Performances'), textSize = 24, } },
+        createLabeledText("  " .. l10n('UI_Stats_Overall'), performanceCounts.overall, 20),
+        createLabeledText("  " .. l10n('UI_Stats_Tavern'), performanceCounts[Song.PerformanceType.Tavern], 20),
+        createLabeledText("  " .. l10n('UI_Stats_Street'), performanceCounts[Song.PerformanceType.Street], 20),
         createPaddingTemplate(8),
-        { template = I.MWUI.templates.textHeader, props = { text = l10n('UI_Stats_GoldEarned') } },
-        createLabeledText("  " .. l10n('UI_Stats_Overall'), goldEarned.overall .. " " .. l10n('UI_Gold')),
-        createLabeledText("  " .. l10n('UI_Type_Tavern'), goldEarned.tavern .. " " .. l10n('UI_Gold')),
-        createLabeledText("  " .. l10n('UI_Type_Street'), goldEarned.street .. " " .. l10n('UI_Gold')),
+        { template = I.MWUI.templates.textHeader, props = { text = l10n('UI_Stats_GoldEarned'), textSize = 24, } },
+        createLabeledText("  " .. l10n('UI_Stats_Overall'), l10n('UI_Stats_Gold'):gsub('%%{amount}', tostring(goldEarned.overall)), 20),
+        createLabeledText("  " .. l10n('UI_Stats_Tavern'), l10n('UI_Stats_Gold'):gsub('%%{amount}', tostring(goldEarned.tavern)), 20),
+        createLabeledText("  " .. l10n('UI_Stats_Street'), l10n('UI_Stats_Gold'):gsub('%%{amount}', tostring(goldEarned.street)), 20),
         createPaddingTemplate(4),
     }
 
     -- Right Section - Scrollable Logs
     local scrollableLogContent = ui.content {}
-    local itemHeight = 20 -- Height of each log entry in the scrollable list
-    for _, log in ipairs(sortedPerformanceLogs) do
+    local itemHeight = 48 -- Height of each log entry in the scrollable list
+    for i, log in ipairs(sortedPerformanceLogs) do
+        if i > 50 then break end
         scrollableLogContent:add(uiTemplates.logDisplaySmall(log, itemHeight))
     end
 
-    local scrollableWidth = calcContentWidth() * 0.5 - 24
-    local scrollableHeight = calcContentHeight() - 128 - 32
+    local scrollableWidth = calcContentWidth() - 360 - 48
+    local scrollableHeight = calcContentHeight() - 128 - 40
 
     -- The scrollable widget for the right panel.
     -- Viewport width will be determined by parent flex, height is relative to parent flex.
@@ -3606,7 +3663,7 @@ getStatsTab = function()
             horizontal = true,
             autoSize = false,
             relativeSize = util.vector2(1, 1), -- Fill available space below XP bar
-            size = util.vector2(-32, -32),
+            size = util.vector2(-32, -40),
         },
         content = ui.content {
             { -- Left Panel (Info)
@@ -3614,9 +3671,10 @@ getStatsTab = function()
                 props = {
                     autoSize = false,
                     relativeSize = util.vector2(0, 1), -- 40% width, full available height
+                    size = util.vector2(360, 0),
                     arrange = ui.ALIGNMENT.Start, -- Vertical arrangement from top
                 },
-                external = { grow = 1, stretch = 1 },
+                external = { stretch = 1 },
                 content = leftSectionContent,
             },
             { -- Spacer
@@ -3799,8 +3857,9 @@ function Editor:showPerformanceLog(log)
         log.cellBlurb = cellBlurb
     end
 
+    local cell = log.cell
     if log.type == Song.PerformanceType.Street then
-        log.cell = l10n('UI_PerfLog_StreetsOf'):gsub('%%{city}', log.cell)
+        cell = l10n('UI_PerfLog_StreetsOf'):gsub('%%{city}', cell)
     end
 
     wrapperElement = ui.create {
@@ -3862,7 +3921,7 @@ function Editor:showPerformanceLog(log)
                             {
                                 template = createPaddingTemplate(4 * scaleMod),
                             },
-                            textWithLabel(l10n('UI_PerfLog_Venue'), log.cell),
+                            textWithLabel(l10n('UI_PerfLog_Venue'), cell),
                             {
                                 template = createPaddingTemplate(4 * scaleMod),
                             },

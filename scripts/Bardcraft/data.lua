@@ -305,6 +305,7 @@ local SONG_IDS = {
     [0x20000] = "int1.mid",
     [0x20001] = "int2.mid",
     [0x20002] = "int3.mid",
+    [0x20003] = "int4.mid",
     [0x20100] = "greensleeves.mid",
     [0x20101] = "imp1.mid",
     [0x20102] = "reddiamond.mid",
@@ -337,6 +338,7 @@ local SONG_POOLS = {
         0x20000, -- int1.mid
         0x20001, -- int2.mid
         0x20002, -- int3.mid
+        0x20003, -- int4.mid
         0x20100, -- greensleeves.mid
         0x20101, -- imp1.mid
         0x20102, -- reddiamond.mid

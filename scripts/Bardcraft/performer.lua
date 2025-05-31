@@ -518,6 +518,16 @@ function P.handleStopEvent(data)
     P.currentPart = nil
 end
 
+function P.handleTempoEvent(data)
+    if not P.playing then return end
+    if data.bpm then
+        P.bpm = data.bpm * P.currentSong.tempoMod
+        if P.hasAnim() then
+            anim.setSpeed(omwself, instrumentData[P.instrument].anim, getBpmConstant())
+        end
+    end
+end
+
 function P.getNoteAccuracy()
     local density = P.currentDensity
 
@@ -582,6 +592,8 @@ function P.handleConductorEvent(data)
         P.handlePerformEvent(data)
     elseif data.type == 'PerformStop' and P.playing then
         P.handleStopEvent(data)
+    elseif data.type == 'TempoEvent' and P.playing then
+        P.handleTempoEvent(data)
     elseif data.type == 'NoteEvent' then
         success = P.handleNoteEvent(data)
     elseif data.type == 'NoteEndEvent' and data.stopSound then

@@ -151,6 +151,22 @@ midiData:
     tempoMod: 0.5
     texture: temple1
     difficulty: intermediate
+  int4.mid:
+    title: Snow over Northmoor
+    description: A festive Breton jig from the Northmoor region, its brisk melody is a traditional herald of the first winter snows, often heard warming the hearths of High Rock taverns.
+    scale:
+      root: F
+      mode: Minor
+    loopBars:
+      - 0.166666666666666
+      - 49.166666666666666
+    loopCount: 0
+    tempoMod: 0.5
+    texture: wayrest
+    difficulty: intermediate
+    partOverrides:
+      Lute: Lute (Easy)
+      Lute 2: Lute (Adv.)
   greensleeves.mid:
     title: Greensleeves
     description: A traditional folk melody of uncertain origin, a staple in taverns throughout the provinces of the Empire.

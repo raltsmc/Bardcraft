@@ -192,7 +192,8 @@ end
 
 local function populatePerformOverlayNotes()
     local windowXOffset = performOverlayTick * performOverlayScaleX - performOverlayScaleX
-    local windowXSize = ui.screenSize().x + practiceSong:secondsToTicks(performOverlayRepopulateTimeWindow) * performOverlayScaleX
+    local tickDiff = practiceSong:dtToTicks(performOverlayTick, performOverlayRepopulateTimeWindow)
+    local windowXSize = ui.screenSize().x + tickDiff * performOverlayScaleX
     local content = ui.content {}
     performOverlayNoteIndexToContentId = {}
 
@@ -552,6 +553,7 @@ return {
                     currentCell = self.cell
 
                     core.sendGlobalEvent('BC_RecheckCell', { player = self, })
+                    core.sendGlobalEvent('BC_RecheckTroupe', { player = self, })
 
                     local banEndTime = Performer.stats.bannedVenues[currentCell.name]
                     if banEndTime and core.getGameTime() < banEndTime then
@@ -672,17 +674,19 @@ return {
                 for id, time in pairs(performOverlayNoteFadeTimes) do
                     if time > 0 then
                         performOverlayNoteFadeTimes[id] = math.max(time - dt, 0)
-                        local note = performOverlayNotesWrapper.layout.content[1].content[performOverlayNoteIndexToContentId[performOverlayNoteIdToIndex[id]]]
-                        if note then
-                            note.props.alpha = lerp((0.5 - performOverlayNoteFadeTimes[id]) / 0.5, performOverlayNoteFadeAlphaStart[id], 0)
-                            local startColor = performOverlayNoteSuccess[id] and Editor.uiColors.DEFAULT or Editor.uiColors.DARK_RED
-                            local endColor = performOverlayNoteSuccess[id] and Editor.uiColors.GRAY or Editor.uiColors.DARK_RED_DESAT
-                            note.props.color = lerpColor((0.5 - performOverlayNoteFadeTimes[id]) / 0.5, startColor, endColor)
-                        end
-                        if performOverlayNoteFadeTimes[id] <= 0 then
-                            performOverlayNoteFadeTimes[id] = nil
-                            performOverlayNoteFadeAlphaStart[id] = nil
-                            performOverlayNoteSuccess[id] = nil
+                        if performOverlayNoteIndexToContentId[performOverlayNoteIdToIndex[id]] then
+                            local note = performOverlayNotesWrapper.layout.content[1].content[performOverlayNoteIndexToContentId[performOverlayNoteIdToIndex[id]]]
+                            if note then
+                                note.props.alpha = lerp((0.5 - performOverlayNoteFadeTimes[id]) / 0.5, performOverlayNoteFadeAlphaStart[id], 0)
+                                local startColor = performOverlayNoteSuccess[id] and Editor.uiColors.DEFAULT or Editor.uiColors.DARK_RED
+                                local endColor = performOverlayNoteSuccess[id] and Editor.uiColors.GRAY or Editor.uiColors.DARK_RED_DESAT
+                                note.props.color = lerpColor((0.5 - performOverlayNoteFadeTimes[id]) / 0.5, startColor, endColor)
+                            end
+                            if performOverlayNoteFadeTimes[id] <= 0 then
+                                performOverlayNoteFadeTimes[id] = nil
+                                performOverlayNoteFadeAlphaStart[id] = nil
+                                performOverlayNoteSuccess[id] = nil
+                            end
                         end
                     end
                 end

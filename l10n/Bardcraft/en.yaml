@@ -65,7 +65,6 @@ UI_Title: "Bardcraft"
 UI_Tab_Performance: "Performance"
 UI_Tab_Songwriting: "Songwriting"
 UI_Tab_Stats: "Stats"
-UI_Tab_Help: "?"
 
 UI_CheckboxOn: "On"
 UI_CheckboxOff: "Off"
@@ -75,6 +74,17 @@ UI_ChooseAnOption: "Choose an option:"
 UI_Confirmation: "Confirmation"
 UI_Choice: "Choice"
 UI_StopPerforming: "Stop performing?"
+UI_EditorControls: "Editor Controls"
+UI_EditorControls_Text: |
+  - Left Click:      Place/move/resize note
+  - Left Click (near top):      Set playback position
+  - Right Click:      Remove note
+  - Middle Click + Drag:      Move view
+  - Mouse Wheel:      Scroll up/down
+  - Shift + Mouse Wheel:      Scroll left/right
+  - Ctrl + Mouse Wheel:      Zoom in/out
+  - Space:      Playback
+  - Ctrl + Space:      Playback from start
 
 UI_MusicBox: "Music Box"
 UI_MusicBox_TogglePlaying: "Toggle Playing"
@@ -330,7 +340,7 @@ UI_Msg_PerfTavern_Tip_93: "Just a bit more gold for the road, bard:\n%{amount} g
 UI_Msg_PerfTavern_Tip_94: "A patron drops a coin, then another for good measure:\n%{amount} gold"
 UI_Msg_PerfTavern_Tip_95: "A small pouch lands near you with a soft thud:\n%{amount} gold"
 
-UI_Msg_PerfTavern_Tip_Bad: "A patron threw you a few coins pitifully:\n%{amount} gold"
+UI_Msg_PerfTavern_Tip_Bad_1: "A patron threw you a few coins pitifully:\n%{amount} gold"
 UI_Msg_PerfTavern_Tip_Bad_2: "Someone reluctantly tossed you a pittance:\n%{amount} gold"
 UI_Msg_PerfTavern_Tip_Bad_3: "You scrounged up a meager tip:\n%{amount} gold"
 UI_Msg_PerfTavern_Tip_Bad_4: "A few drakes, probably out of pity:\n%{amount} gold"

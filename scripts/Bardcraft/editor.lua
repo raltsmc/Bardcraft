@@ -2602,6 +2602,87 @@ getSongTab = function()
             if num == nil or type(num) ~= "number" then return nil, rerr end
             return num, nil
         end
+
+        -- Add floating '?' help button at top right
+        table.insert(manager.content[2].content, {
+            type = ui.TYPE.Widget,
+                props = {
+                    anchor = util.vector2(1, 0),
+                    relativePosition = util.vector2(1, 0),
+                    position = util.vector2(-8, 8),
+                    size = util.vector2(28, 28),
+                },
+                content = ui.content {
+                {
+                    template = I.MWUI.templates.bordersThick,
+                    props = {
+                        size = util.vector2(28, 28),
+                        anchor = util.vector2(1, 0),
+                        relativePosition = util.vector2(1, 0),
+                    },
+                    content = ui.content {
+                        {
+                            template = I.MWUI.templates.textNormal,
+                            props = {
+                                text = "?",
+                                textSize = 16,
+                                textColor = Editor.uiColors.DEFAULT,
+                                anchor = util.vector2(0.5, 0.5),
+                                relativePosition = util.vector2(0.5, 0.5),
+                            }
+                        }
+                    },
+                    events = {
+                        mouseClick = async:callback(function()
+                            if modalElement then
+                                modalElement:destroy()
+                                modalElement = nil
+                            end
+                            modalElement = ui.create(uiTemplates.modal(
+                                {
+                                    type = ui.TYPE.Flex,
+                                    props = {
+                                        autoSize = false,
+                                        relativeSize = util.vector2(1, 1),
+                                        size = util.vector2(-32, 0),
+                                        position = util.vector2(16, 0),
+                                        arrange = ui.ALIGNMENT.Center,
+                                    },
+                                    content = ui.content {
+                                        createPaddingTemplate(8),
+                                        {
+                                            template = I.MWUI.templates.textParagraph,
+                                            props = {
+                                                text = l10n('UI_EditorControls_Text'),
+                                                textAlignH = ui.ALIGNMENT.Start,
+                                            },
+                                            external = {
+                                                grow = 1,
+                                                stretch = 1,
+                                            }
+                                        },
+                                        createPaddingTemplate(8),
+                                        uiTemplates.button(l10n('UI_Button_Close') or "Close", util.vector2(128, 32), function()
+                                            if modalElement then
+                                                modalElement:destroy()
+                                                modalElement = nil
+                                            end
+                                        end)
+                                    }
+                                },
+                                util.vector2(500, 300),
+                                l10n('UI_EditorControls')
+                            ))
+                        end)
+                    }
+                }
+            }
+        })
+
+        table.insert(manager.content[2].content, {
+            
+        })
+
         local middleBox = manager.content[2].content[1].content[2].content
 
         table.insert(middleBox, createPaddingTemplate(8))

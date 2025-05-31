@@ -19,9 +19,6 @@ local INSTRUMENT_ITEMS = {
         t_imp_drum_02 = true,
         t_imp_drum_03 = true,
         t_imp_drum_04 = true,
-        t_nor_deerskin_drum_01 = true,
-        t_orc_drum_01 = true,
-        t_rga_drum_01 = true,
     },
     Fiddle = {
         r_bc_fiddle = true, -- Bardcraft

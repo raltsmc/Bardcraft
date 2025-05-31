@@ -74,7 +74,7 @@ Recruitable Bards
 		An unusually introspective Orc who found solace in the lute after a "disagreement" with his stronghold. Speaks little, but his music is very expressive. Might occasionally grumble about how "true strength is found in accepting sorrow."
 	- Camilla of Cheydinhal (Halfway Tavern, Pelagiad)
 		Hire cost: 1500G
-		A former Imperial court performer slumming it in Morrowind after a run of bad luck. Constantly name-drops nobility no one here has heard of. Possesses considerable talent, but undersells herself.
+		A former Imperial court performer now scraping by in Morrowind after a run of bad luck. Constantly name-drops nobility no one here has heard of. Possesses considerable talent, but undersells herself.
 
 - OCARINA:
 	- Sees-Silent-Reeds (Arrille's Tradehouse, Seyda Neen)
@@ -87,12 +87,12 @@ Recruitable Bards
 - FLUTE:
 	- Sargon Assinabi (Varo Tradehouse, Vos)
 		Hire cost: 200G
-		A recenty exiled Ashlander who left his tribe with his flute as one of his few possessions, and has decided to try to find a place in settled culture. Attempting to build a life as a wandering musician, but finding settled folk have little appreciation for solo flutists.
+		A recently exiled Ashlander who left his tribe with his flute as one of his few possessions, and has decided to try to find a place in settled culture. Attempting to build a life as a wandering musician, but finding settled folk have little appreciation for solo flutists.
 
 - DRUM:
 	- Ra'jira "Quick-Paws" (Black Shalk Cornerclub, Vivec, Foreign Quarter)
 		Hire cost: 300G
-		An incredibly energetic Khajiit whose drumming is fast, complex, and infectious. Might offer to join for the thrill of new rhythms and the promise of "much coin for lively beats, yes?"
+		An incredibly energetic Khajiit whose drumming is fast, complex, and infectious. Offers to join for the thrill of new rhythms and the promise of "much coin for lively beats, yes?"
 	- Rels Llervu (Andus Tradehouse, Maar Gan)
 		Hire cost: 1000G
 		A stern House Redoran drummer who makes yearly journeys up to the Urshilaku tribe to study their traditional drumming technique. Holds no love for the Ashlanders, but views it as a preserved form of ancient Dunmer percussive tradition, and recognizes its potent martial impact.

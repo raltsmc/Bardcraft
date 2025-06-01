@@ -163,10 +163,17 @@ local function lerpColor(t, a, b)
     )
 end
 
+local function getHudSize()
+    local layerIndex = ui.layers.indexOf('HUD')
+    local layer = layerIndex and ui.layers[layerIndex]
+    if not layer then return ui.screenSize() end
+    return layer.size
+end
+
 local function initPerformOverlayNotes()
     if not performOverlayNotesWrapper then return end
 
-    local screenWidth = ui.screenSize().x
+    local screenWidth = getHudSize().x
 
     performOverlayNoteLayouts = {}
     local i = 1
@@ -193,7 +200,7 @@ end
 local function populatePerformOverlayNotes()
     local windowXOffset = performOverlayTick * performOverlayScaleX - performOverlayScaleX
     local tickDiff = practiceSong:dtToTicks(performOverlayTick, performOverlayRepopulateTimeWindow)
-    local windowXSize = ui.screenSize().x + tickDiff * performOverlayScaleX
+    local windowXSize = getHudSize().x + tickDiff * performOverlayScaleX
     local content = ui.content {}
     performOverlayNoteIndexToContentId = {}
 
@@ -243,7 +250,7 @@ local function createPerformOverlay()
                 type = ui.TYPE.Image,
                 props = {
                     resource = ui.texture { path = 'textures/bardcraft/ui/practice-overlay-line.dds' },
-                    position = util.vector2(practiceSong:barToTick(practiceSong.loopBars[2]) * performOverlayScaleX + ui.screenSize().x / 2, 0),
+                    position = util.vector2(practiceSong:barToTick(practiceSong.loopBars[2]) * performOverlayScaleX + getHudSize().x / 2, 0),
                     size = util.vector2(8, 256),
                     color = Editor.uiColors.CYAN,
                 },
@@ -688,6 +695,8 @@ return {
                     table.insert(Performer.stats.performanceLogs, log)
                 end
                 ui.showMessage('DEBUG: Populated 25 dummy logs')
+            elseif string.lower(tokens[1]) == 'luabcreparse' then
+                core.sendGlobalEvent('BC_ParseMidis', { force = true })
             end
         end,
         onMouseWheel = function(v, h)

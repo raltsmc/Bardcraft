@@ -173,7 +173,11 @@ return {
             if not data then return end
             data.item:remove(data.count)
         end,
-        BC_ParseMidis = function()
+        BC_ParseMidis = function(data)
+            if data and data.force then
+                local bardData = storage.globalSection('Bardcraft')
+                bardData:set('songs/preset', nil) -- Clear the old data
+            end
             parseAllPreset()
         end,
         BC_Trespass = function(data)

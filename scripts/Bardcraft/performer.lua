@@ -522,6 +522,9 @@ function P.handleTempoEvent(data)
     if not P.playing then return end
     if data.bpm then
         P.bpm = data.bpm * P.currentSong.tempoMod
+        if P.currentSong.timeSig[1] % 3 == 0 and P.currentSong.timeSig[1] > 3 then
+            P.bpm = P.bpm * 4 / 3
+        end
         if P.hasAnim() then
             anim.setSpeed(omwself, instrumentData[P.instrument].anim, getBpmConstant())
         end

@@ -345,7 +345,9 @@ local function getNoteVolume()
 end
 
 local function playNoteSound(note)
-    ambient.playSoundFile(getNoteSoundPath(note), { volume = getNoteVolume() })
+    local path = getNoteSoundPath(note)
+    ambient.playSoundFile(path, { volume = getNoteVolume() })
+    return path
 end
 
 local function stopNoteSound(note)
@@ -1587,10 +1589,6 @@ uiTemplates = {
                 mouseMove = async:callback(function(e)
                     if e.button == 1 and Editor.activePart then
                         local noteIndex = math.floor((128 - (e.offset.y / 16)))
-                        --[[local octave = math.floor(noteIndex / 12) - 1
-                        local noteNames = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
-                        local noteName = noteNames[(noteIndex % 12) + 1]
-                        local fileName = 'sound\\Bardcraft\\samples\\Lute\\Lute_' .. noteName .. octave .. '.wav']]
                         local fileName = getNoteSoundPath(noteIndex)
                         if playingNoteSound ~= fileName then
                             ambient.playSoundFile(fileName, { volume = getNoteVolume()})
@@ -1604,10 +1602,6 @@ uiTemplates = {
                 mousePress = async:callback(function(e)
                     if e.button == 1 and Editor.activePart then
                         local noteIndex = math.floor((128 - (e.offset.y / 16)))
-                        --[[local octave = math.floor(noteIndex / 12) - 1
-                        local noteNames = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
-                        local noteName = noteNames[(noteIndex % 12) + 1]
-                        local fileName = 'sound\\Bardcraft\\samples\\Lute\\Lute_' .. noteName .. octave .. '.wav']]
                         local fileName = getNoteSoundPath(noteIndex)
                         ambient.playSoundFile(fileName, { volume = getNoteVolume() })
                         playingNoteSound = fileName
@@ -2022,7 +2016,7 @@ uiTemplates = {
 
 local function populateNotes()
     if not pianoRoll.editorWrapper then return end
-    pianoRoll.editorWrapper.layout.content[1].content[3].content = ui.content{}
+    local unsorted = {}
     for _, noteData in pairs(Editor.noteMap) do
         local active = not Editor.activePart or (noteData.part == Editor.activePart.index)
         local id = noteData.id
@@ -2039,8 +2033,16 @@ local function populateNotes()
             local template = uiTemplates.pianoRollNote(id, note, tick, duration, active)
             template.props.alpha = active and 1 or 0.2
             template.props.active = active
-            pianoRoll.editorWrapper.layout.content[1].content[3].content:add(template)
+            table.insert(unsorted, template)
         end
+        -- Sort so that all the active notes are at the end
+        table.sort(unsorted, function(a, b)
+            if a.props.active == b.props.active then
+                return false
+            end
+            return not a.props.active and b.props.active
+        end)
+        pianoRoll.editorWrapper.layout.content[1].content[3].content = ui.content(unsorted)
         --pianoRoll.editorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration))
     end
     pianoRoll.editorWrapper:update()
@@ -3167,8 +3169,7 @@ getSongTab = function()
                         if pianoRoll.dragType == DragType.MOVE then
                             noteData.time = util.clamp(tick, 1, math.huge)
                             if note ~= noteData.note then
-                                playNoteSound(note)
-                                playingNoteSound = note
+                                playingNoteSound = playNoteSound(note)
                                 if Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
                                     stopNoteSound(noteData.note)
                                 end
@@ -3212,8 +3213,7 @@ getSongTab = function()
                         local note, tick = realOffsetToNote(editorOffsetToRealOffset(e.offset))
                         local snap = calcSnapFactor()
                         tick = math.floor(tick / snap) * snap + 1
-                        playNoteSound(note)
-                        playingNoteSound = note
+                        playingNoteSound = playNoteSound(note)
                         pianoRoll.activeNote = addNote(note, tick, pianoRoll.lastNoteSize, true)
                         pianoRoll.dragStart = editorOffsetToRealOffset(e.offset)
                         pianoRoll.dragOffset = util.vector2(0, 0)
@@ -3232,7 +3232,7 @@ getSongTab = function()
                         pianoRoll.activeNote = nil
                         pianoRoll.activeNoteElement = nil
                         if playingNoteSound and Song.getInstrumentProfile(Editor.activePart.instrument).sustain then
-                            stopNoteSound(playingNoteSound)
+                            ambient.stopSoundFile(playingNoteSound)
                             playingNoteSound = nil
                         end
                         pianoRoll.editorWrapper:update()

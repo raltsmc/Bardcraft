@@ -132,6 +132,10 @@ return {
         end
     },
     eventHandlers = {
+        BC_ClearGlobalData = function()
+            local bardData = storage.globalSection('Bardcraft')
+            bardData:set('songs/preset', nil)
+        end,
         BC_RecheckTroupe = function(data)
             local player = data and data.player or world.players[1]
             if not player then return end
@@ -179,6 +183,9 @@ return {
                 bardData:set('songs/preset', nil) -- Clear the old data
             end
             parseAllPreset()
+            for _, player in ipairs(world.players) do
+                player:sendEvent('BC_MidisParsed')
+            end
         end,
         BC_Trespass = function(data)
             if not data then return end

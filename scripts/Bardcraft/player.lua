@@ -514,14 +514,11 @@ return {
     engineHandlers = {
         onInit = function()
             Editor:init()
-            populateKnownSongs()
             setPerformerInfo()
         end,
         onLoad = function(data)
-            core.sendGlobalEvent('BC_ParseMidis')
             if not data then return end
             Performer:onLoad(data)
-            populateKnownSongs()
             anim.removeAllVfx(self)
             Editor:init()
 
@@ -697,6 +694,8 @@ return {
                 ui.showMessage('DEBUG: Populated 25 dummy logs')
             elseif string.lower(tokens[1]) == 'luabcreparse' then
                 core.sendGlobalEvent('BC_ParseMidis', { force = true })
+            elseif string.lower(tokens[1]) == 'luabcglobalclear' then
+                core.sendGlobalEvent('BC_ClearGlobalData')
             end
         end,
         onMouseWheel = function(v, h)
@@ -1103,6 +1102,10 @@ return {
             tpFadeOutTimer = nil
             tpFadeInTimer = 0
             ambient.playSoundFile('sound\\Bardcraft\\gohome.wav')
+        end,
+        BC_MidisParsed = function()
+            populateKnownSongs()
+            setPerformerInfo()
         end,
         DM_TrackStarted = function()
             if Performer.playing or nearbyPlaying then

@@ -658,7 +658,7 @@ function Song.noteNumberToName(noteNumber)
     return noteName .. octave
 end
 
-function Song:tickPlayback(dt, noteOnHandler, noteOffHandler, tempoChangeHandler)
+function Song:tickPlayback(dt, noteOnHandler, noteOffHandler, tempoChangeHandler, loopHandler)
     self.playbackTickPrev = self.playbackTickCurr
     local bpm = self.currentBPM or self.tempo
     local ticksPerSecond = (self.resolution * bpm) / 60
@@ -678,6 +678,9 @@ function Song:tickPlayback(dt, noteOnHandler, noteOffHandler, tempoChangeHandler
             self.playbackTickCurr = loopStart
             self.playbackTickPrev = self.playbackTickCurr
             self.currentBPM = self.tempo
+            if loopHandler then
+                loopHandler()
+            end
             return true
         else
             return false

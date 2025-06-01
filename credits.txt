@@ -11,6 +11,8 @@ Delete icon: https://www.flaticon.com/free-icons/trash-can Created by Freepik - 
 
 === SOUNDS ===
 
+Ocarina samples were recorded and kindly provided by urm <3
+
 finalize_draft.wav: writing_pencil.aif by rui_aires -- https://freesound.org/s/365890/ -- License: Creative Commons 0
 
 boo1.wav: CRWDAngr_Booing, Angry_ShaneVincent_GSC24_XY-AKG214-96k.wav by ShangusBurger -- https://freesound.org/s/763807/ -- License: Creative Commons 0

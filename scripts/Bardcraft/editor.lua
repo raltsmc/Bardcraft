@@ -1818,6 +1818,7 @@ uiTemplates = {
                 if not self.props.active then return end
                 if e.button == 3 then
                     removeNote(self)
+                    saveNotes()
                     return
                 end
                 if e.button == 1 then
@@ -2097,7 +2098,6 @@ end
 saveNotes = function()
     if not Editor.song then return end
     Editor.song.notes = Editor.song:noteMapToNoteEvents(Editor.noteMap)
-    saveDraft()
 end
 
 local getSongTab, getPerformanceTab, getStatsTab
@@ -2210,6 +2210,7 @@ end
 
 local function startPlayback(fromStart)
     if not Editor.song then return end
+    saveNotes()
     playback = true
     if fromStart then
         playbackStartScrollX = (pianoRoll.scrollX / Editor.ZOOM_LEVELS[Editor.zoomLevel])
@@ -2238,6 +2239,7 @@ end
 setDraft = function(song)
     if Editor.song then
         saveNotes()
+        saveDraft()
     end
     if song then
         Editor.song = song
@@ -2751,12 +2753,12 @@ getSongTab = function()
                 redrawPianoRollEditor()
             end
         end))
-        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongLoopCount'), tostring(Editor.song.loopCount or 0), sizeY, function(text, self)
+        table.insert(middleBox, uiTemplates.labeledTextEdit(l10n('UI_PRoll_SongLoopCount'), tostring(Editor.song.loopTimes or 0), sizeY, function(text, self)
             local parsed = parseExp(text)
-            if not parsed or parsed < 1 then
-                self.props.text = tostring(Editor.song.loopCount or 0)
-            elseif not numMatches(Editor.song.loopCount or 0, parsed) then
-                Editor.song.loopCount = parsed
+            if not parsed or parsed < 0 then
+                self.props.text = tostring(Editor.song.loopTimes or 0)
+            elseif not numMatches(Editor.song.loopTimes or 0, parsed) then
+                Editor.song.loopTimes = parsed
                 saveDraft()
                 redrawPianoRollEditor()
             end
@@ -3175,6 +3177,8 @@ getSongTab = function()
                         elseif pianoRoll.dragType == DragType.RESIZE_RIGHT then
                             noteData.duration = util.clamp(tick - noteData.time, snap, math.huge)
                         end
+                        Editor.noteMap[pianoRoll.activeNote] = noteData
+                        saveNotes()
                         local layout = pianoRoll.editorWrapper.layout.content[1].content[3].content
                         local notePos
                         for i, note in ipairs(layout) do
@@ -3214,6 +3218,7 @@ getSongTab = function()
                         pianoRoll.dragStart = editorOffsetToRealOffset(e.offset)
                         pianoRoll.dragOffset = util.vector2(0, 0)
                         pianoRoll.dragType = DragType.MOVE
+                        saveNotes()
                     end
                 end),
                 mouseRelease = async:callback(function(e)
@@ -4403,9 +4408,6 @@ local function tickPlayback(dt)
         if not Editor.song:tickPlayback(dt, 
         function(filePath, velocity, instrument, note, part)
             local profile = Song.getInstrumentProfile(instrument)
-            -- if not profile.polyphonic then
-            --     stopSounds(instrument)
-            -- end
             if velocity > 0 and Editor.partsPlaying[part] then
                 ambient.playSoundFile(filePath, { volume = velocity / 127 * profile.volume })
             end
@@ -4414,6 +4416,20 @@ local function tickPlayback(dt)
             local profile = Song.getInstrumentProfile(instrument)
             if profile.sustain then
                 ambient.stopSoundFile(filePath)
+            end
+        end,
+        nil,
+        function()
+            -- Stop all sustained instrument sounds for playing parts on loop
+            if Editor.song and Editor.partsPlaying then
+                for _, part in ipairs(Editor.song.parts) do
+                    if Editor.partsPlaying[part.index] then
+                        local profile = Song.getInstrumentProfile(part.instrument)
+                        if profile and profile.sustain then
+                            stopSounds(part.instrument)
+                        end
+                    end
+                end
             end
         end) then
             playback = false
@@ -4452,8 +4468,9 @@ function Editor:createUI()
 end
 
 function Editor:destroyUI()
-    if self.state == self.STATE.SONG then
+    if self.state == self.STATE.SONG and self.song then
         saveNotes()
+        saveDraft()
     end
     if wrapperElement then
         auxUi.deepDestroy(wrapperElement)

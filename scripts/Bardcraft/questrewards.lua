@@ -1,6 +1,7 @@
 local self = require('openmw.self')
 local ui = require('openmw.ui')
 local core = require('openmw.core')
+local ambient = require('openmw.ambient')
 
 local QuestRewards = require('scripts.Bardcraft.data').QuestRewards
 

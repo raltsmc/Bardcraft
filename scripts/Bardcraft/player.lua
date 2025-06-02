@@ -437,15 +437,14 @@ input.registerActionHandler('TogglePOV', async:callback(function(e)
 end))
 
 local function silenceAmbientMusic()
-    if configPlayer.options.bSilenceAmbientMusic == true then
+    if not I.S3maphore and configPlayer.options.bSilenceAmbientMusic == true then
         ambient.streamMusic("sound\\Bardcraft\\silence.opus", { fadeOut = 0.5 })
     end
 end
 
 local function unsilenceAmbientMusic()
-    if configPlayer.options.bSilenceAmbientMusic == true then
+    if not I.S3maphore and configPlayer.options.bSilenceAmbientMusic == true then
         ambient.stopMusic()
-        self:sendEvent('DM_ForceRestart')
     end
 end
 
@@ -537,6 +536,19 @@ return {
         onActive = function()
             Performer:setSheatheVfx()
             core.sendGlobalEvent('BC_RecheckTroupe', { player = self, })
+
+            if I.S3maphore then
+                I.S3maphore.registerPlaylist({
+                    id = 'BardcraftSilence',
+                    priority = 1,
+                    tracks = {
+                        'sound/Bardcraft/silence.opus',
+                    },
+                    isValidCallback = function()
+                        return Performer.playing and configPlayer.options.bSilenceAmbientMusic == true
+                    end,
+                })
+            end
         end,
         onUpdate = function(dt)
             if Performer.playing then
@@ -1108,11 +1120,6 @@ return {
         BC_MidisParsed = function()
             populateKnownSongs()
             setPerformerInfo()
-        end,
-        DM_TrackStarted = function()
-            if Performer.playing or nearbyPlaying then
-                silenceAmbientMusic()
-            end
         end,
         UiModeChanged = function(data)
             Performer:verifySheathedInstrument()

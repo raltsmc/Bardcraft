@@ -1,0 +1,10 @@
+1.0.1 (6/1/2025)
+- Fixed incorrect animation speed for compound time
+- Fixed overlay desync when GUI scale doesn't equal 1
+- Fixed newly-parsed starting songs not being available until reload
+- Fixed inactive notes sometimes receiving click priority in the editor
+- Fixed incorrect editor note sound handling
+- Removed unused meshes
+
+1.0.0 (5/31/2025)
+- Initial release

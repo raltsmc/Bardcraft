@@ -1,6 +1,6 @@
 local util = require('openmw.util')
 
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 local INSTRUMENT_ITEMS = {
     Lute = {

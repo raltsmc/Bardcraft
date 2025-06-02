@@ -76,6 +76,13 @@ I.Settings.registerGroup {
             default = true,
         },
 		{
+			key = 'bDisablePerformOverlay',
+			renderer = 'checkbox',
+			name = 'ConfigDisablePerformOverlay',
+			description = 'ConfigDisablePerformOverlayDesc',
+			default = false,
+		},
+		{
 			key = 'bPrecacheSamples',
 			renderer = 'checkbox',
 			name = 'ConfigPrecacheSamples',

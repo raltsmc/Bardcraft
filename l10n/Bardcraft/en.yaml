@@ -2,14 +2,14 @@ ConfigTitle: "Bardcraft"
 ConfigSummary: "Adds a MIDI-based musical performance system, with custom songwriting, group performance, and skill progression mechanics.\n--- v%{version} ---"
 ConfigCategoryKeybinds: "Keybinds"
 ConfigKeybindOpenInterface: "Open interface"
-ConfigKeybindOpenInterfaceDesc: |
-  To toggle overlay, press Alt + this key.
+ConfigKeybindOpenInterfaceDesc: To toggle overlay, press Alt + this key.
 ConfigCategoryPlayerOptions: "Player Options"
 ConfigAmbientMusic: "Silence ambient music"
-ConfigAmbientMusicDesc: "Background music will be silenced during a performance."
+ConfigAmbientMusicDesc: Background music will be silenced during a performance.
+ConfigDisablePerformOverlay: "Disable performance overlay"
+ConfigDisablePerformOverlayDesc: If true, the 'scrolling notes' overlay will be disabled by default and must be manually toggled on.
 ConfigPrecacheSamples: "Precache song samples"
-ConfigPrecacheSamplesDesc: |
-  Eliminates stuttering during performances by preloading all samples, at the cost of an initial lag spike when starting a performance.
+ConfigPrecacheSamplesDesc: Eliminates stuttering during performances by preloading all samples, at the cost of an initial lag spike when starting a performance.
 ConfigUiScaleX: "UI scale X"
 ConfigUiScaleY: "UI scale Y"
 ConfigCategoryGlobalOptions: "Global Options"
@@ -22,19 +22,19 @@ ConfigTavernXpMult: "Tavern XP multiplier"
 ConfigStreetXpMult: "Street XP multiplier"
 ConfigPracticeXpMult: "Practice XP multiplier"
 ConfigEnablePracticeEfficiency: "Enable practice efficiency"
-ConfigEnablePracticeEfficiencyDesc: |
+ConfigEnablePracticeEfficiencyDesc: |-
   Multiple practice sessions will reduce further practice XP and confidence gain.
   Efficiency will recover at the start of each day.
 ConfigEnableTimeRestriction: "Time-of-day restriction"
-ConfigEnableTimeRestrictionDesc: |
+ConfigEnableTimeRestrictionDesc: |-
   Restrict tavern performances to the evening
   (6 p.m. - midnight).
 ConfigEnableAnimations: "Enable animations"
-ConfigEnableAnimationsDesc: |
+ConfigEnableAnimationsDesc: |-
   Enable passive animations for performers.
   Disabling will only play note animations (strumming, fretting, etc.)
 ConfigJamMode: "Jam mode"
-ConfigJamModeDesc: |
+ConfigJamModeDesc: |-
   If enabled, notes will always sound correct, regardless of performer skill.
   This will not affect gameplay or progression.
 

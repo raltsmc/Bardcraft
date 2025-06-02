@@ -230,6 +230,8 @@ local function createPerformOverlay()
         alreadyShowing = true
         alpha = performOverlay.layout.props.alpha
         auxUi.deepDestroy(performOverlay)
+    elseif configPlayer.options.bDisablePerformOverlay then
+        performOverlayToggle = false
     end
     performOverlayNoteMap = getPracticeNoteMap()
 

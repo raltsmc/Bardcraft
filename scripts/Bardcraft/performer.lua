@@ -244,6 +244,7 @@ P.levelGain = 0
 
 P.maxConfidenceGrowth = 0
 P.overallNoteEvents = {}
+P.playingNotes = {}
 
 local function getXpMult(type)
     if type == Song.PerformanceType.Tavern then
@@ -398,10 +399,15 @@ function P.playNote(note, velocity)
     local noteName = Song.noteNumberToName(note)
     local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
     core.sound.playSoundFile3d(filePath, omwself, { volume = volume * configGlobal.options.fInstrumentVolume, pitch = pitch, })
+    P.playingNotes[note] = P.playingNotes[note] and P.playingNotes[note] + 1 or 1
     return success
 end
 
 function P.stopNote(note)
+    P.playingNotes[note] = P.playingNotes[note] and P.playingNotes[note] - 1 or 0
+    if P.playingNotes[note] > 0 then
+        return
+    end
     local noteName = Song.noteNumberToName(note)
     local filePath = 'sound\\Bardcraft\\samples\\' .. P.instrument .. '\\' .. P.instrument .. '_' .. noteName .. '.wav'
     core.sound.stopSoundFile3d(filePath, omwself)
@@ -457,6 +463,7 @@ function P.handlePerformEvent(data)
     end
 
     P.playing = true
+    P.playingNotes = {}
     P.currentSong = song
     P.currentPart = data.part
 end

@@ -1,9 +1,12 @@
-1.0.1 (6/1/2025)
+1.0.1 (6/2/2025)
+- Added config option for performance overlay toggling
 - Fixed incorrect animation speed for compound time
 - Fixed overlay desync when GUI scale doesn't equal 1
 - Fixed newly-parsed starting songs not being available until reload
 - Fixed inactive notes sometimes receiving click priority in the editor
 - Fixed incorrect editor note sound handling
+- Fixed overlapping notes being cut off during performances
+- Fixed incorrect overlay loop marker position on some occasions
 - Removed unused meshes
 
 1.0.0 (5/31/2025)

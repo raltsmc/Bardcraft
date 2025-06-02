@@ -234,6 +234,7 @@ local function createPerformOverlay()
         performOverlayToggle = false
     end
     performOverlayNoteMap = getPracticeNoteMap()
+    performOverlayScaleX = 6 * (practiceSong.tempo * practiceSong.tempoMod / 120) / (practiceSong.resolution / 96)
 
     performOverlayNotesWrapper = ui.create {
         type = ui.TYPE.Container,
@@ -291,7 +292,6 @@ local function createPerformOverlay()
         performOverlayFadeInTimer = performOverlayFadeInDuration
     end
 
-    performOverlayScaleX = 6 * (practiceSong.tempo * practiceSong.tempoMod / 120) / (practiceSong.resolution / 96)
     performOverlayTick = 1
     initPerformOverlayNotes()
     populatePerformOverlayNotes()

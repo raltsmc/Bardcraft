@@ -1,3 +1,10 @@
+1.0.3 (6/2/2025)
+- Fixed invisible first-person instruments on female characters
+
+1.0.2 (6/2/2025)
+- Added S3maphore support for background music silencing
+- Removed redundant IK keyframes
+
 1.0.1 (6/2/2025)
 - Added config option for performance overlay toggling
 - Fixed incorrect animation speed for compound time

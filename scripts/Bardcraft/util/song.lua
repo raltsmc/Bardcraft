@@ -118,9 +118,6 @@ local instrumentMappings = {
 
 local function getInstrumentMapping(instrument)
     instrument = instrument or 0
-    if instrumentProfiles[instrument] then
-        return instrument
-    end
     -- Use binary search
     local low, high = 1, #instrumentMappings
     while low <= high do

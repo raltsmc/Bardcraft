@@ -1,3 +1,12 @@
+1.0.5 (6/5/2025)
+- Added basic controller support
+- Added config option to show parts you don't have the required instrument for
+- Optimized MIDI parsing speed significantly
+- Expanded ocarina's low range to G3
+- Expanded S3maphore music silencing integration to editor and music boxes
+- Fixed editor lag spikes when populating notes
+- Fixed bug where performances could sometimes stop instantly
+
 1.0.4 (6/3/2025)
 - Fixed imported songs having no notes if MIDI instrument = 0 (piano)
 

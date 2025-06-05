@@ -8,6 +8,11 @@ local l10n = core.l10n('Bardcraft')
 
 local versionString = require('scripts.Bardcraft.data').Version
 
+local controllerButtons = { 'None', }
+for k, _ in pairs(input.CONTROLLER_BUTTON) do
+	table.insert(controllerButtons, k)
+end
+
 -- inputKeySelection by Pharis
 I.Settings.registerRenderer('Bardcraft/inputKeySelection', function(value, set)
 	local name = 'No Key Set'
@@ -59,6 +64,16 @@ I.Settings.registerGroup {
 			description = 'ConfigKeybindOpenInterfaceDesc',
             default = input.KEY.B
         },
+		{
+			key = 'kOpenInterfaceGamepad',
+			renderer = 'select',
+			argument = {
+				l10n = 'Bardcraft',
+				items = controllerButtons,
+			},
+			name = 'ConfigKeybindOpenInterfaceGamepad',
+			default = 'None',
+		}
     },
 }
 I.Settings.registerGroup {
@@ -87,6 +102,13 @@ I.Settings.registerGroup {
 			renderer = 'checkbox',
 			name = 'ConfigPrecacheSamples',
 			description = 'ConfigPrecacheSamplesDesc',
+			default = true,
+		},
+		{
+			key = 'bHideUnplayableParts',
+			renderer = 'checkbox',
+			name = 'ConfigHideUnplayableParts',
+			description = 'ConfigHideUnplayablePartsDesc',
 			default = true,
 		},
 		{

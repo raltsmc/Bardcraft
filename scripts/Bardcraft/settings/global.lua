@@ -9,6 +9,13 @@ I.Settings.registerGroup {
     permanentStorage = true,
     settings = {
         {
+            key = 'bJamMode',
+            renderer = 'checkbox',
+            name = 'ConfigJamMode',
+            description = 'ConfigJamModeDesc',
+            default = false,
+        },
+        {
             key = 'bEnablePracticeEfficiency',
             renderer = 'checkbox',
             name = 'ConfigEnablePracticeEfficiency',
@@ -28,13 +35,6 @@ I.Settings.registerGroup {
             name = 'ConfigEnableAnimations',
             description = 'ConfigEnableAnimationsDesc',
             default = true,
-        },
-        {
-            key = 'bJamMode',
-            renderer = 'checkbox',
-            name = 'ConfigJamMode',
-            description = 'ConfigJamModeDesc',
-            default = false,
         },
 		{
 			key = 'fInstrumentVolume',

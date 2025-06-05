@@ -81,6 +81,8 @@ Editor.zoomLevel = 4
 Editor.activePart = nil
 Editor.partsPlaying = {}
 
+Editor.controllerMode = false
+
 Editor.hideSongInfo = false
 
 Editor.deletePartIndex = nil
@@ -327,7 +329,7 @@ local pianoRoll = {
     dragLastNoteSize = 0,
 }
 
-local playback = false
+Editor.playback = false
 local playbackStartScrollX = 0
 
 local function getNoteSoundPath(note)
@@ -1743,7 +1745,7 @@ uiTemplates = {
             })
         end
         -- Add playback marker
-        addMarker(0, Editor.playbackLineColor, playback and 1 or 0)
+        addMarker(0, Editor.playbackLineColor, Editor.playback and 1 or 0)
 
         -- Add cyan lines for loop start and end bar
         local loopBars = Editor.song.loopBars
@@ -1810,7 +1812,7 @@ uiTemplates = {
         if active then
             noteLayout.events.mousePress = async:callback(function(e, self)
                 if not self.props.active then return end
-                if e.button == 3 then
+                if e.button == 3 or (Editor.controllerMode and e.button == 1 and input.isControllerButtonPressed(input.CONTROLLER_BUTTON.LeftShoulder)) then
                     removeNote(self)
                     saveNotes()
                     return
@@ -2035,16 +2037,15 @@ local function populateNotes()
             template.props.active = active
             table.insert(unsorted, template)
         end
-        -- Sort so that all the active notes are at the end
-        table.sort(unsorted, function(a, b)
-            if a.props.active == b.props.active then
-                return false
-            end
-            return not a.props.active and b.props.active
-        end)
-        pianoRoll.editorWrapper.layout.content[1].content[3].content = ui.content(unsorted)
-        --pianoRoll.editorWrapper.layout.content[1].content[3].content:add(uiTemplates.pianoRollNote(id, note, tick, duration))
     end
+    -- Sort so that all the active notes are at the end
+    table.sort(unsorted, function(a, b)
+        if a.props.active == b.props.active then
+            return false
+        end
+        return not a.props.active and b.props.active
+    end)
+    pianoRoll.editorWrapper.layout.content[1].content[3].content = ui.content(unsorted)
     pianoRoll.editorWrapper:update()
 end
 
@@ -2213,7 +2214,7 @@ end
 local function startPlayback(fromStart)
     if not Editor.song then return end
     saveNotes()
-    playback = true
+    Editor.playback = true
     if fromStart then
         playbackStartScrollX = (pianoRoll.scrollX / Editor.ZOOM_LEVELS[Editor.zoomLevel])
     end
@@ -2225,7 +2226,7 @@ local function startPlayback(fromStart)
 end
 
 local function stopPlayback()
-    playback = false
+    Editor.playback = false
     if playbackStartScrollX then
         pianoRoll.scrollX = util.clamp(playbackStartScrollX * Editor.ZOOM_LEVELS[Editor.zoomLevel], -pianoRoll.scrollXMax, 0)
         updatePianoRoll()
@@ -2656,7 +2657,7 @@ getSongTab = function()
                                         {
                                             template = I.MWUI.templates.textParagraph,
                                             props = {
-                                                text = l10n('UI_EditorControls_Text'),
+                                                text = Editor.controllerMode and l10n('UI_EditorControls_Gamepad_Text') or l10n('UI_EditorControls_Text'),
                                                 textAlignH = ui.ALIGNMENT.Start,
                                             },
                                             external = {
@@ -3204,7 +3205,7 @@ getSongTab = function()
                         -- Set playback pos and start playback
                         local offset = editorOffsetToRealOffset(e.offset)
                         stopAllSounds()
-                        playback = true
+                        Editor.playback = true
                         Editor.song:resetPlayback()
                         Editor.song.playbackTickCurr = Editor.song:beatToTick(editorOffsetToRealOffset(e.offset).x / calcBeatWidth(Editor.song.timeSig[2]))
                         Editor.song.playbackTickPrev = Editor.song.playbackTickCurr
@@ -3388,13 +3389,15 @@ getPerformanceTab = function()
             local show = true
             local confidence = 0
             if Editor.performanceSelectedPerformer then
-                show = false
-                local inventory = types.Actor.inventory(Editor.performanceSelectedPerformer)
-                local partInstrument = Song.getInstrumentProfile(part.instrument).name
-                for item, _ in pairs(Data.InstrumentItems[partInstrument] or {}) do
-                    if inventory:find(item) then
-                        show = true
-                        break
+                if configPlayer.options.bHideUnplayableParts then
+                    show = false
+                    local inventory = types.Actor.inventory(Editor.performanceSelectedPerformer)
+                    local partInstrument = Song.getInstrumentProfile(part.instrument).name
+                    for item, _ in pairs(Data.InstrumentItems[partInstrument] or {}) do
+                        if inventory:find(item) then
+                            show = true
+                            break
+                        end
                     end
                 end
                 selected = part.index == Editor.performancePartAssignments[Editor.performanceSelectedPerformer.id]
@@ -4391,7 +4394,7 @@ local function updatePlaybackMarker()
             local playbackX = (Editor.song:tickToBeat(Editor.song.playbackTickCurr)) * calcBeatWidth(Editor.song.timeSig[2])
             playbackMarker.props.position = util.vector2(playbackX, 0)
             playbackMarker.props.alpha = playbackX > 0 and 0.8 or 0
-            if playback and ((playbackX + pianoRoll.scrollX) > calcPianoRollEditorWrapperSize().x or (playbackX + pianoRoll.scrollX) < 0) then
+            if Editor.playback and ((playbackX + pianoRoll.scrollX) > calcPianoRollEditorWrapperSize().x or (playbackX + pianoRoll.scrollX) < 0) then
                 pianoRoll.scrollX = util.clamp(-playbackX, -pianoRoll.scrollXMax, 0)
                 pianoRoll.scrollLastPopulateX = pianoRoll.scrollX
                 updatePianoRoll()
@@ -4404,7 +4407,7 @@ end
 
 local function tickPlayback(dt)
     if not Editor.song then return end
-    if playback then
+    if Editor.playback then
         if not Editor.song:tickPlayback(dt, 
         function(filePath, velocity, instrument, note, part)
             local profile = Song.getInstrumentProfile(instrument)
@@ -4432,7 +4435,7 @@ local function tickPlayback(dt)
                 end
             end
         end) then
-            playback = false
+            Editor.playback = false
             Editor.song:resetPlayback()
             stopAllSounds()
         end
@@ -4502,7 +4505,8 @@ function Editor:onToggle()
 end
 
 function Editor:togglePlayback(fromStart)
-    if playback then
+    if self.state ~= self.STATE.SONG then return end
+    if self.playback then
         stopPlayback()
         updatePlaybackMarker()
     else
@@ -4530,8 +4534,27 @@ function Editor:onFrame()
         self.deletePartClickCount = 0
         self.deletePartIndex = nil
     end
-    if self.active and playback and self.state == self.STATE.SONG then
-        tickPlayback(core.getRealFrameDuration())
+    if self.active and self.state == self.STATE.SONG and self.controllerMode then
+        if self.playback then
+            tickPlayback(core.getRealFrameDuration())
+        end
+        local controllerX = input.getAxisValue(input.CONTROLLER_AXIS.RightX)
+        local controllerY = input.getAxisValue(input.CONTROLLER_AXIS.RightY)
+        if math.abs(controllerX) > 0.25 or math.abs(controllerY) > 0.25 then
+            if pianoRoll.focused then
+                -- Respect 0.25 deadzone for both axes
+                local changeAmtY = math.abs(controllerY) > 0.25 and controllerY * 48 or 0
+                local changeAmtX = math.abs(controllerX) > 0.25 and controllerX * 48 or 0
+
+                pianoRoll.scrollX = util.clamp(pianoRoll.scrollX + changeAmtX, -pianoRoll.scrollXMax, 0)
+                if math.abs(pianoRoll.scrollX - pianoRoll.scrollLastPopulateX) > pianoRoll.scrollPopulateWindowSize then
+                    pianoRoll.scrollLastPopulateX = pianoRoll.scrollX
+                    populateNotes()
+                end
+                pianoRoll.scrollY = util.clamp(pianoRoll.scrollY + changeAmtY, -pianoRoll.scrollYMax, 0)
+                updatePianoRoll()
+            end
+        end
     end
 end
 

@@ -3,6 +3,7 @@ ConfigSummary: "Adds a MIDI-based musical performance system, with custom songwr
 ConfigCategoryKeybinds: "Keybinds"
 ConfigKeybindOpenInterface: "Open interface"
 ConfigKeybindOpenInterfaceDesc: To toggle overlay, press Alt + this key.
+ConfigKeybindOpenInterfaceGamepad: "Open interface (controller)"
 ConfigCategoryPlayerOptions: "Player Options"
 ConfigAmbientMusic: "Silence ambient music"
 ConfigAmbientMusicDesc: Background music will be silenced during a performance.
@@ -10,6 +11,8 @@ ConfigDisablePerformOverlay: "Disable performance overlay"
 ConfigDisablePerformOverlayDesc: If true, the 'scrolling notes' overlay will be disabled by default and must be manually toggled on.
 ConfigPrecacheSamples: "Precache song samples"
 ConfigPrecacheSamplesDesc: Eliminates stuttering during performances by preloading all samples, at the cost of an initial lag spike when starting a performance.
+ConfigHideUnplayableParts: "Hide unplayable parts"
+ConfigHideUnplayablePartsDesc: Hides parts that the selected performer does not have the required instrument for.
 ConfigUiScaleX: "UI scale X"
 ConfigUiScaleY: "UI scale Y"
 ConfigCategoryGlobalOptions: "Global Options"
@@ -85,6 +88,12 @@ UI_EditorControls_Text: |
   - Ctrl + Mouse Wheel:      Zoom in/out
   - Space:      Playback
   - Ctrl + Space:      Playback from start
+UI_EditorControls_Gamepad_Text: |
+  - A:      Place/move/resize note
+  - A + Left Shoulder:      Remove note
+  - Right Stick:      Move view
+  - Y:      Playback
+  - Y + Left Shoulder:      Playback from start
 
 UI_PracticeEfficiency: "Current practice efficiency: %{efficiency}%"
 

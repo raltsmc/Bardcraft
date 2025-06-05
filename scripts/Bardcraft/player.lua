@@ -545,7 +545,7 @@ return {
                         'sound/Bardcraft/silence.opus',
                     },
                     isValidCallback = function()
-                        return Performer.playing and configPlayer.options.bSilenceAmbientMusic == true
+                        return (Performer.playing or (Editor.active and Editor.state == Editor.STATE.SONG) or nearbyPlaying) and configPlayer.options.bSilenceAmbientMusic == true
                     end,
                 })
             end
@@ -604,7 +604,11 @@ return {
                 nearbyPlaying = false
             end
         end,
+        onMouseButtonPress = function()
+            Editor.controllerMode = false
+        end,
         onKeyPress = function(e)
+            Editor.controllerMode = false
             if e.code == configPlayer.keybinds.kOpenInterface then
                 if input.isAltPressed() then
                     togglePerformOverlay()
@@ -618,6 +622,25 @@ return {
                 end
             elseif Editor.active and e.code == input.KEY.Space then
                 Editor:togglePlayback(input.isCtrlPressed())
+            end
+        end,
+        onControllerButtonPress = function(id)
+            Editor.controllerMode = true
+            local binding = configPlayer.keybinds.kOpenInterfaceGamepad
+            local button = input.CONTROLLER_BUTTON[binding]
+            if button and id == button then
+                if input.isAltPressed() then
+                    togglePerformOverlay()
+                elseif not Performer.playing then
+                    setPerformerInfo()
+                    Editor:onToggle()
+                else
+                    confirmModal(function()
+                        core.sendGlobalEvent('BO_StopPerformance')
+                    end)
+                end
+            elseif Editor.active and id == input.CONTROLLER_BUTTON.Y then
+                Editor:togglePlayback(input.isControllerButtonPressed(input.CONTROLLER_BUTTON.LeftShoulder))
             end
         end,
         onConsoleCommand = function(mode, command)

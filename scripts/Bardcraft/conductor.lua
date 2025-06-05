@@ -832,8 +832,6 @@ return {
                 start(data)
 
                 player:sendEvent('BC_StartPerformanceSuccess', { item = playerItem and playerItem.recordId or nil, song = song, playedParts = playedParts })
-            else
-                stop()
             end
         end,
         BO_StopPerformance = function(data)

@@ -64,32 +64,38 @@ function MidiParser.new(filename)
     return self
 end
 
--- Read variable-length quantity
-function MidiParser:readVLQ(file)
+-- Read variable-length quantity from a string buffer
+function MidiParser:readVLQ(content, cursor, contentLength)
     local value = 0
-    local byte = file:read(1):byte()
+    if cursor > contentLength then return nil, cursor, "EOF before reading VLQ byte" end
+    local byte = content:byte(cursor)
+    cursor = cursor + 1
     value = bit.band(byte, 0x7F)
 
     while bit.band(byte, 0x80) ~= 0 do
-        byte = file:read(1):byte()
+        if cursor > contentLength then return nil, cursor, "EOF in VLQ continuation byte" end
+        byte = content:byte(cursor)
+        cursor = cursor + 1
         value = bit.lshift(value, 7)
         value = bit.bor(value, bit.band(byte, 0x7F))
     end
 
-    return value
+    return value, cursor
 end
 
--- Read a specific number of bytes from file and return as number
-function MidiParser:readBytes(file, count)
-    local bytes = file:read(count)
-    local value = 0
-
-    for i = 1, #bytes do
-        value = bit.lshift(value, 8)
-        value = value + bytes:byte(i)
+-- Read a specific number of bytes from string buffer and return as number
+function MidiParser:readBytes(content, cursor, count, contentLength)
+    if cursor + count - 1 > contentLength then
+        return nil, cursor, "EOF trying to read " .. count .. " bytes"
     end
 
-    return value
+    local value = 0
+    for i = 1, count do
+        value = bit.lshift(value, 8)
+        value = value + content:byte(cursor)
+        cursor = cursor + 1
+    end
+    return value, cursor
 end
 
 -- Parse a MIDI file
@@ -103,189 +109,189 @@ function MidiParser:parse()
         return false, "Could not open file: " .. self.filename
     end
 
+    local content = file:read("*a") -- Read entire file content
+    file:close()
+
+    local contentLength = #content
+    local cursor = 1
+    local errMsg
+
     -- Read header chunk
-    local headerChunk = file:read(4)
+    if cursor + 3 > contentLength then return false, "Unexpected EOF reading header chunk ID" end
+    local headerChunk = content:sub(cursor, cursor + 3)
+    cursor = cursor + 4
     if headerChunk ~= "MThd" then
-        file:close()
         return false, "Not a valid MIDI file (header not found)"
     end
 
     -- Read header length
-    local headerLength = self:readBytes(file, 4)
+    local headerLength
+    headerLength, cursor, errMsg = self:readBytes(content, cursor, 4, contentLength)
+    if errMsg then return false, "Error reading header length: " .. errMsg end
     if headerLength ~= 6 then
-        file:close()
         return false, "Invalid header length"
     end
 
     -- Read format type
-    self.format = self:readBytes(file, 2)
+    self.format, cursor, errMsg = self:readBytes(content, cursor, 2, contentLength)
+    if errMsg then return false, "Error reading format type: " .. errMsg end
 
     -- Read number of tracks
-    self.numTracks = self:readBytes(file, 2)
+    self.numTracks, cursor, errMsg = self:readBytes(content, cursor, 2, contentLength)
+    if errMsg then return false, "Error reading number of tracks: " .. errMsg end
 
     -- Read time division
-    self.division = self:readBytes(file, 2)
+    self.division, cursor, errMsg = self:readBytes(content, cursor, 2, contentLength)
+    if errMsg then return false, "Error reading time division: " .. errMsg end
 
     -- Process each track
     for trackNum = 1, self.numTracks do
-        local track = {}
-        track.events = {}
+        local track = { events = {} }
 
         -- Check for track header
-        local trackHeader = file:read(4)
+        if cursor + 3 > contentLength then return false, "Unexpected EOF reading track header ID for track " .. trackNum end
+        local trackHeader = content:sub(cursor, cursor + 3)
+        cursor = cursor + 4
         if trackHeader ~= "MTrk" then
-            file:close()
             return false, "Invalid track header in track " .. trackNum
         end
 
         -- Read track length
-        local trackLength = self:readBytes(file, 4)
-        local trackEnd = file:seek("cur") + trackLength
+        local trackLength
+        trackLength, cursor, errMsg = self:readBytes(content, cursor, 4, contentLength)
+        if errMsg then return false, "Error reading track length for track " .. trackNum .. ": " .. errMsg end
+        
+        local trackDataStartCursor = cursor
+        local trackEndLimit = trackDataStartCursor + trackLength
 
-        -- Process events in track
         local absoluteTime = 0
         local runningStatus = 0
 
-        while file:seek("cur") < trackEnd do
+        while cursor < trackEndLimit and cursor <= contentLength do
             local event = {}
 
-            -- Read delta time
-            local deltaTime = self:readVLQ(file)
+            local deltaTime
+            deltaTime, cursor, errMsg = self:readVLQ(content, cursor, contentLength)
+            if errMsg then return false, "Error reading delta time in track " .. trackNum .. " at cursor " .. (cursor -1) .. ": " .. errMsg end
             absoluteTime = absoluteTime + deltaTime
             event.time = absoluteTime
 
-            -- Read event type
-            local statusByte = file:read(1):byte()
-
-            -- Check for running status
-            if statusByte < 0x80 then
-                -- This is actually data, not a status byte
-                file:seek("cur", -1)
+            if cursor > contentLength then return false, "Unexpected EOF reading status byte in track " .. trackNum end
+            local statusByte = content:byte(cursor)
+            
+            if statusByte < 0x80 then -- Running status
+                if runningStatus == 0 then return false, "Invalid running status (0) with data byte in track " .. trackNum end
+                -- Data byte, not status byte. Do not advance cursor for status byte.
                 statusByte = runningStatus
-            else
+            else -- New status byte
+                cursor = cursor + 1 -- Advance cursor as we consumed the status byte
                 runningStatus = statusByte
             end
 
-            -- Get event type and channel
             local eventType = bit.rshift(statusByte, 4)
             local channel = bit.band(statusByte, 0x0F)
-
             event.channel = channel
 
-            -- Process different event types
-            if eventType == 0x8 then
-                -- Note Off
+            if eventType == 0x8 then -- Note Off
                 event.type = "noteOff"
-                event.note = file:read(1):byte()
-                event.velocity = file:read(1):byte()
+                if cursor + 1 > contentLength then return false, "Unexpected EOF for Note Off data in track " .. trackNum end
+                event.note = content:byte(cursor)
+                event.velocity = content:byte(cursor + 1)
+                cursor = cursor + 2
                 table.insert(track.events, event)
-            elseif eventType == 0x9 then
-                -- Note On
+            elseif eventType == 0x9 then -- Note On
                 event.type = "noteOn"
-                event.note = file:read(1):byte()
-                event.velocity = file:read(1):byte()
-
-                -- Note On with velocity 0 is actually a Note Off
-                if event.velocity == 0 then
-                    event.type = "noteOff"
-                end
-
+                if cursor + 1 > contentLength then return false, "Unexpected EOF for Note On data in track " .. trackNum end
+                event.note = content:byte(cursor)
+                event.velocity = content:byte(cursor + 1)
+                cursor = cursor + 2
+                if event.velocity == 0 then event.type = "noteOff" end
                 table.insert(track.events, event)
-            elseif eventType == 0xC then
-                -- Program Change (instrument)
+            elseif eventType == 0xC then -- Program Change
                 event.type = "programChange"
-                event.program = file:read(1):byte()
+                if cursor > contentLength then return false, "Unexpected EOF for Program Change data in track " .. trackNum end
+                event.program = content:byte(cursor)
+                cursor = cursor + 1
                 table.insert(track.events, event)
                 if not self.instruments[channel] then
                     self.instruments[channel] = event.program
                 end
-            elseif eventType == 0xF then
-                -- Meta Event or System Exclusive
-                if statusByte == 0xFF then
-                    -- Meta Event
-                    local metaType = file:read(1):byte()
-                    local metaLength = self:readVLQ(file)
+            elseif eventType == 0xF then -- Meta Event or System Exclusive
+                if statusByte == 0xFF then -- Meta Event
+                    if cursor > contentLength then return false, "Unexpected EOF for Meta Event type in track " .. trackNum end
+                    local metaType = content:byte(cursor)
+                    cursor = cursor + 1
+                    
+                    local metaLength
+                    metaLength, cursor, errMsg = self:readVLQ(content, cursor, contentLength)
+                    if errMsg then return false, "Error reading Meta Event length in track " .. trackNum .. ": " .. errMsg end
 
-                    if metaType == 0x2F then
-                        -- End of Track
-                        file:seek("cur", metaLength)
-                        break
-                    elseif metaType == 0x51 then
-                        -- Tempo Change Event
+                    local metaDataStartCursor = cursor
+                    if metaType == 0x2F then -- End of Track
+                        cursor = metaDataStartCursor + metaLength -- Skip data
+                        if cursor > contentLength + 1 then cursor = contentLength + 1 end
+                        break -- End processing for this track
+                    elseif metaType == 0x51 then -- Tempo Change
                         if metaLength == 3 then
-                            -- Tempo is stored as 3 bytes representing microseconds per quarter note
-                            local tempoByte1 = file:read(1):byte()
-                            local tempoByte2 = file:read(1):byte()
-                            local tempoByte3 = file:read(1):byte()
-
+                            if metaDataStartCursor + 2 > contentLength then return false, "Unexpected EOF for Tempo data in track " .. trackNum end
+                            local tempoByte1 = content:byte(metaDataStartCursor)
+                            local tempoByte2 = content:byte(metaDataStartCursor + 1)
+                            local tempoByte3 = content:byte(metaDataStartCursor + 2)
                             local microsecondsPerQuarter = (tempoByte1 * 65536) + (tempoByte2 * 256) + tempoByte3
                             local bpm = 60000000 / microsecondsPerQuarter
-                            -- Round to 3 decimal places
                             bpm = math.floor(bpm * 1000 + 0.5) / 1000
-
-                            local tempoEvent = {
-                                type = "setTempo",
-                                time = absoluteTime,
-                                track = trackNum,
-                                microsecondsPerQuarter = microsecondsPerQuarter,
-                                bpm = bpm
-                            }
-
-                            table.insert(self.tempoEvents, tempoEvent)
-                        else
-                            -- Skip malformed tempo event
-                            file:seek("cur", metaLength)
+                            table.insert(self.tempoEvents, {type = "setTempo", time = absoluteTime, track = trackNum, microsecondsPerQuarter = microsecondsPerQuarter, bpm = bpm})
                         end
-                    elseif metaType == 0x58 then
-                        -- Time Signature Event
+                        cursor = metaDataStartCursor + metaLength
+                    elseif metaType == 0x58 then -- Time Signature
                         if metaLength == 4 then
-                            local numerator = file:read(1):byte()
-                            local denominator = file:read(1):byte()
-                            local clocksPerClick = file:read(1):byte()
-                            local thirtySecondNotesPerQuarter = file:read(1):byte()
-
-                            if metaLength > 4 then
-                                file:seek("cur", metaLength - 4)
-                            end
-
-                            local denominator = 2 ^ denominator
-                            local timeSignatureEvent = {
-                                type = "timeSignature",
-                                time = absoluteTime,
-                                track = trackNum,
-                                numerator = numerator,
-                                denominator = denominator,
-                                clocksPerClick = clocksPerClick,
-                                thirtySecondNotesPerQuarter = thirtySecondNotesPerQuarter
-                            }
-
-                            table.insert(self.timeSignatureEvents, timeSignatureEvent)
-                        else
-                            -- Skip malformed time signature event
-                            file:seek("cur", metaLength)
+                            if metaDataStartCursor + 3 > contentLength then return false, "Unexpected EOF for Time Signature data in track " .. trackNum end
+                            local numerator = content:byte(metaDataStartCursor)
+                            local denominatorPower = content:byte(metaDataStartCursor + 1)
+                            local clocksPerClick = content:byte(metaDataStartCursor + 2)
+                            local thirtySecondNotesPerQuarter = content:byte(metaDataStartCursor + 3)
+                            table.insert(self.timeSignatureEvents, {type = "timeSignature", time = absoluteTime, track = trackNum, numerator = numerator, denominator = 2 ^ denominatorPower, clocksPerClick = clocksPerClick, thirtySecondNotesPerQuarter = thirtySecondNotesPerQuarter})
                         end
-                    else
-                        -- Skip other meta events
-                        file:seek("cur", metaLength)
+                        cursor = metaDataStartCursor + metaLength
+                    else -- Other meta events
+                        cursor = metaDataStartCursor + metaLength
                     end
-                elseif statusByte == 0xF0 or statusByte == 0xF7 then
-                    -- SysEx Event - skip
-                    local length = self:readVLQ(file)
-                    file:seek("cur", length)
+                    if cursor > contentLength + 1 then cursor = contentLength + 1 end
+                elseif statusByte == 0xF0 or statusByte == 0xF7 then -- SysEx Event
+                    local length
+                    length, cursor, errMsg = self:readVLQ(content, cursor, contentLength) -- cursor is after status byte (0xF0/0xF7)
+                    if errMsg then return false, "Error reading SysEx length in track " .. trackNum .. ": " .. errMsg end
+                    cursor = cursor + length
+                    if cursor > contentLength + 1 then cursor = contentLength + 1 end
+                else
+                    -- Don't handle 0xFx System Common/Real-Time messages (e.g., 0xF1, 0xF2, 0xF3, 0xF6, 0xF8-0xFE)
                 end
-            else
-                -- Skip other events with 2 data bytes
-                file:seek("cur", 2)
+            else -- Other event types (0xA, 0xB, 0xD, 0xE)
+                if cursor + 1 > contentLength then return false, "Unexpected EOF for 2-byte skip event (type " .. string.format("%X", eventType) .. ") in track " .. trackNum end
+                cursor = cursor + 2
             end
+            -- Ensure cursor does not run away if track data is malformed
+            if cursor > trackEndLimit then cursor = trackEndLimit end
+            if cursor > contentLength + 1 then cursor = contentLength + 1 end
+        end -- while events in track
+
+        -- After processing events, or if EoT was hit, cursor might not be at trackEndLimit.
+        -- The original parser would continue from wherever the file pointer was left.
+        -- To ensure we start the next track chunk correctly, or finish parsing if this was the last track,
+        -- we should advance the cursor to the end of the current track's declared length,
+        -- but only if we haven't already passed it or the end of the file.
+        if cursor < trackEndLimit and trackEndLimit <= contentLength +1 then
+            cursor = trackEndLimit
         end
+        -- Final safety clamp for cursor
+        if cursor > contentLength + 1 then cursor = contentLength + 1 end
 
         table.insert(self.tracks, track)
-    end
+    end -- for each track
 
     table.sort(self.tempoEvents, function(a, b) return a.time < b.time end)
     table.sort(self.timeSignatureEvents, function(a, b) return a.time < b.time end)
 
-    file:close()
     return true
 end
 
